@@ -31,7 +31,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - Not using static analysis / sandboxed SDK
 - Modifying workflow history in interceptors or shared libraries
 
-## Timeouts
+## Timeouts and Retries
 - Assuming workflow timeouts allow graceful cleanup (treated like termination, not cancellation)
 - Preventing activity retries
 	- Not setting activity heartbeat timeout
@@ -39,7 +39,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 	- Setting start to close and schedule to close timeout to same value
 - Using workflow retries
 - Setting too-short workflow or activity timeouts (keep long enough to survive downstream failures)
-- Not setting a workflow timeout (they run forever!)
+- Not setting a workflow timeout (they'll run for 10 years!)
 
 ## Cancellation
 - Expecting activities to observe workflow cancellation automatically
@@ -75,6 +75,8 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
     - [Use an activity, or (rarely) a child workflow + ContinueAsNew](https://community.temporal.io/t/long-polling-inside-workflows-or-activities/11348/2)
 - Querying closed workflows
 - Storing sensitive data in workflow history
+- Fallible local activities
+    - https://youtu.be/b2AnXkqCwgw?feature=shared&t=429
 
 ## Testing
 
@@ -88,11 +90,13 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - Underutilizing namespaces
 - Not draining activity tasks before graceful worker shutdown
 - Downloading workflow history from UI with "DecodePayloads" option enabled
+- Not validating replay safety before worker deployments
 
 ## Other
 - Starting workflows on the wrong task queue
 - Not understanding why you're using Temporal
 - Not investing in a Temporal platform team (?)
+- Using the Temporal UI use cases other than debugging (eg. as the main interface for end users)
 
 ---
 
