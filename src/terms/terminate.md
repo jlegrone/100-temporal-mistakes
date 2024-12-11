@@ -1,0 +1,2 @@
+# Terminate
+In Temporal, workflow termination is equivalent of a `kill -9` command in bash. It stops an ongoing workflow execution immediately without giving it a chance to perform any cleanup operation.

@@ -1,16 +1,17 @@
-# 100-temporal-mistakes
+# 100 Temporal Mistakes
 
 A collection of common mistakes made when using [Temporal](https://temporal.io) and how to avoid them. This is a work in progress!
 
 ## Workflow Limits
-- Overflowing workflow history length
+- [Overflowing workflow history length](src/overflowing-workflow-history-size.md)
 - Overflowing workflow history bytes
-- Overflowing maximum individual payload size
-- Shard contention due to concurrent updates
+- [Overflowing maximum individual payload size](src/overflowing-maximum-individual-payload-size.md)
+- [Shard contention due to concurrent updates](src/workflow-lock-contention-due-to-concurrent-updates.md)
 	- Concurrent activities
 	- Concurrent heartbeats
-	- Concurrent child workflows
+    - Concurrent child workflows
 	- Frequent signals, updates, queries
+	- [Naive batch processing implementations](src/naive-batch-processing-implementation.md)
 - Exceeding 10s task timeout
 
 ## Workflow Replay
