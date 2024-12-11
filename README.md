@@ -92,6 +92,10 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - Not draining activity tasks before graceful worker shutdown
 - Downloading workflow history from UI with "DecodePayloads" option enabled
 - Not validating replay safety before worker deployments
+- Not setting up TLS
+- Not enabling ringpop TLS
+- Not setting up persistence rate limits
+- Not setting up namespaces rate limits
 
 ## Other
 - Starting workflows on the wrong task queue
