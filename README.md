@@ -43,10 +43,10 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - Not setting a workflow timeout (they'll run for 10 years!)
 
 ## Cancellation
-- Expecting activities to observe workflow cancellation automatically
 - Assuming activity cancellation means workflow cancellation
 - Not using ParentClosePolicy when graceful cleanup on cancellation is needed in child workflows
 - Deadlocking when workflow cancelled (handle cancel signal)
+- Not sending heartbeats from activities you want to handle cancellation.
 
 ## Software Design
 - Not making activities idempotent (at least once execution semantic, even with max attempts == 1)
