@@ -4,7 +4,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 
 ## Workflow Limits
 - [Overflowing workflow history length](src/overflowing-workflow-history-size.md)
-- Overflowing workflow history bytes
+- [Overflowing workflow history bytes](src/overflowing-workflow-history-bytes.md)
 - [Overflowing maximum individual payload size](src/overflowing-maximum-individual-payload-size.md)
 - [Shard contention due to concurrent updates](src/workflow-lock-contention-due-to-concurrent-updates.md)
 	- Concurrent activities
