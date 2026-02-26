@@ -25,7 +25,7 @@ When your workflow logic depends on a specific ordering (e.g., "initialize" must
 
 Design your workflow to handle messages in any order:
 
-1. **Sequence numbers.** Include a monotonically increasing sequence number in each signal payload. Buffer out-of-order messages and process them in sequence order.
+1. **Sequence numbers.** Include a monotonically increasing sequence number in each signal [payload](terms/payload.md). Buffer out-of-order messages and process them in sequence order.
 
     ```go
     // In the signal handler, buffer and process in order

@@ -1,7 +1,7 @@
 # Returning Both a Payload and an Error
 
 > [!TIP]
-> * In Go, the Temporal SDK discards the payload when an error is returned alongside it from an activity or workflow.
+> * In Go, the Temporal SDK discards the [payload](terms/payload.md) when an error is returned alongside it from an activity or workflow.
 > * This leads to silent data loss -- the caller receives a nil result even though the activity produced meaningful output.
 > * Return either a successful result or an error, never both.
 
@@ -24,7 +24,7 @@ In the Temporal Go SDK, when an activity or workflow function returns both a non
 
 ## Why?
 
-The Temporal SDK serializes activity and workflow results into the event history. When an error is returned, the SDK records a failure event, not a completion event. There is no mechanism to store both a result payload and an error in the same event. The error wins, and the payload is silently dropped.
+The Temporal SDK serializes activity and workflow results into the [event history](terms/event-history.md). When an error is returned, the SDK records a failure event, not a completion event. There is no mechanism to store both a result payload and an error in the same event. The error wins, and the payload is silently dropped.
 
 This is particularly dangerous because:
 

@@ -1,8 +1,8 @@
 # Modifying Workflow History or Behavior in Interceptors
 
 > [!TIP]
-> * Interceptors run during workflow execution *and* during [replay](terms/replay.md) -- changes to interceptor behavior affect running workflows the same way changes to workflow code do.
-> * Updating a shared library or interceptor that modifies how commands are issued (adding/removing activities, changing headers, wrapping calls) can cause non-determinism errors for in-flight workflows.
+> * [Interceptors](terms/interceptor.md) run during workflow execution *and* during [replay](terms/replay.md) -- changes to interceptor behavior affect running workflows the same way changes to workflow code do.
+> * Updating a shared library or interceptor that modifies how commands are issued (adding/removing activities, changing headers, wrapping calls) can cause [non-determinism](terms/non-determinism.md) errors for in-flight workflows.
 > * Treat interceptor code with the same [versioning](terms/versioning.md) discipline as workflow code.
 
 ## What?
@@ -10,11 +10,11 @@
 Temporal SDKs support interceptors (sometimes called middleware) that wrap workflow and activity execution. Interceptors are commonly used for:
 
 - Adding tracing or logging context.
-- Injecting headers into activity and child workflow calls.
+- Injecting headers into activity and [child workflow](terms/child-workflow.md) calls.
 - Enforcing policies (timeouts, retries).
 - Modifying inputs or outputs.
 
-Because interceptors run as part of the workflow execution pipeline, they participate in the command sequence that gets recorded in history. If an interceptor's behavior changes between the original execution and a [replay](terms/replay.md), the replayed command sequence won't match the recorded history, resulting in a non-determinism error.
+Because interceptors run as part of the workflow execution pipeline, they participate in the command sequence that gets recorded in history. If an interceptor's behavior changes between the original execution and a [replay](terms/replay.md), the replayed command sequence won't match the recorded [history](terms/event-history.md), resulting in a non-determinism error.
 
 The same risk applies to shared libraries that interceptors (or workflow code) depend on. A seemingly innocent library update can change behavior in ways that break replay.
 

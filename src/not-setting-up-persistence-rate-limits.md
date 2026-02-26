@@ -1,13 +1,13 @@
 # Not Setting Up Persistence Rate Limits
 
 > [!TIP]
-> * Without persistence rate limits, a burst of workflow traffic or a misbehaving workflow can overwhelm your database, causing cascading failures across all namespaces.
+> * Without persistence rate limits, a burst of workflow traffic or a misbehaving workflow can overwhelm your database, causing cascading failures across all [namespaces](terms/namespace.md).
 > * Configure persistence rate limits via [dynamic configuration](terms/dynamic-config.md) to protect your [Temporal server backend](terms/temporal-server-backend.md).
 > * Rate limits act as a safety valve: they cause individual requests to be throttled rather than letting the entire system degrade.
 
 ## What?
 
-Temporal server relies heavily on its persistence layer (Cassandra, MySQL, or PostgreSQL) for storing workflow histories, managing task queues, and maintaining cluster state. Every workflow start, activity completion, heartbeat, signal, and query generates database operations.
+Temporal server relies heavily on its persistence layer (Cassandra, MySQL, or PostgreSQL) for storing [workflow histories](terms/event-history.md), managing [task queues](terms/task-queue.md), and maintaining cluster state. Every workflow start, activity completion, [heartbeat](terms/heartbeat.md), [signal](terms/signals.md), and [query](terms/queries.md) generates database operations.
 
 By default, Temporal does not impose aggressive rate limits on persistence operations. This means the server will issue as many database requests as the workload demands, trusting that the database can handle it. In practice, this trust is misplaced. A sudden spike in workflow starts, a workflow that signals thousands of other workflows in a tight loop, or even normal growth can push the database past its capacity.
 

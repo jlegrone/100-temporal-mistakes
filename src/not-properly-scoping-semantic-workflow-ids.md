@@ -1,13 +1,13 @@
 # Not Properly Scoping Semantic Workflow IDs
 
 > [!TIP]
-> * Temporal uses workflow IDs for deduplication -- you can't start two workflows with the same ID simultaneously by default.
+> * Temporal uses [workflow IDs](terms/workflow-id.md) for deduplication -- you can't start two workflows with the same ID simultaneously by default.
 > * IDs that are too broad cause unexpected conflicts; IDs that are too narrow or random lose the deduplication benefit.
 > * Scope workflow IDs to the business entity they represent (e.g., `process-order-{orderId}`).
 
 ## What?
 
-Temporal workflow IDs serve a dual purpose: they uniquely identify a workflow execution and they provide an idempotency mechanism. By default, starting a workflow with an ID that already has a running execution will be rejected with a `WorkflowExecutionAlreadyStarted` error.
+Temporal workflow IDs serve a dual purpose: they uniquely identify a workflow execution and they provide an [idempotency](terms/idempotency.md) mechanism. By default, starting a workflow with an ID that already has a running execution will be rejected with a `WorkflowExecutionAlreadyStarted` error.
 
 The mistake is choosing workflow IDs that don't align with your business semantics -- either too broad, too narrow, or entirely random.
 
@@ -31,4 +31,4 @@ The key principle: if two callers independently decide to start the same logical
 
 When you need to allow multiple executions for the same entity over time (e.g., a daily report for user X), include the distinguishing dimension in the ID: `daily-report-{userId}-{date}`.
 
-If you genuinely need multiple concurrent workflows for the same entity, consider whether a single workflow with child workflows or activities would be a better fit. If not, you can use the `WorkflowIDReusePolicy` and `WorkflowIDConflictPolicy` options to control the behavior, but think carefully about whether your ID scheme is the real problem first.
+If you genuinely need multiple concurrent workflows for the same entity, consider whether a single workflow with [child workflows](terms/child-workflow.md) or activities would be a better fit. If not, you can use the `WorkflowIDReusePolicy` and `WorkflowIDConflictPolicy` options to control the behavior, but think carefully about whether your ID scheme is the real problem first.

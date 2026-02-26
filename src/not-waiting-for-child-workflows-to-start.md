@@ -1,13 +1,13 @@
 # Not Waiting for Child Workflows to Start
 
 > [!TIP]
-> * When using a disconnected context for cleanup, you must wait for the child workflow to actually start before the parent returns.
+> * When using a [disconnected context](terms/disconnected-context.md) for cleanup, you must wait for the [child workflow](terms/child-workflow.md) to actually start before the parent returns.
 > * `GetChildWorkflowExecution()` resolves when the child is scheduled on the server -- use it as your synchronization point.
 > * If the parent completes before the child is scheduled, the child may never be created.
 
 ## What?
 
-When a workflow is cancelled and you use a [disconnected context for cleanup](not-using-disconnected-context-for-cleanup.md), a common pattern is to start a child workflow to perform compensating actions. The mistake is returning from the parent workflow immediately after calling `ExecuteChildWorkflow()` without waiting for the child to actually start.
+When a workflow is [cancelled](terms/cancellation.md) and you use a [disconnected context for cleanup](not-using-disconnected-context-for-cleanup.md), a common pattern is to start a child workflow to perform compensating actions. The mistake is returning from the parent workflow immediately after calling `ExecuteChildWorkflow()` without waiting for the child to actually start.
 
 `ExecuteChildWorkflow()` returns a future, but the child workflow isn't scheduled on the server the moment you call it. The scheduling happens asynchronously. If the parent workflow completes (returns) before the server processes the child workflow creation, the child may never be started because the parent is already closed.
 

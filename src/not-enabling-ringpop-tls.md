@@ -7,7 +7,7 @@
 
 ## What?
 
-Temporal's server nodes form a cluster using Ringpop, a protocol based on SWIM (Scalable Weakly-consistent Infection-style Process Group Membership). Ringpop handles membership discovery and consistent hashing, which the server uses to route requests to the correct node (e.g., routing a workflow task to the history service shard that owns it).
+Temporal's server nodes form a cluster using Ringpop, a protocol based on SWIM (Scalable Weakly-consistent Infection-style Process Group Membership). Ringpop handles membership discovery and consistent hashing, which the server uses to route requests to the correct node (e.g., routing a [workflow task](terms/workflow-task.md) to the history service shard that owns it).
 
 Ringpop communicates over a dedicated port (typically the service's gRPC port + 1) using TCP. This traffic is separate from the gRPC inter-service communication, and has its own TLS configuration. It is common to set up TLS for the gRPC frontend and inter-service connections but overlook Ringpop, leaving cluster membership traffic unencrypted.
 

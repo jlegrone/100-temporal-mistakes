@@ -1,13 +1,13 @@
 # Breaking Changes to Payloads
 
 > [!TIP]
-> * Workflow inputs, activity inputs/outputs, signal payloads, and query parameters are serialized and stored in history -- treat their types like a wire protocol.
+> * Workflow inputs, activity inputs/outputs, [signal](terms/signals.md) payloads, and [query](terms/queries.md) parameters are serialized and stored in [history](terms/event-history.md) -- treat their types like a wire protocol.
 > * Renaming fields, changing types, or removing fields can break deserialization for in-flight workflows during [replay](terms/replay.md).
 > * Use backwards-compatible changes only: add optional fields, don't remove or rename existing ones.
 
 ## What?
 
-Every payload type that flows through Temporal -- workflow inputs, activity inputs and outputs, signal payloads, update parameters -- gets serialized via a [data converter](terms/data-converter.md) and persisted in the workflow history. When a running workflow is replayed, those historical payloads are deserialized using the *current* version of your code.
+Every [payload](terms/payload.md) type that flows through Temporal -- workflow inputs, activity inputs and outputs, signal payloads, [update](terms/updates.md) parameters -- gets serialized via a [data converter](terms/data-converter.md) and persisted in the workflow history. When a running workflow is replayed, those historical payloads are deserialized using the *current* version of your code.
 
 A breaking change to a payload type means that the current code can no longer correctly deserialize values that were written by a previous version. Common examples:
 
@@ -18,13 +18,13 @@ A breaking change to a payload type means that the current code can no longer co
 
 ## Why?
 
-Unlike a typical web API where you control both the client and server and can coordinate deployments, Temporal workflows can run for days, weeks, or months. At any point during that lifespan, a worker restart triggers [replay](terms/replay.md) which deserializes historical payloads using the latest code.
+Unlike a typical web API where you control both the client and server and can coordinate deployments, Temporal workflows can run for days, weeks, or months. At any point during that lifespan, a [worker](terms/worker.md) restart triggers [replay](terms/replay.md) which deserializes historical payloads using the latest code.
 
 If the payload types have changed incompatibly, replay fails with deserialization errors. The workflow becomes stuck -- it can't make progress because it can't read its own history. Fixing this typically requires either:
 
 - Reverting the code change (if possible).
 - Using [versioning](terms/versioning.md) to maintain two code paths.
-- Manually resetting or terminating affected workflows.
+- Manually resetting or [terminating](terms/terminate.md) affected workflows.
 
 None of these are pleasant options, especially at scale.
 

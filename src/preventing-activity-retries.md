@@ -1,9 +1,9 @@
 # Preventing Activity Retries
 
 > [!TIP]
-> * Without a heartbeat timeout, Temporal can't detect a stuck activity and won't retry it until the start-to-close timeout expires.
-> * Without a start-to-close timeout, you have no per-attempt timeout -- a single hung attempt blocks the activity for the entire schedule-to-close duration.
-> * Setting start-to-close equal to schedule-to-close effectively gives you only one attempt since both expire at the same time.
+> * Without a [heartbeat timeout](terms/heartbeat-timeout.md), Temporal can't detect a stuck activity and won't retry it until the start-to-close timeout expires.
+> * Without a [start-to-close timeout](terms/start-to-close-timeout.md), you have no per-attempt timeout -- a single hung attempt blocks the activity for the entire schedule-to-close duration.
+> * Setting start-to-close equal to [schedule-to-close](terms/schedule-to-close-timeout.md) effectively gives you only one attempt since both expire at the same time.
 
 ## What?
 
@@ -11,7 +11,7 @@ Temporal's activity retry mechanism is one of its most powerful features, but it
 
 ### Not setting a heartbeat timeout
 
-Long-running activities should report heartbeats to let the server know they're still making progress. Without a heartbeat timeout, Temporal has no way to detect that an activity is stuck -- say, the worker process is deadlocked, the network connection is hanging, or the activity is blocked on an unresponsive downstream service. Temporal will wait for the entire start-to-close timeout to expire before considering the attempt failed and retrying. If your activity normally completes in 10 seconds but gets stuck, you'll wait the full start-to-close duration (potentially minutes or hours) before a retry kicks in.
+Long-running activities should report [heartbeats](terms/heartbeat.md) to let the server know they're still making progress. Without a heartbeat timeout, Temporal has no way to detect that an activity is stuck -- say, the [worker](terms/worker.md) process is deadlocked, the network connection is hanging, or the activity is blocked on an unresponsive downstream service. Temporal will wait for the entire start-to-close timeout to expire before considering the attempt failed and retrying. If your activity normally completes in 10 seconds but gets stuck, you'll wait the full start-to-close duration (potentially minutes or hours) before a retry kicks in.
 
 ### Not setting a start-to-close timeout
 

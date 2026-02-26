@@ -1,9 +1,9 @@
 # Not Using a Disconnected Context for Cleanup
 
 > [!TIP]
-> * When a workflow is cancelled, the main workflow context and all its descendants are cancelled too.
-> * Activities or child workflows started with a cancelled context will fail immediately -- they are never dispatched.
-> * Create a disconnected context with `workflow.NewDisconnectedContext()` for any cleanup that must run after cancellation.
+> * When a workflow is [cancelled](terms/cancellation.md), the main workflow context and all its descendants are cancelled too.
+> * Activities or [child workflows](terms/child-workflow.md) started with a cancelled context will fail immediately -- they are never dispatched.
+> * Create a [disconnected context](terms/disconnected-context.md) with `workflow.NewDisconnectedContext()` for any cleanup that must run after cancellation.
 
 ## What?
 
@@ -55,7 +55,7 @@ func MyWorkflow(ctx workflow.Context, input Input) error {
 
 ### Guidelines
 
-1. **Always set a timeout on cleanup activities.** The disconnected context is not cancelled by the workflow, so without a timeout, a stuck cleanup activity could run until its start-to-close timeout expires. Keep cleanup bounded and predictable.
+1. **Always set a timeout on cleanup activities.** The disconnected context is not cancelled by the workflow, so without a timeout, a stuck cleanup activity could run until its [start-to-close timeout](terms/start-to-close-timeout.md) expires. Keep cleanup bounded and predictable.
 
 2. **Defer the cancel function.** Even though the context is disconnected from the workflow's cancellation, calling `cancel()` when you're done prevents resource leaks in normal (non-cancelled) execution paths.
 

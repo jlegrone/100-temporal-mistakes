@@ -1,15 +1,15 @@
 # Performing Expensive Computation in Workflow Code
 
 > [!TIP]
-> * Workflow tasks have a default 10-second execution timeout. If your workflow code takes too long to execute, the task times out and gets retried, potentially causing a livelock.
+> * [Workflow tasks](terms/workflow-task.md) have a default 10-second execution timeout. If your workflow code takes too long to execute, the task times out and gets retried, potentially causing a livelock.
 > * Expensive computation is re-executed on every [replay](terms/replay.md), compounding the performance problem.
 > * Move CPU-intensive or long-running computation into activities, which have independent timeouts and don't block the workflow task.
 
 ## What?
 
-Performing expensive or long-running computation directly in workflow code -- large data transformations, complex mathematical calculations, heavy string processing, parsing large files from memory -- can cause the workflow task to exceed its execution timeout. By default, a workflow task must complete within 10 seconds. If it doesn't, the Temporal server considers the task lost and schedules it again on (potentially) another worker.
+Performing expensive or long-running computation directly in workflow code -- large data transformations, complex mathematical calculations, heavy string processing, parsing large files from memory -- can cause the workflow task to exceed its execution timeout. By default, a workflow task must complete within 10 seconds. If it doesn't, the Temporal server considers the task lost and schedules it again on (potentially) another [worker](terms/worker.md).
 
-The retried task starts from the beginning (replaying the full history), hits the same expensive computation, times out again, and the cycle repeats. This creates a livelock where the workflow is perpetually retrying but never making progress. For more on this failure mode, see [Exceeding the 10s Workflow Task Timeout](exceeding-10s-task-timeout.md).
+The retried task starts from the beginning (replaying the full [history](terms/event-history.md)), hits the same expensive computation, times out again, and the cycle repeats. This creates a livelock where the workflow is perpetually retrying but never making progress. For more on this failure mode, see [Exceeding the 10s Workflow Task Timeout](exceeding-10s-task-timeout.md).
 
 ```go
 // BAD: expensive computation in workflow code
@@ -59,8 +59,8 @@ func MyWorkflow(ctx workflow.Context, data []Record) error {
 }
 ```
 
-Activities have their own independently configurable timeouts, can heartbeat to report progress, and their results are recorded in history so the computation doesn't repeat on [replay](terms/replay.md).
+Activities have their own independently configurable timeouts, can [heartbeat](terms/heartbeat.md) to report progress, and their results are recorded in history so the computation doesn't repeat on [replay](terms/replay.md).
 
-**Use local activities for lighter computation.** If the computation is not too heavy (a few hundred milliseconds) but still not suitable for workflow code, local activities are a lighter-weight option. They execute in the same worker process, avoid the overhead of scheduling through the server, but still record their result in history.
+**Use local activities for lighter computation.** If the computation is not too heavy (a few hundred milliseconds) but still not suitable for workflow code, [local activities](terms/local-activity.md) are a lighter-weight option. They execute in the same worker process, avoid the overhead of scheduling through the server, but still record their result in history.
 
 **If computation is truly trivial, keep it in workflow code.** Simple comparisons, basic arithmetic, string formatting, or building an activity input from workflow state -- these are fine in workflow code. The rule of thumb: if it completes in well under a second, it can stay in the workflow function. If it might take seconds, move it to an activity.

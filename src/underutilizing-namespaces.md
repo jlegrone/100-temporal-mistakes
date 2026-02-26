@@ -1,7 +1,7 @@
 # Underutilizing Namespaces
 
 > [!TIP]
-> * Namespaces provide isolation boundaries in Temporal: separate rate limits, separate visibility, and separate access controls.
+> * [Namespaces](terms/namespace.md) provide isolation boundaries in Temporal: separate rate limits, separate [visibility](terms/visibility.md), and separate access controls.
 > * Many teams put everything in the "default" namespace, losing all the benefits of isolation.
 > * Use separate namespaces for different environments, teams, or reliability tiers.
 
@@ -16,7 +16,7 @@ Despite this, many teams run all of their workflows in a single "default" namesp
 Cramming everything into one namespace creates several problems:
 
 - **No rate limit isolation**: One team's runaway workflow can consume the namespace's rate limit budget, starving other teams' workflows. If team A triggers a batch operation that creates 10,000 workflows per second, team B's latency-sensitive payment workflows get throttled.
-- **Noisy visibility**: The workflow list becomes a mess. Finding your team's workflows among thousands of others requires careful search attribute discipline that most teams don't have.
+- **Noisy visibility**: The workflow list becomes a mess. Finding your team's workflows among thousands of others requires careful [search attribute](terms/search-attributes.md) discipline that most teams don't have.
 - **No access control granularity**: Everyone with access to the namespace can see and operate on everyone else's workflows. An operator trying to cancel a test workflow could accidentally target production workflows if the search query is too broad.
 - **Blast radius**: Configuration changes (retention period, rate limits, archival settings) apply to the entire namespace. Changing retention from 30 days to 7 days because one team doesn't need the history affects all teams.
 - **Operational confusion**: During incidents, it's harder to isolate the impact and triage when all workflows are mixed together.

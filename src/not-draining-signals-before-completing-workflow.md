@@ -7,7 +7,7 @@
 
 ## What?
 
-[Signals](terms/signals.md) are asynchronous messages sent to a running workflow. They are appended to the workflow's history and delivered to the workflow code via signal channels. However, if the workflow completes -- either by returning a result, returning an error, or calling [ContinueAsNew](terms/continue-as-new.md) -- any signals that are sitting in the channel buffer but have not been received by the workflow code are silently dropped.
+[Signals](terms/signals.md) are asynchronous messages sent to a running workflow. They are appended to the workflow's [history](terms/event-history.md) and delivered to the workflow code via signal channels. However, if the workflow completes -- either by returning a result, returning an error, or calling [ContinueAsNew](terms/continue-as-new.md) -- any signals that are sitting in the channel buffer but have not been received by the workflow code are silently dropped.
 
 This is a subtle issue because it creates a race condition: a signal sender believes the signal was delivered (the API call succeeded and the signal was recorded in the history), but the workflow never processes it.
 

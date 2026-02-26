@@ -1,13 +1,13 @@
 # Using Local Activities
 
 > [!TIP]
-> * Local activities execute on the same worker without a round trip to the Temporal server, reducing latency and history size.
-> * The workflow task timeout (default 10s) must be long enough to cover the local activity's execution -- if it isn't, the workflow task times out and the entire workflow task is retried from scratch.
+> * [Local activities](terms/local-activity.md) execute on the same [worker](terms/worker.md) without a round trip to the Temporal server, reducing latency and [history](terms/event-history.md) size.
+> * The [workflow task](terms/workflow-task.md) timeout (default 10s) must be long enough to cover the local activity's execution -- if it isn't, the workflow task times out and the entire workflow task is retried from scratch.
 > * Use local activities only for short, fast operations like data transformations, lightweight lookups, or validations.
 
 ## What?
 
-Local activities are an optimization that skips the normal activity scheduling flow. Instead of the worker sending a task to the Temporal server and the server dispatching it back to a worker's task queue, the local activity runs directly in the same workflow task on the same worker. The result is recorded in a single workflow task completion event rather than the usual `ActivityTaskScheduled` / `ActivityTaskCompleted` pair.
+Local activities are an optimization that skips the normal activity scheduling flow. Instead of the worker sending a task to the Temporal server and the server dispatching it back to a worker's [task queue](terms/task-queue.md), the local activity runs directly in the same workflow task on the same worker. The result is recorded in a single workflow task completion event rather than the usual `ActivityTaskScheduled` / `ActivityTaskCompleted` pair.
 
 ```go
 func MyWorkflow(ctx workflow.Context, input Input) error {
@@ -26,7 +26,7 @@ This sounds like a pure win -- less latency, fewer history events. But local act
 
 Local activities have several caveats that can cause serious problems if not understood:
 
-1. **Bound by the workflow task timeout**: A local activity runs within the context of a workflow task. The workflow task has a timeout (default 10s, see [exceeding the default task timeout](exceeding-10s-task-timeout.md)). If the local activity takes longer than the remaining workflow task time, the entire workflow task times out. The server then schedules a new workflow task, the worker replays the workflow, and the local activity runs again from scratch. This can create an infinite loop where the local activity never completes.
+1. **Bound by the workflow task timeout**: A local activity runs within the context of a workflow task. The workflow task has a timeout (default 10s, see [exceeding the default task timeout](exceeding-10s-task-timeout.md)). If the local activity takes longer than the remaining workflow task time, the entire workflow task times out. The server then schedules a new workflow task, the worker [replays](terms/replay.md) the workflow, and the local activity runs again from scratch. This can create an infinite loop where the local activity never completes.
 
 2. **No independent visibility**: Local activities don't generate their own events in the history until the workflow task completes successfully. This means you can't see them in progress in the Temporal UI, and if the workflow task fails, there's no trace of the local activity attempt.
 

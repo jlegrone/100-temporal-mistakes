@@ -1,9 +1,9 @@
 # Passing Too Much Information from Activities
 
 > [!TIP]
-> * Activity results are persisted in workflow history -- every byte counts toward history size limits and [replay](terms/replay.md) performance.
+> * Activity results are persisted in [workflow history](terms/event-history.md) -- every byte counts toward history size limits and [replay](terms/replay.md) performance.
 > * Return only what the workflow actually needs: IDs, status codes, small summaries.
-> * Store large data externally (database, blob storage) and pass references instead of full payloads.
+> * Store large data externally (database, blob storage) and pass references instead of full [payloads](terms/payload.md).
 
 ## What?
 
@@ -13,12 +13,12 @@ For example, an activity that looks up a customer might return the entire custom
 
 ## Why?
 
-Every activity result is serialized and stored as an event in the workflow history. That history is what gets [replayed](terms/replay.md) when a workflow resumes after a worker restart or rebalance. Large activity results have compounding effects:
+Every activity result is serialized and stored as an event in the workflow history. That history is what gets [replayed](terms/replay.md) when a workflow resumes after a [worker](terms/worker.md) restart or rebalance. Large activity results have compounding effects:
 
 1. **History bloat**: Each oversized result pushes the workflow closer to the [history size limit](overflowing-workflow-history-size.md). Workflows that would otherwise run for weeks may hit the 50k event or size cap prematurely.
 2. **Slower replay**: When a workflow needs to be replayed, the entire history is fetched from the server and processed. Larger payloads mean more data transferred over the network and more time spent deserializing.
 3. **Payload size limits**: Individual payloads that exceed the gRPC size limit (4MB by default) will be rejected outright, causing the workflow to [stop making progress](overflowing-maximum-individual-payload-size.md).
-4. **Storage costs**: All that data lives in your Temporal server backend. Multiply a 500KB activity result by millions of workflow executions and the storage adds up.
+4. **Storage costs**: All that data lives in your [Temporal server backend](terms/temporal-server-backend.md). Multiply a 500KB activity result by millions of workflow executions and the storage adds up.
 
 ## How?
 

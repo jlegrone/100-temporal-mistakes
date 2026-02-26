@@ -17,9 +17,9 @@ Temporal is not a general purpose application framework. It is an opinionated pl
 
 - **Durability**: workflow state survives process crashes, restarts, and deployments. You don't need to manually persist checkpoints or build recovery logic.
 - **Reliability**: activities are retried automatically on failure. You get exactly-once execution semantics for workflow logic without writing retry loops yourself.
-- **Visibility**: every workflow execution has a full history that you can inspect, debug, and audit after the fact.
+- **[Visibility](terms/visibility.md)**: every workflow execution has a full history that you can inspect, debug, and audit after the fact.
 
-If your use case doesn't need these properties, Temporal adds overhead without payoff. And if your use case does need them but your team doesn't understand the programming model, you'll fight against it -- writing non-deterministic workflow code, ignoring [versioning](terms/versioning.md) constraints, or treating activities like regular function calls.
+If your use case doesn't need these properties, Temporal adds overhead without payoff. And if your use case does need them but your team doesn't understand the programming model, you'll fight against it -- writing [non-deterministic](terms/non-determinism.md) workflow code, ignoring [versioning](terms/versioning.md) constraints, or treating activities like regular function calls.
 
 Understanding the "why" also helps with buy-in. When your team understands that Temporal eliminates entire categories of failure handling code, they'll write better workflows and be more willing to adopt the constraints that come with the programming model.
 

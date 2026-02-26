@@ -13,7 +13,7 @@ The result: duplicated logs that make debugging harder, inflated metrics that mi
 
 ## Why?
 
-When a worker restarts or a workflow is evicted from cache, the SDK replays the workflow history to reconstruct its state. During replay, your workflow code re-executes from the beginning up to the point where new work needs to happen. Any observability calls embedded in that code path fire again.
+When a [worker](terms/worker.md) restarts or a workflow is evicted from cache, the SDK replays the [workflow history](terms/event-history.md) to reconstruct its state. During replay, your workflow code re-executes from the beginning up to the point where new work needs to happen. Any observability calls embedded in that code path fire again.
 
 Consider a workflow that processes 100 items and logs each one. After a single worker restart, you now have 200 log entries for 100 items. After two restarts, 300. With millions of workflows, this noise becomes a real operational problem:
 
@@ -53,7 +53,7 @@ Use the SDK's metrics handler. In Go, configure a metrics handler on the client 
 
 ### Tracing
 
-Use the OpenTelemetry interceptors provided by the SDK. These create spans that are correctly linked to the workflow execution and are suppressed during replay.
+Use the OpenTelemetry [interceptors](terms/interceptor.md) provided by the SDK. These create spans that are correctly linked to the workflow execution and are suppressed during replay.
 
 ### Important caveat
 

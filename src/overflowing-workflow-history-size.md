@@ -21,6 +21,6 @@ By default, workflows which are known to accumulate events should be designed wi
 Think about triggering [ContinueAsNew](terms/continue-as-new.md) when one of those things:
 - Events counts
 - Time is greater than reasonable limit e.g. 24h.
-- A signal is received specifically to trigger ContinueAsNew
+- A [signal](terms/signals.md) is received specifically to trigger ContinueAsNew
 
 The timing aspect is important to ensure long running workflows age is capped which greatly simplifies [versioning](terms/versioning.md) and enables [temporal worker kubernetes controller](<terms/temporal-worker-kubernetes-controller.md>) to manage less versions.

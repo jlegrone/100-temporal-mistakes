@@ -1,7 +1,7 @@
 # Not Using ParentClosePolicy
 
 > [!TIP]
-> * By default, child workflows are [terminated](terms/terminate.md) when their parent completes, fails, or is cancelled -- giving them no chance for cleanup.
+> * By default, [child workflows](terms/child-workflow.md) are [terminated](terms/terminate.md) when their parent completes, fails, or is [cancelled](terms/cancellation.md) -- giving them no chance for cleanup.
 > * If child workflows need to perform graceful cleanup, you must set `ParentClosePolicy` to `REQUEST_CANCEL` or `ABANDON`.
 > * Choose the policy based on whether the child needs to react to the parent's closure or should simply continue independently.
 

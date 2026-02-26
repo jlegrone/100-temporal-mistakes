@@ -9,7 +9,7 @@
 
 `SideEffect` is a Temporal SDK primitive designed for capturing small, non-deterministic values inside workflow code -- things like generating a UUID, reading the current time, or picking a random number. It works by:
 
-1. **First execution**: Running the provided function, recording the result in history.
+1. **First execution**: Running the provided function, recording the result in [history](terms/event-history.md).
 2. **Replay**: Returning the recorded result *without* running the function again.
 
 The mistake happens when developers use `SideEffect` to "wrap" some non-deterministic logic but then ignore the return value and instead rely on what the function itself did. For example:
@@ -31,7 +31,7 @@ During the initial workflow execution, this appears to work perfectly. The funct
 
 - The `SideEffect` function is **not** re-executed on replay. The SDK returns the recorded value (which in the broken example above is `nil`).
 - The variable that was set as a side effect of the function retains its zero value.
-- The workflow now behaves differently than it did during the original execution, potentially causing non-determinism errors or silent logic bugs.
+- The workflow now behaves differently than it did during the original execution, potentially causing [non-determinism](terms/non-determinism.md) errors or silent logic bugs.
 
 This is particularly insidious because it passes all testing that doesn't involve replay.
 

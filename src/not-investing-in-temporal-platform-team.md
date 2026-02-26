@@ -15,7 +15,7 @@ A Temporal platform team is a small group that owns the shared Temporal infrastr
 
 Temporal is infrastructure. Like databases, message queues, or container orchestration, it needs dedicated ownership once it reaches a certain scale. Here's what goes wrong without it:
 
-**Inconsistent operational quality.** One team sets up proper alerting on Schedule-To-Start latency and [workflow lock contention](<workflow-lock-contention-due-to-concurrent-updates.md>), another team doesn't monitor anything. When the second team's workflows start silently [failing due to wrong task queues](<starting-workflows-on-wrong-task-queue.md>), nobody notices until customers complain.
+**Inconsistent operational quality.** One team sets up proper alerting on [Schedule-To-Start latency](terms/schedule-to-start-latency.md) and [workflow lock contention](<workflow-lock-contention-due-to-concurrent-updates.md>), another team doesn't monitor anything. When the second team's workflows start silently [failing due to wrong task queues](<starting-workflows-on-wrong-task-queue.md>), nobody notices until customers complain.
 
 **Duplicated effort.** Every team builds their own wrapper libraries, their own deployment patterns, their own monitoring dashboards. Five teams each spend a week solving the same problem is five weeks of wasted engineering time.
 
@@ -32,10 +32,10 @@ Temporal is infrastructure. Like databases, message queues, or container orchest
 - Shared client libraries and templates that encode best practices
 - Documentation and onboarding guides for product teams
 - Consultation and review of new workflow designs
-- Namespace management and multi-tenancy configuration
+- [Namespace](terms/namespace.md) management and multi-tenancy configuration
 
 **Provide golden paths.** Create starter templates that include proper monitoring, error handling, and [versioning](terms/versioning.md) patterns out of the box. If you make the right thing easy, teams will do the right thing.
 
-**Don't gatekeep.** The platform team should accelerate product teams, not block them. Provide self-service tooling for common operations like creating namespaces, deploying workers, and viewing metrics. Reserve reviews for architecture decisions, not day-to-day workflow development.
+**Don't gatekeep.** The platform team should accelerate product teams, not block them. Provide self-service tooling for common operations like creating namespaces, deploying [workers](terms/worker.md), and viewing metrics. Reserve reviews for architecture decisions, not day-to-day workflow development.
 
 **Establish feedback loops.** Regularly collect pain points from product teams. The patterns they struggle with are the ones the platform team should solve once and share with everyone.

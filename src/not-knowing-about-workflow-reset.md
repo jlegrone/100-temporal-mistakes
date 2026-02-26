@@ -12,7 +12,7 @@ Temporal records the complete history of every workflow execution. Workflow rese
 Concretely, when you reset a workflow to event N in its history:
 - Events up to N are preserved and replayed.
 - Events after N are discarded.
-- The workflow continues executing from that point with whatever worker code is currently deployed.
+- The workflow continues executing from that point with whatever [worker](terms/worker.md) code is currently deployed.
 
 This is conceptually similar to `git reset` -- you're rewinding to a known good state and replaying from there.
 
@@ -20,7 +20,7 @@ This is conceptually similar to `git reset` -- you're rewinding to a known good 
 
 Without knowing about reset, teams facing a workflow that went down the wrong path due to a bug are left with bad options:
 
-- **Terminate and restart**: Loses all progress. If the workflow had completed expensive operations (payments, external API calls, provisioning), you may not be able to simply redo them.
+- **[Terminate](terms/terminate.md) and restart**: Loses all progress. If the workflow had completed expensive operations (payments, external API calls, provisioning), you may not be able to simply redo them.
 - **Manual compensation**: Writing ad-hoc scripts or manually fixing state is error-prone and doesn't scale.
 - **Waiting it out**: Hoping the workflow will eventually reach a recovery path, which may never happen if the bug is in a critical decision point.
 
@@ -30,7 +30,7 @@ This is particularly powerful when combined with [batch operations](not-knowing-
 
 ## How?
 
-1. **Identify the reset point**. Examine the workflow history in the Temporal UI or via `tctl` to find the event ID just before the workflow took the wrong path. Typically you'll want to reset to a workflow task completed event.
+1. **Identify the reset point**. Examine the [workflow history](terms/event-history.md) in the Temporal UI or via `tctl` to find the event ID just before the workflow took the wrong path. Typically you'll want to reset to a [workflow task](terms/workflow-task.md) completed event.
 
 2. **Reset via CLI or API**:
    ```bash
@@ -43,6 +43,6 @@ This is particularly powerful when combined with [batch operations](not-knowing-
 
 3. **Deploy your fix first**. Reset replays history and then continues with current code. If you reset before deploying the fix, the workflow will just hit the same bug again.
 
-4. **Understand the implications**: activities that already completed before the reset point will not re-execute -- their recorded results are replayed. Activities after the reset point will be re-executed. Make sure activity implementations are idempotent or that re-execution is acceptable.
+4. **Understand the implications**: activities that already completed before the reset point will not re-execute -- their recorded results are replayed. Activities after the reset point will be re-executed. Make sure activity implementations are [idempotent](terms/idempotency.md) or that re-execution is acceptable.
 
 5. **Use reset types** to simplify targeting: `LastWorkflowTask`, `LastContinuedAsNew`, `BadBinary`, or a specific `EventId`. The `BadBinary` option is especially useful when you know which binary version introduced the bug.

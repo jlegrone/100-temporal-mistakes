@@ -1,7 +1,7 @@
 # Assuming Workflow Timeouts Allow Graceful Cleanup
 
 > [!TIP]
-> * When a workflow execution timeout or run timeout is reached, Temporal [terminates](terms/terminate.md) the workflow -- it does not cancel it.
+> * When a [workflow execution timeout](terms/workflow-execution-timeout.md) or [run timeout](terms/workflow-run-timeout.md) is reached, Temporal [terminates](terms/terminate.md) the workflow -- it does not [cancel](terms/cancellation.md) it.
 > * A terminated workflow gets no chance to run cleanup code: no compensation, no resource release, no notifications.
 > * If you need graceful cleanup on timeout, implement a timer + cancellation pattern inside your workflow instead of relying on workflow-level timeouts.
 

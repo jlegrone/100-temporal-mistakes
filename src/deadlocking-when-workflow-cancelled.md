@@ -1,7 +1,7 @@
 # Deadlocking When a Workflow Is Cancelled
 
 > [!TIP]
-> * When a workflow is cancelled, all pending activity and child workflow contexts are immediately cancelled too.
+> * When a workflow is [cancelled](terms/cancellation.md), all pending activity and [child workflow](terms/child-workflow.md) contexts are immediately cancelled too.
 > * If cleanup code tries to execute activities using the already-cancelled context, it blocks forever -- the workflow deadlocks.
 > * Use a [disconnected context](<not-using-disconnected-context-for-cleanup.md>) for any work that must run after cancellation.
 
@@ -31,7 +31,7 @@ func MyWorkflow(ctx workflow.Context, input Input) error {
 }
 ```
 
-When the workflow is cancelled, `MainActivity` returns a `CanceledError`, the function returns, the `defer` fires, and `CleanupActivity` is scheduled with the cancelled context. The activity is never dispatched to a worker. The `Get()` call returns immediately with a `CanceledError`. In many cases the workflow ends up in a state where no forward progress is possible, causing it to deadlock from Temporal's perspective.
+When the workflow is cancelled, `MainActivity` returns a `CanceledError`, the function returns, the `defer` fires, and `CleanupActivity` is scheduled with the cancelled context. The activity is never dispatched to a [worker](terms/worker.md). The `Get()` call returns immediately with a `CanceledError`. In many cases the workflow ends up in a state where no forward progress is possible, causing it to deadlock from Temporal's perspective.
 
 ## Why?
 

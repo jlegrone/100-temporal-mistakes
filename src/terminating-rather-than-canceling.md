@@ -2,14 +2,14 @@
 
 > [!TIP]
 > * [Termination](terms/terminate.md) is immediate and gives the workflow no chance to clean up -- it is the equivalent of `kill -9`.
-> * Cancellation is cooperative: the workflow receives a cancellation request and can run cleanup logic before completing.
+> * [Cancellation](terms/cancellation.md) is cooperative: the workflow receives a cancellation request and can run cleanup logic before completing.
 > * Default to cancellation unless you have a specific reason to terminate immediately.
 
 ## What?
 
 When operators need to stop a running workflow, Temporal offers two mechanisms: **terminate** and **cancel**. Many teams default to termination because it feels decisive and they see it first in the UI or CLI, but in doing so they deny the workflow any opportunity to perform cleanup.
 
-Termination ends the workflow immediately. No more workflow code runs. Any resources held, side effects in progress, or child workflows are left in an undefined state.
+Termination ends the workflow immediately. No more workflow code runs. Any resources held, side effects in progress, or [child workflows](terms/child-workflow.md) are left in an undefined state.
 
 Cancellation, on the other hand, is cooperative. Temporal delivers a cancellation request to the workflow which can then catch it, run compensation logic (rolling back transactions, releasing external resources, notifying downstream systems), and complete gracefully.
 
@@ -31,4 +31,4 @@ Termination has its place -- for example when a workflow is stuck in a tight loo
 
 3. **Reserve termination for true emergencies** where the workflow cannot or should not be allowed to run any more code at all. Document in your runbooks when termination is appropriate versus cancellation.
 
-4. **Consider restricting terminate permissions** via namespace-level access controls so that only administrators can terminate workflows while regular operators can only cancel them.
+4. **Consider restricting terminate permissions** via [namespace](terms/namespace.md)-level access controls so that only administrators can terminate workflows while regular operators can only cancel them.

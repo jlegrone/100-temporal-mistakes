@@ -25,7 +25,7 @@ The fundamental problem is that these custom frameworks end up reimplementing (p
 2. **Loss of type safety**: Configuration-driven approaches replace compile-time checked workflow code with runtime-interpreted strings and maps. Bugs that the compiler would catch now surface in production.
 3. **Debugging nightmares**: When something goes wrong, you're debugging your framework's interpretation of a config, not a straightforward workflow. Stack traces point to your generic executor, not to the business logic that failed.
 4. **Maintenance burden**: The framework becomes a critical piece of infrastructure that needs ongoing investment. Every Temporal SDK update, every new feature, every edge case in workflow execution needs to be accounted for in your abstraction layer.
-5. **Impedance mismatch**: Temporal's programming model is intentionally code-first. Trying to hide the code behind a configuration layer often means you can't leverage Temporal's most powerful features (complex branching, dynamic activity selection, signals, queries) without making your DSL increasingly complex.
+5. **Impedance mismatch**: Temporal's programming model is intentionally code-first. Trying to hide the code behind a configuration layer often means you can't leverage Temporal's most powerful features (complex branching, dynamic activity selection, [signals](terms/signals.md), [queries](terms/queries.md)) without making your DSL increasingly complex.
 
 The irony is that the framework usually starts simple ("just define your steps in YAML!") and grows in complexity until it's essentially a worse version of the Temporal SDK.
 

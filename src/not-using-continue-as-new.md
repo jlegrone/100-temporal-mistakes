@@ -1,19 +1,19 @@
 # Not Using ContinueAsNew
 
 > [!TIP]
-> * Long-running workflows accumulate events in their history, leading to longer replay times and eventually hitting the [history size limit](<overflowing-workflow-history-size.md>).
+> * Long-running workflows accumulate events in their history, leading to longer [replay](terms/replay.md) times and eventually hitting the [history size limit](<overflowing-workflow-history-size.md>).
 > * [ContinueAsNew](terms/continue-as-new.md) creates a fresh workflow execution with a new history, carrying over only the essential state.
 > * It also limits the age of your code, greatly simplifying [versioning](terms/versioning.md).
 
 ## What?
 
-Every action in a Temporal workflow -- scheduling an activity, receiving a signal, firing a timer -- adds events to the workflow's history. For workflows that run indefinitely or for a long time (event listeners, polling loops, subscription managers, recurring jobs), this history grows without bound.
+Every action in a Temporal workflow -- scheduling an activity, receiving a [signal](terms/signals.md), firing a timer -- adds events to the workflow's [history](terms/event-history.md). For workflows that run indefinitely or for a long time (event listeners, polling loops, subscription managers, recurring jobs), this history grows without bound.
 
 Without [ContinueAsNew](terms/continue-as-new.md), the workflow will eventually hit the history size limit (50k events by default) and be [terminated](terms/terminate.md) by the server. Even before hitting that hard limit, large histories cause performance problems due to increasingly slow replays.
 
 ## Why?
 
-**Replay performance**: When a worker picks up a workflow task (or restarts after a crash), it must replay the entire history to reconstruct the workflow's state. A history with 40,000 events takes significantly longer to replay than one with 200 events. At scale, this impacts worker throughput and workflow latency.
+**Replay performance**: When a [worker](terms/worker.md) picks up a [workflow task](terms/workflow-task.md) (or restarts after a crash), it must replay the entire history to reconstruct the workflow's state. A history with 40,000 events takes significantly longer to replay than one with 200 events. At scale, this impacts worker throughput and workflow latency.
 
 **History size limit**: The Temporal server will terminate workflows that exceed the maximum history size (50k events by default, configurable via [dynamic configuration](terms/dynamic-config.md)). A terminated workflow does not get a chance to clean up -- it simply stops.
 

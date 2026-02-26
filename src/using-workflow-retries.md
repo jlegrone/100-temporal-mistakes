@@ -2,7 +2,7 @@
 
 > [!TIP]
 > * Retrying an entire workflow throws away all accumulated state and starts from scratch -- the opposite of what makes Temporal useful.
-> * Activities already have their own retry policies; handle failures internally through activity retries, compensation, and conditional logic.
+> * Activities already have their own [retry policies](terms/retry-policy.md); handle failures internally through activity retries, compensation, and conditional logic.
 > * Workflow-level retries should be reserved for simple, short-lived workflows where there's no meaningful state to preserve.
 
 ## What?
@@ -19,7 +19,7 @@ This creates several problems:
 
 **Wasted work.** Everything the workflow accomplished before failing is discarded. Activities that called external services, sent emails, or modified databases ran for nothing (or worse, will run again on retry, potentially causing duplicates).
 
-**Non-idempotent side effects.** If your workflow triggered side effects -- payments, notifications, resource creation -- those side effects already happened. Retrying the workflow from scratch may duplicate them unless every single activity is idempotent.
+**Non-idempotent side effects.** If your workflow triggered side effects -- payments, notifications, resource creation -- those side effects already happened. Retrying the workflow from scratch may duplicate them unless every single activity is [idempotent](terms/idempotency.md).
 
 **Compounding failure.** If the workflow failed due to a bug in workflow logic rather than a transient issue, retrying it will just fail the same way. You burn through retry attempts while accomplishing nothing.
 

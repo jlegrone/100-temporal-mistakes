@@ -1,13 +1,13 @@
 # Storing Sensitive Data in Workflow History
 
 > [!TIP]
-> * Workflow history -- including activity inputs/outputs, signal payloads, and workflow arguments -- is persisted in the [Temporal server backend](terms/temporal-server-backend.md) and visible through the UI and API.
+> * [Workflow history](terms/event-history.md) -- including activity inputs/outputs, [signal](terms/signals.md) [payloads](terms/payload.md), and workflow arguments -- is persisted in the [Temporal server backend](terms/temporal-server-backend.md) and visible through the UI and API.
 > * Sensitive data (PII, credentials, financial data) in history creates security and compliance risks.
 > * Use a custom [data converter](terms/data-converter.md) with encryption, or store sensitive data externally and pass only references.
 
 ## What?
 
-Everything that flows through a Temporal workflow is persisted: workflow inputs and outputs, activity inputs and outputs, signal and update payloads, query results, search attributes, and memo fields. All of this data is stored in the [Temporal server backend](terms/temporal-server-backend.md) database and is accessible via the Temporal UI, CLI, and API to anyone with the appropriate namespace permissions.
+Everything that flows through a Temporal workflow is persisted: workflow inputs and outputs, activity inputs and outputs, signal and [update](terms/updates.md) payloads, [query](terms/queries.md) results, [search attributes](terms/search-attributes.md), and memo fields. All of this data is stored in the [Temporal server backend](terms/temporal-server-backend.md) database and is accessible via the Temporal UI, CLI, and API to anyone with the appropriate [namespace](terms/namespace.md) permissions.
 
 The mistake is treating workflow history like an internal, private data store and passing sensitive information -- passwords, API keys, personally identifiable information, credit card numbers, health records -- directly as workflow or activity parameters.
 
@@ -24,7 +24,7 @@ Sensitive data in workflow history creates multiple risk vectors:
 
 ### Use a custom data converter with encryption
 
-Temporal SDKs support custom [data converters](terms/data-converter.md) that can encrypt payloads before they're sent to the server. The data is stored encrypted and only decrypted on workers that have the encryption key:
+Temporal SDKs support custom [data converters](terms/data-converter.md) that can encrypt payloads before they're sent to the server. The data is stored encrypted and only decrypted on [workers](terms/worker.md) that have the encryption key:
 
 ```go
 // Configure the client with an encrypting data converter

@@ -5,9 +5,9 @@
 > - Workflows and activities inputs and outputs have hard limits in terms of size and can’t exceed 4MB by default.
 
 ## What?
-It is important to remember that every input and output of workflows and activities are being serialized (using a [data converter](<terms/data-converter.md>), send over the network and persisted in your [temporal server backend](<terms/temporal-server-backend.md>). This means that limits in terms of payload size exist.
+It is important to remember that every input and output of workflows and activities are being serialized (using a [data converter](<terms/data-converter.md>), send over the network and persisted in your [temporal server backend](<terms/temporal-server-backend.md>). This means that limits in terms of [payload](terms/payload.md) size exist.
 
-By default, serialized inputs/outputs can’t go larger than 2MB. If they grow larger, the request is rejected by the server with a `ResourceExhausted` error and your workflow stop making progress $^\text{[ref needed]}$ and your worker will log errors.
+By default, serialized inputs/outputs can’t go larger than 2MB. If they grow larger, the request is rejected by the server with a `ResourceExhausted` error and your workflow stop making progress $^\text{[ref needed]}$ and your [worker](terms/worker.md) will log errors.
 
 ## Why?
 

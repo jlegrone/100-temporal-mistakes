@@ -1,7 +1,7 @@
 # Assuming Activity Cancellation Means Workflow Cancellation
 
 > [!TIP]
-> * Activities can be cancelled for several reasons: heartbeat timeout, start-to-close timeout, worker shutdown, explicit cancellation from the workflow, or workflow cancellation.
+> * Activities can be [cancelled](terms/cancellation.md) for several reasons: [heartbeat timeout](terms/heartbeat-timeout.md), [start-to-close timeout](terms/start-to-close-timeout.md), [worker](terms/worker.md) shutdown, explicit cancellation from the workflow, or workflow cancellation.
 > * Handling activity cancellation by assuming the whole workflow is cancelled can lead to premature workflow termination or skipped work.
 > * Always check the actual cancellation reason before deciding what to do.
 
@@ -24,7 +24,7 @@ This mistake is particularly insidious because it often works fine in tests (whe
 
 ## How?
 
-In Go, the `temporal.IsCanceledError` helper tells you that the context was cancelled but not _why_. To distinguish the reason, you need to check the activity's context and the error type returned by heartbeating:
+In Go, the `temporal.IsCanceledError` helper tells you that the context was cancelled but not _why_. To distinguish the reason, you need to check the activity's context and the error type returned by [heartbeating](terms/heartbeat.md):
 
 1. **Check the context error first.** If `ctx.Err()` returns `context.Canceled`, cancellation was requested. If it returns `context.DeadlineExceeded`, a timeout fired.
 2. **Don't conflate activity cancellation with workflow cancellation.** In your activity code, treat cancellation as "stop what you're doing and return" rather than "the world is ending." Return partial results or a well-defined error that the workflow can interpret.

@@ -3,7 +3,7 @@
 > [!TIP]
 > * Don't repeatedly call `DescribeWorkflowExecution` or `GetWorkflowExecutionHistory` in a loop to check if a workflow has completed.
 > * Use the SDK's blocking `GetWorkflowResult` (or equivalent) which efficiently waits for completion without polling.
-> * From within a workflow, use child workflows or `ExecuteActivity` futures which natively provide completion notification.
+> * From within a workflow, use [child workflows](terms/child-workflow.md) or `ExecuteActivity` futures which natively provide completion notification.
 
 ## What?
 
@@ -35,7 +35,7 @@ Polling is problematic for several reasons:
 1. **Wasted resources**: Every poll is an RPC to the Temporal server. A polling loop running every few seconds multiplied by many concurrent callers puts unnecessary load on the server and increases API rate limit consumption.
 2. **Latency tradeoff**: You're forced to choose between frequent polls (more load, lower latency) and infrequent polls (less load, higher latency). Either way, you detect completion later than necessary.
 3. **Error handling complexity**: You need to handle transient RPC errors in your polling loop, decide when to back off, and deal with timeouts. This is boilerplate that obscures your actual business logic.
-4. **Race conditions**: Between detecting completion and fetching the result, the workflow execution could be archived or the run ID could change (if the workflow continued as new).
+4. **Race conditions**: Between detecting completion and fetching the result, the workflow execution could be archived or the run ID could change (if the workflow [continued as new](terms/continue-as-new.md)).
 
 ## Solution
 
@@ -76,7 +76,7 @@ func ParentWorkflow(ctx workflow.Context) error {
 }
 ```
 
-Never use activities to poll for workflow results from within a workflow. This wastes activity slots, grows history with polling events, and can lead to workflow history overflow for long-running target workflows.
+Never use activities to poll for workflow results from within a workflow. This wastes activity slots, grows [history](terms/event-history.md) with polling events, and can lead to workflow history overflow for long-running target workflows.
 
 ### Async notification pattern
 

@@ -1,7 +1,7 @@
 # Not Using Workflow Replay for Debugging
 
 > [!TIP]
-> * The Temporal SDK can replay a single workflow's history locally, without connecting to a server, letting you step through the exact execution in a debugger.
+> * The Temporal SDK can replay a single workflow's [history](terms/event-history.md) locally, without connecting to a server, letting you step through the exact execution in a debugger.
 > * You can download a workflow's history from the Temporal CLI or UI and replay it on your machine.
 > * This is often the fastest way to reproduce and diagnose workflow bugs, yet many teams don't know the feature exists.
 
@@ -17,9 +17,9 @@ This means you can:
 
 ## Why?
 
-Debugging workflow code through logs alone is painful. Workflows can run for hours, days, or weeks, interacting with dozens of activities and child workflows. Reproducing the exact sequence of events that led to a bug in a test environment is often impractical.
+Debugging workflow code through logs alone is painful. Workflows can run for hours, days, or weeks, interacting with dozens of activities and [child workflows](terms/child-workflow.md). Reproducing the exact sequence of events that led to a bug in a test environment is often impractical.
 
-Replay-based debugging sidesteps all of that. The workflow history *is* the reproduction case -- it contains every activity result, signal, timer, and decision point that the workflow encountered. By replaying it locally, you get a deterministic reproduction every time.
+Replay-based debugging sidesteps all of that. The workflow history *is* the reproduction case -- it contains every activity result, [signal](terms/signals.md), timer, and decision point that the workflow encountered. By replaying it locally, you get a deterministic reproduction every time.
 
 Without this technique, teams often resort to:
 
@@ -85,4 +85,4 @@ Set breakpoints in your workflow code and run the replay test under your debugge
 
 ### Bonus: Replay tests as regression tests
 
-Once you've captured a history that exposed a bug, keep it as a test fixture. Replay tests make excellent regression tests -- they verify that your current code can correctly process histories produced by previous versions, catching non-determinism errors before deployment.
+Once you've captured a history that exposed a bug, keep it as a test fixture. Replay tests make excellent regression tests -- they verify that your current code can correctly process histories produced by previous versions, catching [non-determinism](terms/non-determinism.md) errors before deployment.

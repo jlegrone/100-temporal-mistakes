@@ -3,21 +3,21 @@
 > [!TIP]
 > * Not every operation needs the durability guarantees that Temporal provides.
 > * Simple CRUD operations, synchronous request-response handlers, and fast operations don't benefit from workflow orchestration.
-> * The overhead of workflow creation, history persistence, and replay is not free -- use workflows when you genuinely need durability, retries, or long-running coordination.
+> * The overhead of workflow creation, history persistence, and [replay](terms/replay.md) is not free -- use workflows when you genuinely need durability, retries, or long-running coordination.
 
 ## What?
 
 When teams adopt Temporal, there is a natural temptation to route everything through workflows. After all, if workflows give you retries, observability, and durability, why not use them for everything?
 
-The problem is that Temporal workflows come with overhead. Creating a workflow means persisting a history, scheduling tasks, consuming server resources, and potentially replaying state. For operations that complete in milliseconds and don't need durability, this overhead is pure cost with no benefit.
+The problem is that Temporal workflows come with overhead. Creating a workflow means persisting a [history](terms/event-history.md), scheduling tasks, consuming server resources, and potentially replaying state. For operations that complete in milliseconds and don't need durability, this overhead is pure cost with no benefit.
 
 ## Why?
 
 **Latency**: Starting a workflow, scheduling an activity, and waiting for its completion adds latency compared to a direct function call or API request. For user-facing synchronous operations where response time matters, this overhead can be significant.
 
-**Resource consumption**: Every workflow execution consumes resources on the Temporal server: database storage for the history, shard capacity, and task queue throughput. Routing trivial operations through Temporal wastes these resources and can impact the performance of workflows that actually need them.
+**Resource consumption**: Every workflow execution consumes resources on the Temporal server: database storage for the history, shard capacity, and [task queue](terms/task-queue.md) throughput. Routing trivial operations through Temporal wastes these resources and can impact the performance of workflows that actually need them.
 
-**Complexity**: Wrapping simple operations in workflows adds code (workflow definitions, activity definitions, worker setup) without adding value. It makes the codebase harder to navigate and increases the surface area for bugs.
+**Complexity**: Wrapping simple operations in workflows adds code (workflow definitions, activity definitions, [worker](terms/worker.md) setup) without adding value. It makes the codebase harder to navigate and increases the surface area for bugs.
 
 **Operational burden**: More workflows means more to monitor, more history to retain, and more potential for issues like task queue backlogs. The operational cost scales with the number of workflow executions.
 

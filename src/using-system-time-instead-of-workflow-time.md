@@ -22,17 +22,17 @@ func MyWorkflow(ctx workflow.Context) error {
 }
 ```
 
-This workflow might take the morning branch during original execution and the afternoon branch during replay, causing a non-determinism error.
+This workflow might take the morning branch during original execution and the afternoon branch during replay, causing a [non-determinism](terms/non-determinism.md) error.
 
 ## Why?
 
-System time violations are especially tricky because they often work fine in development and testing. The replay typically happens so quickly after the original execution that `time.Now()` returns a nearly identical value, and the workflow makes the same decision. The bug only surfaces when a workflow replays hours or days later -- after a long worker outage, a redeployment, or workflow cache eviction -- and the time difference causes a different code path.
+System time violations are especially tricky because they often work fine in development and testing. The replay typically happens so quickly after the original execution that `time.Now()` returns a nearly identical value, and the workflow makes the same decision. The bug only surfaces when a workflow replays hours or days later -- after a long [worker](terms/worker.md) outage, a redeployment, or workflow cache eviction -- and the time difference causes a different code path.
 
 This makes the issue hard to reproduce and diagnose. The workflow worked for weeks, and then one day it fails with a non-determinism error that seems to come out of nowhere.
 
 ## How?
 
-Use the SDK's deterministic time API. During original execution, it returns the current time. During replay, it returns the time that was recorded in the workflow's history, guaranteeing the same value both times.
+Use the SDK's deterministic time API. During original execution, it returns the current time. During replay, it returns the time that was recorded in the workflow's [history](terms/event-history.md), guaranteeing the same value both times.
 
 ```go
 // GOOD: workflow time

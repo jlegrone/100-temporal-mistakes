@@ -1,13 +1,13 @@
 # Not Setting Up Namespace Rate Limits
 
 > [!TIP]
-> * Without per-namespace rate limits, one namespace's traffic can starve all others, which is especially dangerous in multi-tenant setups.
+> * Without per-namespace rate limits, one [namespace](terms/namespace.md)'s traffic can starve all others, which is especially dangerous in multi-tenant setups.
 > * Configure namespace-level rate limits via [dynamic configuration](terms/dynamic-config.md) to ensure fair resource allocation across teams and workloads.
 > * Namespace rate limits complement persistence rate limits by providing isolation between tenants rather than just protecting the database.
 
 ## What?
 
-Temporal supports multiple namespaces on a single cluster, allowing teams or applications to share infrastructure while maintaining logical isolation. However, without rate limits, this isolation is only logical, not physical. A namespace generating a massive burst of workflow starts, signals, or queries can consume all available server and database capacity, starving every other namespace on the cluster.
+Temporal supports multiple namespaces on a single cluster, allowing teams or applications to share infrastructure while maintaining logical isolation. However, without rate limits, this isolation is only logical, not physical. A namespace generating a massive burst of workflow starts, [signals](terms/signals.md), or [queries](terms/queries.md) can consume all available server and database capacity, starving every other namespace on the cluster.
 
 By default, Temporal's namespace rate limits are either not set or set very high. This means any namespace is free to use as much capacity as it can, and the only backstop is the global persistence rate limit (if configured).
 
@@ -29,7 +29,7 @@ Key dynamic configuration values:
 
 - **`frontend.namespaceRPS`** -- Maximum frontend requests per second for a given namespace, per frontend host. This limits the rate of API calls (start workflow, signal, query, etc.) that a namespace can make.
 - **`frontend.globalNamespaceRPS`** -- Cluster-wide frontend request rate limit for a namespace, distributed across all frontend hosts. This is typically the more useful setting as it doesn't depend on the number of frontend hosts.
-- **`frontend.maxNamespaceVisibilityRPSPerInstance`** -- Rate limit for visibility (list/count workflows) operations per namespace.
+- **`frontend.maxNamespaceVisibilityRPSPerInstance`** -- Rate limit for [visibility](terms/visibility.md) (list/count workflows) operations per namespace.
 - **`frontend.maxNamespaceVisibilityBurstRatioPerInstance`** -- Burst ratio for visibility operations allowing short spikes above the sustained rate.
 
 ```yaml
