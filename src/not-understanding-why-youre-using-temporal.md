@@ -1,0 +1,38 @@
+# Not Understanding Why You're Using Temporal
+
+> [!TIP]
+> * Temporal solves specific problems: reliable execution of long-running processes, durable state management, and fault-tolerant orchestration.
+> * Without understanding these value propositions, teams either misuse Temporal where simpler tools work or under-use it by not leveraging its guarantees.
+> * Take the time to map Temporal's strengths to your actual needs before adopting it.
+
+## What?
+
+Teams adopt Temporal because they've heard it solves distributed systems problems, or because another team in the organization uses it successfully. But they skip the step of understanding what specific problems Temporal is designed to solve and whether those problems match their use case.
+
+This leads to two failure modes. The first is misuse: using Temporal for things that don't need it, like short-lived request-reply HTTP handlers or simple CRUD operations. You end up with all the operational complexity of running Temporal infrastructure for workflows that would be fine as a plain function call. The second is under-use: adopting Temporal but writing code as if it were a regular application framework, missing out on durability guarantees, [replay](terms/replay.md) semantics, and fault tolerance -- the very things that justify the complexity.
+
+## Why?
+
+Temporal is not a general purpose application framework. It is an opinionated platform that trades simplicity for specific guarantees:
+
+- **Durability**: workflow state survives process crashes, restarts, and deployments. You don't need to manually persist checkpoints or build recovery logic.
+- **Reliability**: activities are retried automatically on failure. You get exactly-once execution semantics for workflow logic without writing retry loops yourself.
+- **Visibility**: every workflow execution has a full history that you can inspect, debug, and audit after the fact.
+
+If your use case doesn't need these properties, Temporal adds overhead without payoff. And if your use case does need them but your team doesn't understand the programming model, you'll fight against it -- writing non-deterministic workflow code, ignoring [versioning](terms/versioning.md) constraints, or treating activities like regular function calls.
+
+Understanding the "why" also helps with buy-in. When your team understands that Temporal eliminates entire categories of failure handling code, they'll write better workflows and be more willing to adopt the constraints that come with the programming model.
+
+## How?
+
+**Before adopting Temporal**, answer these questions concretely:
+1. What processes in our system need to survive crashes or restarts?
+2. Where are we currently writing manual retry logic, state machines, or recovery code?
+3. Do we have long-running processes that span minutes, hours, or days?
+4. Do we need visibility into the state of in-flight operations?
+
+If you can't point to specific problems in your codebase that match these, Temporal may not be the right tool.
+
+**During adoption**, invest in education. Make sure the team understands the [replay](terms/replay.md) model, determinism constraints, and the difference between workflow code and activity code. These are not things you can learn by trial and error without wasting significant time debugging non-determinism errors.
+
+**After adoption**, periodically review whether new workflows actually need Temporal's guarantees or whether they're being written as Temporal workflows out of habit. Not every piece of business logic needs to be durable. It is perfectly fine to have parts of your system that don't use Temporal.

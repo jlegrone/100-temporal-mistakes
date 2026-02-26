@@ -1,25 +1,36 @@
-# Overflowing Maximum Workflow History Bytes
+# Overflowing Workflow History Bytes
 
 > [!TIP]
-> - Workflows histories record many events during the execution of a workflow including all the inputs and outputs of activities and child workflows, signals payloads, ...
-> - Workflow history size (in terms of bytes utilization) are capped at 50MB by default. When that limit is crossed, workflows are terminated without giving a chance to cleanup after themselves.
+> * Temporal enforces a maximum history size in bytes, separate from the [event count limit](<overflowing-workflow-history-size.md>). Exceeding it causes the workflow to be [terminated](terms/terminate.md).
+> * Large activity results, signal payloads, and workflow inputs are the most common culprits for hitting this limit.
+> * Solution: minimize payload sizes, offload large data to external storage, and use [ContinueAsNew](terms/continue-as-new.md) to keep histories bounded.
 
 ## What?
-Alongside the [number of events a workflow history can hold](overflowing-workflow-history-size.md), a second limit can easily be reached, the individual history bytes size.
 
-Every input and output of workflows, child workflows and activities are being serialized (using a [data converter](<terms/data-converter.md>) and stored in the [temporal server backend](<terms/temporal-server-backend.md>) inside a workflow history. Signals payloads are also recorded in the workflow history. Other history events (timers, workflow tasks, ...) also need a couple of bytes of storage ultimately.
+In addition to the [50k event count limit](<overflowing-workflow-history-size.md>), Temporal enforces a separate hard limit on the total byte size of a workflow's history. By default, this limit is 50MB (configurable via [dynamic configuration](<terms/dynamic-config.md>)). When a workflow's history exceeds this byte-size threshold, the server [terminates](terms/terminate.md) it -- just like with the event count limit, there is no chance for cleanup.
 
-While [each individual payload for an activity or workflow input / output are capped](overflowing-maximum-individual-payload-size.md), this doesn't prevent total history bytes size to grow big when you sum the size of all events an history contains.
+This means a workflow can be terminated well before reaching 50k events if its individual events carry large payloads. A workflow with only a few hundred activity completions can hit the byte limit if each result contains megabytes of serialized data.
 
-By default, maximum history size is set to 50MB. If an history grow larger, the server will immediately [terminate](terminate.md) the workflow without giving it a chance to perform any cleanup operation.
-
-Temporal servers will also log warning when it sees an history crossing the warning size limit which is by default set to 10MB. The limit can be tweaked via the `limit.historySize.warning` server [dynamic-config](dynamic-config.md).
 ## Why?
-Temporal data model relies heavily on [replay](terms/replay.md) which is not a free operation as it involves downloading workflow histories over the network and re-running workflow code many times during the life of a workflow, especially when in memory caches are not hot. So large histories take more time to replay than small ones. 10ms additional replay delay may compound quickly when you run millions of workflows and you have to replay all of them at once.
-## Solutions
-To workaround the issue, it is recommended to:
-1. Trim down your inputs and outputs to the minimum first
-2. Store the payloads in an external system (a database, blob storage, disk if you use [sessions](terms/sessions.md) , …) and pass references (IDs, links, …) to as inputs, outputs or signal payload.
-3. Fan out work on multiple smaller workflows as each will have their own limit
-4. Look at the [large payload codec](<terms/large-payload-codec.md>) (which offloads activities and workflows inputs / outputs to blob storage automatically).
-5. Tweak the `limit.historySize.error` server [dynamic-config](dynamic-config.md).
+
+It is easy to focus solely on the event count limit and overlook the byte-size limit. A workflow that processes modest numbers of activities might seem safe from the 50k event cap, but if those activities return large results (images, documents, serialized datasets, etc.), the cumulative history size in bytes grows quickly.
+
+During [replay](terms/replay.md), the entire history must be fetched from the [server backend](<terms/temporal-server-backend.md>) and deserialized by the worker. Large histories in bytes mean:
+
+- Higher network bandwidth consumption between workers and the Temporal server.
+- Longer replay times, directly affecting workflow task processing latency.
+- Increased memory pressure on workers, which must hold the full history in memory during replay.
+
+Unlike the event count limit which you can estimate by counting scheduled operations, the byte-size limit depends on the actual data flowing through your workflow, making it harder to predict at design time.
+
+## Solution
+
+1. **Minimize payload sizes.** Audit what your activities return and what your signals carry. Return only the data the workflow actually needs to make decisions. If an activity produces a large result that is only needed by a subsequent activity, store it externally and pass a reference (ID, URL, S3 key, etc.) instead.
+
+2. **Use external storage for large data.** Databases, blob stores, or shared file systems are better suited for moving large data between activities than Temporal's history. Treat the workflow as an orchestration layer -- it should coordinate work, not be a data pipeline.
+
+3. **Use [ContinueAsNew](terms/continue-as-new.md).** For long-running workflows that accumulate results over time, periodically invoke ContinueAsNew to start a fresh history. This resets both the event count and the byte-size counters.
+
+4. **Monitor history sizes.** Keep an eye on the `workflow_history_size_bytes` metric and set alerts well below the configured limit. Catching the trend early gives you time to refactor before workflows start getting terminated.
+
+5. **Consider the [large payload codec](<terms/large-payload-codec.md>).** If only a fraction of your payloads are oversized, this codec can transparently offload them to external storage at the serialization layer.
