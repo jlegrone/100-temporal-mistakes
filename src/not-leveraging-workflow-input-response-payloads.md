@@ -3,7 +3,7 @@
 > [!TIP]
 > * Temporal supports typed inputs and outputs on workflow executions -- use them.
 > * Defining clear input and output types makes workflows self-documenting, easier to test, and enables better tooling.
-> * Prefer passing data as workflow arguments rather than sending it via signals or queries after the workflow starts.
+> * Prefer passing data as workflow arguments rather than sending it via [signals](terms/signals.md) or [queries](terms/queries.md) after the workflow starts.
 
 ## What?
 
@@ -15,7 +15,7 @@ Instead, workflows should accept well-defined typed input structs and return wel
 
 ## Why?
 
-Leveraging workflow input and output payloads provides several benefits:
+Leveraging workflow input and output [payloads](terms/payload.md) provides several benefits:
 
 **Self-documenting workflows**: When a workflow's input type contains all the data it needs, anyone reading the code immediately understands what the workflow expects. No need to trace signal handlers or query handlers to understand the data flow.
 

@@ -1,13 +1,13 @@
 # Downloading History with DecodePayloads Enabled
 
 > [!TIP]
-> * Downloading workflow history from the Temporal UI with "Decode Payloads" enabled produces a modified history that cannot be used for replay testing.
+> * Downloading [workflow history](terms/event-history.md) from the Temporal UI with "Decode Payloads" enabled produces a modified history that cannot be used for replay testing.
 > * Always download the raw (encoded) history when you need it for [replay](terms/replay.md) tests or workflow reset operations.
 > * The decoded version is only useful for human readability and debugging, not as a replay input.
 
 ## What?
 
-The Temporal Web UI offers an option to download workflow history as JSON. When you toggle the "Decode Payloads" option, the UI uses the configured [data converter](terms/data-converter.md) (or codec server) to decode all payloads in the history before saving the file. The resulting JSON contains human-readable data instead of the raw base64-encoded payloads.
+The Temporal Web UI offers an option to download workflow history as JSON. When you toggle the "Decode Payloads" option, the UI uses the configured [data converter](terms/data-converter.md) (or codec server) to decode all [payloads](terms/payload.md) in the history before saving the file. The resulting JSON contains human-readable data instead of the raw base64-encoded payloads.
 
 While this is convenient for reading the history, the decoded file has a different structure than what the SDK expects during [replay](terms/replay.md). Using a decoded history file for replay testing will either fail outright or produce incorrect results.
 

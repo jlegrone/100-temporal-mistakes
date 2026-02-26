@@ -1,7 +1,7 @@
 # Reading Environment Variables in Workflow Code
 
 > [!TIP]
-> * Environment variables can differ between workers and between deployments, making workflow code non-deterministic on [replay](terms/replay.md).
+> * Environment variables can differ between [workers](terms/worker.md) and between deployments, making workflow code [non-deterministic](terms/non-determinism.md) on [replay](terms/replay.md).
 > * If you need configuration values in workflow logic, pass them as workflow input or use `SideEffect`/`MutableSideEffect`.
 > * Environment variables are fine to read in activity code, worker initialization, or any code that runs outside the workflow function.
 
@@ -32,7 +32,7 @@ Environment variables feel harmless because they look like simple constants. But
 - **Different deployments.** A deployment that updates an environment variable changes the value for all subsequent replays of existing workflows.
 - **Different times.** Some environment variables are set dynamically (e.g., by container orchestrators) and may change across worker restarts.
 
-The fundamental issue is the same as any other non-deterministic operation in workflow code: it produces different results on replay, breaking the history-code contract that Temporal relies on.
+The fundamental issue is the same as any other non-deterministic operation in workflow code: it produces different results on replay, breaking the [history](terms/event-history.md)-code contract that Temporal relies on.
 
 ## How?
 

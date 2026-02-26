@@ -12,10 +12,10 @@ When that happens you'll see contention in the form of a rise in `busy_workflow`
 
 ## Why?
 
-Workflow history updates are serialized using a workflow level locking mechanism. As a result, concurrent updates will eventually compete to acquire that workflow lock resulting in high end to end latency for your workflow executions due to the high overhead caused by code blocked waiting for lock acquisition.
+[Workflow history](terms/event-history.md) updates are serialized using a workflow level locking mechanism. As a result, concurrent updates will eventually compete to acquire that workflow lock resulting in high end to end latency for your workflow executions due to the high overhead caused by code blocked waiting for lock acquisition.
 
 Concurrent updates come in many flavors, the most obvious one being [signals](terms/signals.md) as those can be appended to workflow histories at any time by definition.
-But asynchronous activities and child workflows completing at the same time, long running activities heartbeats, as well as workflows [updates](terms/updates.md) and [queries](terms/queries.md) can also lead to contention.
+But asynchronous activities and [child workflows](terms/child-workflow.md) completing at the same time, long running activities [heartbeats](terms/heartbeat.md), as well as workflows [updates](terms/updates.md) and [queries](terms/queries.md) can also lead to contention.
 
 ## How?
 

@@ -1,9 +1,9 @@
 # Unnecessary Child Workflows
 
 > [!TIP]
-> * Child workflows add coordination overhead, extra history events, and more complex error handling compared to activities.
+> * [Child workflows](terms/child-workflow.md) add coordination overhead, extra [history](terms/event-history.md) events, and more complex error handling compared to activities.
 > * Don't reach for child workflows when a simple activity would suffice.
-> * Use child workflows when you need independent lifecycle management, separate retry policies, history size management, or logical separation at the workflow level.
+> * Use child workflows when you need independent lifecycle management, separate [retry policies](terms/retry-policy.md), history size management, or logical separation at the workflow level.
 
 ## What?
 
@@ -40,13 +40,13 @@ These costs compound quickly when you have many unnecessary child workflows in a
 - Is a single unit of work (API call, database query, file operation)
 - Doesn't need its own independent lifecycle
 - Doesn't need different retry or timeout policies from the parent workflow
-- Doesn't need to survive parent workflow cancellation independently
+- Doesn't need to survive parent workflow [cancellation](terms/cancellation.md) independently
 
 **Use a child workflow** when you genuinely need:
-- **Independent lifecycle management**: The child should continue running even if the parent is cancelled or times out (using the `ParentClosePolicy` option).
+- **Independent lifecycle management**: The child should continue running even if the parent is cancelled or times out (using the [`ParentClosePolicy`](terms/parent-close-policy.md) option).
 - **Separate retry policies**: The child needs fundamentally different retry behavior from the parent workflow's activities.
 - **History size management**: The parent workflow is processing large batches and would overflow its history limit without distributing work across child workflows. See [overflowing workflow history size](overflowing-workflow-history-size.md).
 - **Logical domain boundary**: The child represents a genuinely independent business process (e.g., an "order fulfillment" sub-process within a larger "purchase" workflow) that might be triggered independently in other contexts.
-- **Different task queue**: The child needs to run on a different set of workers than the parent.
+- **Different [task queue](terms/task-queue.md)**: The child needs to run on a different set of [workers](terms/worker.md) than the parent.
 
 When in doubt, start with an activity. You can always refactor to a child workflow later if the need arises. Going the other way -- collapsing unnecessary child workflows back into activities -- is harder because callers may already depend on the child workflow's independent existence.

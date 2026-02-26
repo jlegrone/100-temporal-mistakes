@@ -15,7 +15,7 @@ func MyWorkflow(ctx workflow.Context, userID string, amount int, currency string
 }
 ```
 
-While this compiles and works, it creates several problems. Each positional argument is serialized as a separate payload in the Temporal event history. This means the workflow contract is implicitly defined by the order and types of positional arguments rather than by an explicit named structure.
+While this compiles and works, it creates several problems. Each positional argument is serialized as a separate [payload](terms/payload.md) in the Temporal [event history](terms/event-history.md). This means the workflow contract is implicitly defined by the order and types of positional arguments rather than by an explicit named structure.
 
 ## Why?
 

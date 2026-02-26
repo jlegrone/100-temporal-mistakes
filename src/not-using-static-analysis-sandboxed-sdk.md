@@ -1,7 +1,7 @@
 # Not Using Static Analysis or the Sandboxed SDK
 
 > [!TIP]
-> * Several Temporal SDKs provide built-in mechanisms to detect non-deterministic code -- sandboxes, linters, and isolates -- but they only help if you enable and pay attention to them.
+> * Several Temporal SDKs provide built-in mechanisms to detect [non-deterministic](terms/non-determinism.md) code -- sandboxes, linters, and isolates -- but they only help if you enable and pay attention to them.
 > * Catching non-determinism at development time or during CI is far cheaper than discovering it in production during [replay](terms/replay.md).
 > * Choose the tools appropriate for your SDK: TypeScript has a V8 isolate sandbox, Python and .NET have runtime sandboxing, Go has linting rules.
 
@@ -13,7 +13,7 @@ The good news is that most Temporal SDKs ship with tools to catch these violatio
 
 ## Why?
 
-Without early detection, non-determinism errors only surface when a workflow is actually replayed -- typically after a worker restart, a deployment, or a rebalance. By that point:
+Without early detection, non-determinism errors only surface when a workflow is actually replayed -- typically after a [worker](terms/worker.md) restart, a deployment, or a rebalance. By that point:
 
 - The workflow is stuck and can't make progress.
 - The error message may be cryptic (e.g., "non-deterministic workflow detected" with a history event mismatch).

@@ -16,7 +16,7 @@ It is also important, when implementing batch processing workflows to pay attent
 
 ## How?
 
-One way to limit [workflow lock contention](<workflow-lock-contention-due-to-concurrent-updates.md>) is to design your batch processing workflow to handle each batch in a child workflow. The pattern can be repeated for batches of batches, batches of batches of batches, ... essentially creating a tree of workflows. Concurrency can be controlled at each level of the tree.
+One way to limit [workflow lock contention](<workflow-lock-contention-due-to-concurrent-updates.md>) is to design your batch processing workflow to handle each batch in a [child workflow](terms/child-workflow.md). The pattern can be repeated for batches of batches, batches of batches of batches, ... essentially creating a tree of workflows. Concurrency can be controlled at each level of the tree.
 
 You should also pay attention to the data itself and remember that all activity and workflows inputs and outputs are serialized and persisted in Temporal backend. This means that each time data is passed around, it transits over the network and use disk space. If possible, compute batches using IDs referencing each batch of data and let the lower level workflows that do the actual work look up the data to process. You'll minimize the bandwidth needed to process everything.
 

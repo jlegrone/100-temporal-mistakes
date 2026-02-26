@@ -17,9 +17,9 @@ Misunderstanding replay leads to several downstream problems:
 
 **Unnecessary panic about side effects.** Developers worry that a database write in an activity will happen twice during replay. It won't. The activity doesn't run during replay at all.
 
-**Misplaced idempotency concerns.** Some teams invest heavily in making activities idempotent specifically to protect against replay. Activities absolutely should be idempotent, but the reason is retries (an activity can be retried after a transient failure or worker crash) and recovery, not replay. Conflating the two reasons leads to confused mental models.
+**Misplaced [idempotency](terms/idempotency.md) concerns.** Some teams invest heavily in making activities idempotent specifically to protect against replay. Activities absolutely should be idempotent, but the reason is retries (an activity can be retried after a transient failure or worker crash) and recovery, not replay. Conflating the two reasons leads to confused mental models.
 
-**Over-engineering workflow code.** Developers sometimes add guards or flags in workflow code to "prevent" activities from running again during replay. These guards are unnecessary and can actually introduce non-determinism bugs if they cause the workflow to produce different commands on replay.
+**Over-engineering workflow code.** Developers sometimes add guards or flags in workflow code to "prevent" activities from running again during replay. These guards are unnecessary and can actually introduce [non-determinism](terms/non-determinism.md) bugs if they cause the workflow to produce different commands on replay.
 
 ## How?
 
@@ -30,7 +30,7 @@ Build the correct mental model of what happens during replay:
 3. **The workflow code continues** with that result, exactly as it did during the original execution.
 4. **This repeats** until the workflow catches up to the point where history ends. From that point forward, new commands (activities, timers, etc.) are executed for real.
 
-In practice, replay is what allows Temporal to recover workflow state after a worker crash or restart. The worker re-executes the workflow function, replays all the recorded results, and picks up exactly where it left off. No activity runs twice because of this process.
+In practice, replay is what allows Temporal to recover workflow state after a [worker](terms/worker.md) crash or restart. The worker re-executes the workflow function, replays all the recorded results, and picks up exactly where it left off. No activity runs twice because of this process.
 
 The correct reasons to make activities idempotent are:
 - **Retries:** If an activity fails partway through (e.g., the worker crashes after writing to a database but before reporting success), Temporal will retry it on another worker.

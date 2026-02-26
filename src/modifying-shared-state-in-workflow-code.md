@@ -1,13 +1,13 @@
 # Modifying Shared State in Workflow Code
 
 > [!TIP]
-> * Workflow code runs in a shared worker process -- modifying global variables, singletons, or shared maps creates race conditions and breaks determinism.
+> * Workflow code runs in a shared [worker](terms/worker.md) process -- modifying global variables, singletons, or shared maps creates race conditions and breaks determinism.
 > * Multiple workflow executions run concurrently on the same worker, so shared mutable state is accessed from multiple goroutines/threads without synchronization.
 > * Keep all workflow state local to the workflow function. Use activities for anything that needs to interact with external or shared state.
 
 ## What?
 
-Modifying shared state -- global variables, package-level variables, singletons, static fields, shared maps or caches -- from within workflow code is a mistake that causes two distinct problems: race conditions between concurrent workflow executions and non-determinism on [replay](terms/replay.md).
+Modifying shared state -- global variables, package-level variables, singletons, static fields, shared maps or caches -- from within workflow code is a mistake that causes two distinct problems: race conditions between concurrent workflow executions and [non-determinism](terms/non-determinism.md) on [replay](terms/replay.md).
 
 A Temporal worker runs many workflow executions concurrently in the same process. When workflow code writes to a global variable, every concurrent workflow execution on that worker is racing to read and write the same memory without synchronization.
 
@@ -48,7 +48,7 @@ func MyWorkflow(ctx workflow.Context) error {
 }
 ```
 
-**Use workflow state for data that persists across events.** Variables declared in the workflow function naturally survive replay because the function is re-executed and the values are reconstructed from history. There is no need for external storage to maintain workflow state.
+**Use workflow state for data that persists across events.** Variables declared in the workflow function naturally survive replay because the function is re-executed and the values are reconstructed from [history](terms/event-history.md). There is no need for external storage to maintain workflow state.
 
 **Use activities for external state.** If your workflow needs to read from or write to a shared resource (a database, a cache, a counter service), do it through an activity. The activity result is recorded in history and replayed deterministically.
 

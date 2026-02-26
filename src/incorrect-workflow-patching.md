@@ -7,7 +7,7 @@
 
 ## What?
 
-[Versioning](terms/versioning.md) APIs like `workflow.GetVersion` and `patched()` are the right tool for evolving workflow code, but they have a lifecycle that must be respected. Getting the details wrong -- removing the old branch too early, using incorrect version numbers, or nesting patches improperly -- leads to the same non-determinism errors that patching was supposed to prevent.
+[Versioning](terms/versioning.md) APIs like `workflow.GetVersion` and `patched()` are the right tool for evolving workflow code, but they have a lifecycle that must be respected. Getting the details wrong -- removing the old branch too early, using incorrect version numbers, or nesting patches improperly -- leads to the same [non-determinism](terms/non-determinism.md) errors that patching was supposed to prevent.
 
 Common mistakes include:
 
@@ -35,7 +35,7 @@ The blast radius scales with how many in-flight workflows exist. A single incorr
 4. **Wait again.** Let all workflows started during steps 1-2 complete.
 5. **Remove the patch entirely.** Now no running workflow has this patch marker in its history, so the marker can be safely removed.
 
-**Use replay tests.** Record workflow histories from production and replay them against your updated code in CI. This catches non-determinism errors before they reach production.
+**Use replay tests.** Record [workflow histories](terms/event-history.md) from production and replay them against your updated code in CI. This catches non-determinism errors before they reach production.
 
 **Be conservative with cleanup.** If you're unsure whether all affected workflows have completed, don't remove the old branch yet. The cost of keeping dead code around is low compared to the cost of breaking running workflows.
 

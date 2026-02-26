@@ -3,13 +3,13 @@
 > [!TIP]
 > * Temporal has at-least-once execution semantics for activities -- even with max attempts set to 1, infrastructure failures can cause an activity to execute more than once.
 > * Activities must be designed to produce the same result when run multiple times with the same input.
-> * Use idempotency keys, check-then-act patterns, or database constraints to enforce idempotency.
+> * Use [idempotency](terms/idempotency.md) keys, check-then-act patterns, or database constraints to enforce idempotency.
 
 ## What?
 
-A common misconception is that setting `MaximumAttempts` to 1 on an activity retry policy guarantees that the activity will only run once. This is not the case. Temporal provides at-least-once execution semantics for activities, not exactly-once.
+A common misconception is that setting `MaximumAttempts` to 1 on an activity [retry policy](terms/retry-policy.md) guarantees that the activity will only run once. This is not the case. Temporal provides at-least-once execution semantics for activities, not exactly-once.
 
-Consider this scenario: a worker picks up an activity task, executes the activity successfully (e.g. charges a credit card), but crashes before it can report the result back to the Temporal server. The server, unaware that the activity completed, may schedule the activity for execution again on another worker. The result: the credit card is charged twice.
+Consider this scenario: a [worker](terms/worker.md) picks up an activity task, executes the activity successfully (e.g. charges a credit card), but crashes before it can report the result back to the Temporal server. The server, unaware that the activity completed, may schedule the activity for execution again on another worker. The result: the credit card is charged twice.
 
 This can also happen during network partitions, worker deployments, or any situation where the acknowledgment of a completed activity is lost.
 
@@ -27,7 +27,7 @@ Because the duplicate execution can happen at any time due to infrastructure iss
 
 There are several strategies to make activities idempotent:
 
-**Idempotency keys**: Generate a unique key for each logical operation (e.g. derived from the workflow ID and activity input) and pass it to the downstream system. Payment providers, for instance, typically accept an idempotency key and will return the result of the original request if the same key is sent again.
+**Idempotency keys**: Generate a unique key for each logical operation (e.g. derived from the [workflow ID](terms/workflow-id.md) and activity input) and pass it to the downstream system. Payment providers, for instance, typically accept an idempotency key and will return the result of the original request if the same key is sent again.
 
 **Check-then-act**: Before performing the operation, check whether it has already been done. For example, before inserting a record, check if a record with the same unique identifier already exists. Be aware that this approach is subject to race conditions unless combined with proper locking or database constraints.
 

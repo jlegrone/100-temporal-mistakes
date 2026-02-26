@@ -1,13 +1,13 @@
 # Fallible Local Activities
 
 > [!TIP]
-> * Local activities that fail are retried within the same workflow task, counting against the workflow task timeout.
+> * [Local activities](terms/local-activity.md) that fail are retried within the same [workflow task](terms/workflow-task.md), counting against the workflow task timeout.
 > * If retries take too long, the workflow task times out and the entire workflow task -- including the local activity -- is retried from scratch.
 > * Use local activities only for operations expected to succeed quickly and reliably.
 
 ## What?
 
-Local activities are a performance optimization that bypasses the normal activity task queue. Instead of scheduling an activity on the server and having a worker pick it up, a local activity executes directly within the current workflow task on the same worker. This eliminates the round trip to the server, making local activities ideal for short, fast operations.
+Local activities are a performance optimization that bypasses the normal activity [task queue](terms/task-queue.md). Instead of scheduling an activity on the server and having a worker pick it up, a local activity executes directly within the current workflow task on the same [worker](terms/worker.md). This eliminates the round trip to the server, making local activities ideal for short, fast operations.
 
 The mistake is using local activities for operations that can fail or take a long time to retry. The retry behavior of local activities is fundamentally different from regular activities, and misunderstanding this leads to surprising failures.
 
@@ -25,7 +25,7 @@ Here's what happens when retries exceed the workflow task timeout:
 2. The retries (including backoff delays) consume more time than the workflow task timeout allows.
 3. The workflow task times out.
 4. The Temporal server reschedules the workflow task on a worker.
-5. The workflow replays, hits the local activity again, and starts the retry cycle over from scratch.
+5. The workflow [replays](terms/replay.md), hits the local activity again, and starts the retry cycle over from scratch.
 
 This creates a loop where the local activity never makes progress. The retries always start over because the workflow task keeps timing out.
 
@@ -35,7 +35,7 @@ Follow these guidelines for [using local activities](using-local-activities.md) 
 
 1. **Only use local activities for operations that are expected to succeed quickly.** Good candidates: lightweight computations, in-memory cache lookups, reading local configuration, fast network calls to highly available services.
 
-2. **Keep retry policies minimal or absent.** If you set a retry policy on a local activity, ensure the total time across all retry attempts (including backoff) stays well under the workflow task timeout.
+2. **Keep retry policies minimal or absent.** If you set a [retry policy](terms/retry-policy.md) on a local activity, ensure the total time across all retry attempts (including backoff) stays well under the workflow task timeout.
 
 3. **Use regular activities for anything that might fail.** If the operation calls an external service that could be down, involves network I/O with unpredictable latency, or needs a robust retry policy -- use a regular activity instead.
 

@@ -2,7 +2,7 @@
 
 > [!TIP]
 > * Using a single workflow as a message queue (receiving signals as "messages") creates a scalability bottleneck.
-> * A single workflow's history shard becomes a hot spot under high throughput, leading to [lock contention](workflow-lock-contention-due-to-concurrent-updates.md) and growing history.
+> * A single workflow's [history](terms/event-history.md) shard becomes a hot spot under high throughput, leading to [lock contention](workflow-lock-contention-due-to-concurrent-updates.md) and growing history.
 > * Spread work across multiple workflows or use dedicated queuing systems for queue semantics.
 
 ## What?
@@ -31,8 +31,8 @@ On the surface this looks elegant: you get durability, retries, and visibility f
 All updates to a single workflow's history are serialized through a [workflow-level lock](workflow-lock-contention-due-to-concurrent-updates.md). When many signals arrive concurrently, they all compete for this lock. The result is:
 
 1. **Lock contention**: As signal throughput increases, you'll see a rise in `busy_workflow` errors and dramatically increased end-to-end latency. The workflow becomes a bottleneck.
-2. **Unbounded history growth**: Each signal adds events to the workflow history. A workflow receiving hundreds or thousands of messages will quickly approach the history size limit (50k events by default), at which point the server terminates the workflow.
-3. **Replay cost**: If the worker restarts or the workflow gets evicted from cache, the entire history must be replayed. A workflow with thousands of signal events will take a long time to replay.
+2. **Unbounded history growth**: Each signal adds events to the workflow history. A workflow receiving hundreds or thousands of messages will quickly approach the history size limit (50k events by default), at which point the server [terminates](terms/terminate.md) the workflow.
+3. **Replay cost**: If the [worker](terms/worker.md) restarts or the workflow gets evicted from cache, the entire history must be [replayed](terms/replay.md). A workflow with thousands of signal events will take a long time to replay.
 4. **Single point of failure**: All your "queue processing" is concentrated in one workflow on one shard. If that shard has issues, everything stops.
 
 Temporal scales horizontally across many workflows. It does not scale vertically within a single workflow. Using a workflow as a queue fights against the fundamental architecture.
@@ -56,7 +56,7 @@ This spreads work across many workflow histories and shards, leveraging Temporal
 
 ### Use task queues directly
 
-If the "messages" are really units of work to be processed, consider modeling them as activities dispatched through Temporal's built-in task queue mechanism rather than routing them through a workflow's signal channel.
+If the "messages" are really units of work to be processed, consider modeling them as activities dispatched through Temporal's built-in [task queue](terms/task-queue.md) mechanism rather than routing them through a workflow's signal channel.
 
 ### Use a dedicated message queue
 

@@ -2,20 +2,20 @@
 
 > [!TIP]
 > * By default, all Temporal SDK-to-server communication is unencrypted, meaning workflow data travels in plaintext over the network.
-> * In any production environment, TLS must be configured for worker-to-server and client-to-server connections.
+> * In any production environment, TLS must be configured for [worker](terms/worker.md)-to-server and client-to-server connections.
 > * Temporal supports mutual TLS (mTLS) for both authentication and encryption, which you should enable when possible.
 
 ## What?
 
-Temporal SDKs communicate with the Temporal server over gRPC. Out of the box, these connections are unencrypted. This means all data flowing between your workers and the server (workflow inputs, activity outputs, heartbeat payloads, etc.) is transmitted in plaintext. Anyone with network access can observe or tamper with this traffic.
+Temporal SDKs communicate with the Temporal server over gRPC. Out of the box, these connections are unencrypted. This means all data flowing between your workers and the server (workflow inputs, activity outputs, [heartbeat](terms/heartbeat.md) [payloads](terms/payload.md), etc.) is transmitted in plaintext. Anyone with network access can observe or tamper with this traffic.
 
 This applies to all SDK connections: workers polling for tasks, clients starting workflows, and clients querying workflow state.
 
 ## Why?
 
-Workflow payloads often contain sensitive business data: customer information, financial records, internal identifiers, and so on. Even if you are using a custom data converter to encrypt payloads at the application level, metadata such as workflow IDs, task queue names, namespace names, and Temporal headers are still transmitted in the clear without TLS.
+Workflow payloads often contain sensitive business data: customer information, financial records, internal identifiers, and so on. Even if you are using a custom [data converter](terms/data-converter.md) to encrypt payloads at the application level, metadata such as [workflow IDs](terms/workflow-id.md), [task queue](terms/task-queue.md) names, [namespace](terms/namespace.md) names, and Temporal headers are still transmitted in the clear without TLS.
 
-Beyond confidentiality, TLS also provides integrity (protection against tampering) and, with mutual TLS, authentication (verifying the identity of both client and server). Without mTLS, any process that can reach the Temporal server's gRPC port can start workflows, send signals, or terminate running workflows.
+Beyond confidentiality, TLS also provides integrity (protection against tampering) and, with mutual TLS, authentication (verifying the identity of both client and server). Without mTLS, any process that can reach the Temporal server's gRPC port can start workflows, send [signals](terms/signals.md), or [terminate](terms/terminate.md) running workflows.
 
 In production environments, running without TLS typically violates security compliance requirements (SOC 2, HIPAA, PCI-DSS, etc.) regardless of whether the traffic stays within a private network.
 

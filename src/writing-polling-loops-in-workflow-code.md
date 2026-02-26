@@ -1,8 +1,8 @@
 # Writing Polling Loops in Workflow Code
 
 > [!TIP]
-> * Polling loops using `workflow.Sleep()` add timer events to the history on every iteration, bloating it over time.
-> * Use [signals](terms/signals.md) or updates to push state changes to the workflow instead of polling for them.
+> * Polling loops using `workflow.Sleep()` add timer events to the [history](terms/event-history.md) on every iteration, bloating it over time.
+> * Use [signals](terms/signals.md) or [updates](terms/updates.md) to push state changes to the workflow instead of polling for them.
 > * For long-running polling needs, use an activity or child workflow with [ContinueAsNew](terms/continue-as-new.md).
 
 ## What?
@@ -24,7 +24,7 @@ Each iteration of this loop adds events to the workflow history: at minimum a `T
 
 ## Why?
 
-Temporal workflows are event-sourced. Every operation -- timers, activity calls, child workflows -- adds events to the history. This history is persisted and replayed when the workflow needs to be recovered.
+Temporal workflows are event-sourced. Every operation -- timers, activity calls, [child workflows](terms/child-workflow.md) -- adds events to the history. This history is persisted and [replayed](terms/replay.md) when the workflow needs to be recovered.
 
 A polling loop that runs every 30 seconds generates roughly 2,880 timer event pairs per day, plus the activity events. A workflow polling for a week could easily accumulate tens of thousands of events, approaching or exceeding the default 50,000 event limit.
 
@@ -64,7 +64,7 @@ selector.Select(ctx)
 
 ### Offload polling to an activity
 
-If you genuinely need to poll an external system, do the polling inside an activity with heartbeats. The activity can poll as frequently as needed without adding events to the workflow history:
+If you genuinely need to poll an external system, do the polling inside an activity with [heartbeats](terms/heartbeat.md). The activity can poll as frequently as needed without adding events to the workflow history:
 
 ```go
 func PollUntilReady(ctx context.Context) (Result, error) {

@@ -1,7 +1,7 @@
 # Doing Work Outside of the Workflow
 
 > [!TIP]
-> * Work done before starting a workflow or before sending a signal is not durable -- if the process crashes, that work is lost.
+> * Work done before starting a workflow or before sending a [signal](terms/signals.md) is not durable -- if the process crashes, that work is lost.
 > * Move side-effectful operations into workflows or activities to benefit from Temporal's durability guarantees.
 > * The boundary between "your code" and "Temporal-managed code" is the most dangerous place for data loss.
 
@@ -67,5 +67,5 @@ func MyWorkflow(ctx workflow.Context, data Data) error {
 If you truly need to coordinate between an external system and a workflow, consider these patterns:
 
 1. **Start the workflow first**, then have the workflow perform side effects as activities. The workflow is the durable orchestrator.
-2. **Use idempotency keys**: If you must do work before starting a workflow, make both the external work and the workflow start idempotent so you can safely retry the entire operation.
+2. **Use [idempotency](terms/idempotency.md) keys**: If you must do work before starting a workflow, make both the external work and the workflow start idempotent so you can safely retry the entire operation.
 3. **Signal then act**: Start the workflow upfront (even eagerly), then send signals to it as events arrive. The workflow decides what to do with each signal durably.

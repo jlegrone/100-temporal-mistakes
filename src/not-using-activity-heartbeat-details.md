@@ -1,7 +1,7 @@
 # Not Using Activity Heartbeat Details
 
 > [!TIP]
-> * Activity heartbeats can carry progress information, not just keep-alive signals.
+> * Activity [heartbeats](terms/heartbeat.md) can carry progress information, not just keep-alive signals.
 > * When a long-running activity is retried, the new attempt can retrieve the last heartbeat details and resume from where the previous attempt left off.
 > * This is especially valuable for batch processing, file uploads, or any activity with meaningful progress state.
 
@@ -13,14 +13,14 @@ Without heartbeat details, a retried activity starts from scratch. With heartbea
 
 ## Why?
 
-Consider an activity that processes 10,000 records from a database. Without heartbeat details, if the worker crashes after processing 9,500 records, the next attempt starts over from record 1. That is 9,500 records processed twice for no reason.
+Consider an activity that processes 10,000 records from a database. Without heartbeat details, if the [worker](terms/worker.md) crashes after processing 9,500 records, the next attempt starts over from record 1. That is 9,500 records processed twice for no reason.
 
 The same applies to file uploads (re-uploading from byte 0), data migrations (re-migrating already-migrated rows), or any operation where partial progress is meaningful.
 
 The waste compounds:
 - **Time**: Repeating already-completed work adds latency to the overall workflow.
 - **Resources**: Redundant API calls, database queries, or compute cycles cost real money.
-- **Side effects**: If the work is not fully idempotent, re-processing can cause issues. Even if it is idempotent, it is still unnecessary load on downstream systems.
+- **Side effects**: If the work is not fully [idempotent](terms/idempotency.md), re-processing can cause issues. Even if it is idempotent, it is still unnecessary load on downstream systems.
 
 ## How?
 
@@ -55,7 +55,7 @@ func ProcessRecordsActivity(ctx context.Context, input ProcessRecordsInput) erro
 
 A few practical notes:
 
-**Don't heartbeat too frequently**: Heartbeats generate network traffic to the Temporal server. The SDK throttles heartbeats by default (typically to 80% of the heartbeat timeout interval), but it is still good practice to heartbeat at reasonable intervals (e.g. every N records or every few seconds) rather than after every single item.
+**Don't heartbeat too frequently**: Heartbeats generate network traffic to the Temporal server. The SDK throttles heartbeats by default (typically to 80% of the [heartbeat timeout](terms/heartbeat-timeout.md) interval), but it is still good practice to heartbeat at reasonable intervals (e.g. every N records or every few seconds) rather than after every single item.
 
 **Keep heartbeat details small**: Heartbeat details are serialized and sent over the network. A simple integer index or a small checkpoint struct is fine. Don't stuff the entire state of your activity into the heartbeat.
 

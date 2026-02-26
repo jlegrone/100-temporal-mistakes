@@ -7,14 +7,14 @@
 
 ## What?
 
-When you deploy a new version of your workflow code, all currently running workflows will [replay](terms/replay.md) using that new code. If the updated code produces different commands than what was originally recorded in the workflow's history, Temporal detects the mismatch and raises a non-determinism error. The workflow gets stuck and stops making progress.
+When you deploy a new version of your workflow code, all currently running workflows will [replay](terms/replay.md) using that new code. If the updated code produces different commands than what was originally recorded in the workflow's [history](terms/event-history.md), Temporal detects the mismatch and raises a [non-determinism](terms/non-determinism.md) error. The workflow gets stuck and stops making progress.
 
 This happens because Temporal relies on deterministic replay to reconstruct workflow state. The workflow code is essentially re-executed from the beginning, and at each step Temporal checks that the commands produced match the events already in history. Changing the sequence, type, or parameters of those commands breaks that contract.
 
 Common changes that trigger non-determinism errors include:
 - Adding, removing, or reordering activity calls
 - Changing timer durations
-- Adding or removing child workflow executions
+- Adding or removing [child workflow](terms/child-workflow.md) executions
 - Modifying the arguments passed to an activity
 
 ## Why?

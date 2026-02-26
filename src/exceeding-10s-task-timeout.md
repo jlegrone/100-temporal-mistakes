@@ -7,9 +7,9 @@
 
 ## What?
 
-A workflow task is the unit of work that the Temporal worker processes when executing workflow code. Each time the worker picks up a workflow task, it [replays](terms/replay.md) the workflow history and then executes new workflow code until the next yield point (e.g., waiting for an activity, a timer, or a signal). By default, the server expects a workflow task to complete within 10 seconds.
+A [workflow task](terms/workflow-task.md) is the unit of work that the Temporal [worker](terms/worker.md) processes when executing workflow code. Each time the worker picks up a workflow task, it [replays](terms/replay.md) the [workflow history](terms/event-history.md) and then executes new workflow code until the next yield point (e.g., waiting for an activity, a timer, or a [signal](terms/signals.md)). By default, the server expects a workflow task to complete within 10 seconds.
 
-If the worker fails to return a result within that window, the server considers the task timed out and reschedules it. The worker picks it up again, replays the same history, hits the same bottleneck, times out again -- and the cycle repeats. The workflow is stuck in a livelock: it is not terminated, but it cannot make forward progress either.
+If the worker fails to return a result within that window, the server considers the task timed out and reschedules it. The worker picks it up again, replays the same history, hits the same bottleneck, times out again -- and the cycle repeats. The workflow is stuck in a livelock: it is not [terminated](terms/terminate.md), but it cannot make forward progress either.
 
 You will see this manifest as `WorkflowTaskTimedOut` events accumulating in the workflow history and `workflow_task_schedule_to_start_latency` / `workflow_task_execution_latency` metrics spiking.
 
@@ -17,11 +17,11 @@ You will see this manifest as `WorkflowTaskTimedOut` events accumulating in the 
 
 Three common scenarios lead to exceeding the workflow task timeout:
 
-1. **Expensive computation in workflow code.** Workflow code runs on the worker's workflow task processing goroutine (or thread). CPU-intensive operations like JSON parsing of large payloads, complex data transformations, or cryptographic operations eat into the 10-second budget. Unlike activities, workflow code has no built-in mechanism for heartbeating or extending the deadline.
+1. **Expensive computation in workflow code.** Workflow code runs on the worker's workflow task processing goroutine (or thread). CPU-intensive operations like JSON parsing of large [payloads](terms/payload.md), complex data transformations, or cryptographic operations eat into the 10-second budget. Unlike activities, workflow code has no built-in mechanism for [heartbeating](terms/heartbeat.md) or extending the deadline.
 
 2. **Replaying a large history.** Every workflow task starts by replaying the full event history (unless the workflow is cached in memory). A workflow with tens of thousands of events can spend most of the 10-second budget just on [replay](terms/replay.md), leaving little time for executing new code. This problem compounds: the more the workflow grows, the closer each task gets to the timeout, until eventually replay alone exceeds 10 seconds and the workflow is permanently stuck.
 
-3. **Scheduling too many operations in a single task.** If your workflow code loops and schedules thousands of activities or child workflows without yielding, the resulting workflow task completion message can become very large and slow to process, pushing the task past the timeout.
+3. **Scheduling too many operations in a single task.** If your workflow code loops and schedules thousands of activities or [child workflows](terms/child-workflow.md) without yielding, the resulting workflow task completion message can become very large and slow to process, pushing the task past the timeout.
 
 ## Solution
 

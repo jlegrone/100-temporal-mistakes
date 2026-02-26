@@ -1,9 +1,9 @@
 # Not Draining Activity Tasks Before Shutdown
 
 > [!TIP]
-> * When a worker shuts down, in-flight activities need time to complete. Killing the worker immediately causes activities to time out and retry on another worker, wasting all progress.
-> * Configure a graceful shutdown drain period that gives activities enough time to finish or checkpoint via heartbeats.
-> * Activities should heartbeat regularly and check for cancellation so they can save progress when the worker is shutting down.
+> * When a [worker](terms/worker.md) shuts down, in-flight activities need time to complete. Killing the worker immediately causes activities to time out and retry on another worker, wasting all progress.
+> * Configure a graceful shutdown drain period that gives activities enough time to finish or checkpoint via [heartbeats](terms/heartbeat.md).
+> * Activities should heartbeat regularly and check for [cancellation](terms/cancellation.md) so they can save progress when the worker is shutting down.
 
 ## What?
 
@@ -13,7 +13,7 @@ This is particularly painful for long-running activities (e.g., data migrations,
 
 ## Why?
 
-Temporal workers handle two types of tasks: workflow tasks and activity tasks. Workflow tasks are inherently safe to interrupt because workflows are deterministic and will simply [replay](terms/replay.md) from history on the next worker. Activity tasks, however, represent actual side-effecting work. When an activity is interrupted mid-execution, there is no automatic recovery mechanism other than retrying from the beginning.
+Temporal workers handle two types of tasks: [workflow tasks](terms/workflow-task.md) and activity tasks. Workflow tasks are inherently safe to interrupt because workflows are deterministic and will simply [replay](terms/replay.md) from history on the next worker. Activity tasks, however, represent actual side-effecting work. When an activity is interrupted mid-execution, there is no automatic recovery mechanism other than retrying from the beginning.
 
 Without a drain period:
 - Activities time out, adding unnecessary latency equal to the timeout duration before they are retried.

@@ -1,7 +1,7 @@
 # Not Knowing About the Batch Operations API
 
 > [!TIP]
-> * Temporal provides a batch operations API that can perform operations (terminate, cancel, signal, reset) on many workflows matching a visibility query.
+> * Temporal provides a batch operations API that can perform operations (terminate, [cancel](terms/cancellation.md), [signal](terms/signals.md), reset) on many workflows matching a [visibility](terms/visibility.md) query.
 > * Use batch operations instead of writing scripts that iterate over workflows one by one -- it's more efficient and handles rate limiting for you.
 > * Available via `tctl` and the SDK APIs, this is an essential tool for operational incident response.
 
@@ -50,6 +50,6 @@ Batch operations solve real operational problems:
 
 2. **Via the SDK**: All Temporal SDKs expose batch operation methods on the workflow client. Use these when you need to integrate batch operations into your operational tooling or automation.
 
-3. **Craft precise visibility queries**. The power of batch operations depends on the quality of your visibility query. Use search attributes to tag workflows with metadata (team, environment, feature flag, version) so you can target exactly the right set of workflows.
+3. **Craft precise visibility queries**. The power of batch operations depends on the quality of your visibility query. Use [search attributes](terms/search-attributes.md) to tag workflows with metadata (team, environment, feature flag, version) so you can target exactly the right set of workflows.
 
 4. **Test your query first**. Before running a batch operation, run the visibility query alone to verify it matches the expected set of workflows. A too-broad query applied to a destructive operation like terminate can cause significant damage.

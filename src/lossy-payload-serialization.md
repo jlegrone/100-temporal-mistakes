@@ -3,7 +3,7 @@
 > [!TIP]
 > * Serialization round-trips that lose type information (dates becoming strings, enums becoming ints, custom types flattened) can cause subtle bugs during [replay](terms/replay.md).
 > * The default JSON serializer in most SDKs is convenient but not always lossless -- know its limitations.
-> * Use a [data converter](terms/data-converter.md) that preserves type fidelity, or design your payload types to survive round-trips cleanly.
+> * Use a [data converter](terms/data-converter.md) that preserves type fidelity, or design your [payload](terms/payload.md) types to survive round-trips cleanly.
 
 ## What?
 
@@ -14,7 +14,7 @@ Temporal serializes all workflow and activity inputs and outputs using a [data c
 - Language-specific types like Python's `datetime`, `Decimal`, or `set` lose their identity through JSON.
 - Nested structs may deserialize into generic maps or dictionaries instead of typed objects.
 
-This works fine during the initial execution because the code naturally handles the types it expects. But during [replay](terms/replay.md), the SDK deserializes values from history, and the reconstituted types may not match what the code originally produced.
+This works fine during the initial execution because the code naturally handles the types it expects. But during [replay](terms/replay.md), the SDK deserializes values from [history](terms/event-history.md), and the reconstituted types may not match what the code originally produced.
 
 ## Why?
 

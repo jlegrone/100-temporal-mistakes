@@ -1,13 +1,13 @@
 # Not Validating Replay Safety Before Deployments
 
 > [!TIP]
-> * Deploying non-replay-safe workflow code causes running workflows to fail with non-determinism errors.
-> * Replay tests against production workflow histories should be part of your CI/CD pipeline to catch breaking changes before they reach production.
+> * Deploying non-replay-safe workflow code causes running workflows to fail with [non-determinism](terms/non-determinism.md) errors.
+> * Replay tests against production [workflow histories](terms/event-history.md) should be part of your CI/CD pipeline to catch breaking changes before they reach production.
 > * Combine replay testing with proper [versioning](terms/versioning.md) to safely evolve workflow code over time.
 
 ## What?
 
-When you deploy new worker code, any currently running workflows will eventually [replay](terms/replay.md) using the new code. If the new code has changed the workflow's deterministic sequence of commands (e.g., added, removed, or reordered activities without proper [versioning](terms/versioning.md)), the replay will detect a mismatch between the recorded history and the expected commands. This results in a non-determinism error, and the workflow becomes stuck, unable to make progress.
+When you deploy new [worker](terms/worker.md) code, any currently running workflows will eventually [replay](terms/replay.md) using the new code. If the new code has changed the workflow's deterministic sequence of commands (e.g., added, removed, or reordered activities without proper [versioning](terms/versioning.md)), the replay will detect a mismatch between the recorded history and the expected commands. This results in a non-determinism error, and the workflow becomes stuck, unable to make progress.
 
 Without automated replay validation in your deployment pipeline, these breaking changes are only discovered after deployment when workflows start failing in production.
 
@@ -17,7 +17,7 @@ Temporal workflows are deterministic state machines. The workflow history record
 
 Common changes that break replay safety:
 - Adding or removing an activity call without a version guard
-- Changing the order of activities or child workflow calls
+- Changing the order of activities or [child workflow](terms/child-workflow.md) calls
 - Modifying timer durations for in-flight timers
 - Changing the type or structure of data stored in workflow state
 - Switching from `activity.Execute` to `workflow.SideEffect` or vice versa
