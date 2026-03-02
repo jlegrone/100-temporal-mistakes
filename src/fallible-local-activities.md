@@ -7,7 +7,7 @@
 
 ## What?
 
-Local activities are a performance optimization that bypasses the normal activity [task queue](terms/task-queue.md). Instead of scheduling an activity on the server and having a worker pick it up, a local activity executes directly within the current workflow task on the same [worker](terms/worker.md). This eliminates the round trip to the server, making local activities ideal for short, fast operations.
+Local activities bypass the normal activity [task queue](terms/task-queue.md). Instead of scheduling an activity on the server and having a worker pick it up, a local activity executes directly within the current workflow task on the same [worker](terms/worker.md). This eliminates the round trip to the server, making local activities ideal for short, fast operations.
 
 The mistake is using local activities for operations that can fail or take a long time to retry. The retry behavior of local activities is fundamentally different from regular activities, and misunderstanding this leads to surprising failures.
 
@@ -15,9 +15,9 @@ The mistake is using local activities for operations that can fail or take a lon
 
 Regular activities and local activities handle retries very differently:
 
-**Regular activities** are scheduled as independent tasks. When a regular activity fails, the retry happens as a new task picked up by a worker. The workflow task that scheduled the activity has already completed, so there's no timeout pressure.
+**Regular activities** are scheduled as independent tasks. When one fails, the retry happens as a new task picked up by a worker. The workflow task that scheduled the activity has already completed, so there's no timeout pressure.
 
-**Local activities** execute within the bounds of a workflow task. A workflow task has a default timeout of 10 seconds (see [exceeding the workflow task timeout](exceeding-10s-task-timeout.md)). When a local activity fails and retries, each retry attempt happens within the same workflow task, eating into that timeout budget.
+**Local activities** execute within the bounds of a workflow task. A workflow task has a default timeout of 10 seconds (see [exceeding the workflow task timeout](exceeding-10s-task-timeout.md)). When a local activity fails and retries, each retry attempt runs within the same workflow task, eating into that timeout budget.
 
 Here's what happens when retries exceed the workflow task timeout:
 
@@ -61,4 +61,4 @@ localCtx := workflow.WithLocalActivityOptions(ctx, localActivityOpts)
 err := workflow.ExecuteLocalActivity(localCtx, CallExternalAPI, request).Get(ctx, &result)
 ```
 
-In the "bad" example, if the external API is down, the local activity retries with backoff within the workflow task. After 10 seconds, the workflow task times out, and the whole cycle restarts -- the local activity never gets enough time to exhaust its retries and the workflow is stuck in a retry loop.
+In the "bad" example, if the external API is down, the local activity retries with backoff within the workflow task. After 10 seconds, the workflow task times out and the whole cycle restarts -- the local activity never gets enough time to exhaust its retries, and the workflow is stuck in a retry loop.

@@ -7,11 +7,11 @@
 
 ## What?
 
-A common misconception is that setting `MaximumAttempts` to 1 on an activity [retry policy](terms/retry-policy.md) guarantees that the activity will only run once. This is not the case. Temporal provides at-least-once execution semantics for activities, not exactly-once.
+A common misconception is that setting `MaximumAttempts` to 1 on an activity [retry policy](terms/retry-policy.md) guarantees the activity runs only once. Temporal provides at-least-once execution semantics for activities, not exactly-once.
 
-Consider this scenario: a [worker](terms/worker.md) picks up an activity task, executes the activity successfully (e.g. charges a credit card), but crashes before it can report the result back to the Temporal server. The server, unaware that the activity completed, may schedule the activity for execution again on another worker. The result: the credit card is charged twice.
+Consider this scenario: a [worker](terms/worker.md) picks up an activity task, executes it successfully (e.g. charges a credit card), but crashes before reporting the result back to the Temporal server. The server, unaware that the activity completed, schedules the activity again on another worker. The result: the credit card is charged twice.
 
-This can also happen during network partitions, worker deployments, or any situation where the acknowledgment of a completed activity is lost.
+This also happens during network partitions, worker deployments, or any situation where the acknowledgment of a completed activity is lost.
 
 ## Why?
 
@@ -21,7 +21,7 @@ The consequences of non-idempotent activities range from annoying to catastrophi
 - **State mutations**: records created or updated twice leading to inconsistent state.
 - **External API calls**: side effects triggered multiple times in third-party systems.
 
-Because the duplicate execution can happen at any time due to infrastructure issues, it is not something you can reliably reproduce in development or testing environments. It will happen in production, and when it does, you need your activities to handle it gracefully.
+Because duplicate execution can happen at any time due to infrastructure issues, you cannot reliably reproduce it in development or testing environments. It will happen in production, and when it does, your activities need to handle it gracefully.
 
 ## How?
 
@@ -29,7 +29,7 @@ There are several strategies to make activities idempotent:
 
 **Idempotency keys**: Generate a unique key for each logical operation (e.g. derived from the [workflow ID](terms/workflow-id.md) and activity input) and pass it to the downstream system. Payment providers, for instance, typically accept an idempotency key and will return the result of the original request if the same key is sent again.
 
-**Check-then-act**: Before performing the operation, check whether it has already been done. For example, before inserting a record, check if a record with the same unique identifier already exists. Be aware that this approach is subject to race conditions unless combined with proper locking or database constraints.
+**Check-then-act**: Before performing the operation, check whether it has already been done. For example, before inserting a record, check if a record with the same unique identifier already exists. This approach is subject to race conditions unless combined with proper locking or database constraints.
 
 **Database constraints**: Use unique constraints or conditional writes (e.g. `INSERT ... ON CONFLICT DO NOTHING`, `PutItem` with a condition expression in DynamoDB) to ensure that duplicate operations are rejected at the storage level.
 

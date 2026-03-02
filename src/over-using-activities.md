@@ -13,7 +13,7 @@ This often comes from applying general software design principles (single respon
 
 ## Why?
 
-Activities are not free. Each activity execution generates at minimum three history events: `ActivityTaskScheduled`, `ActivityTaskStarted`, and `ActivityTaskCompleted` (or `ActivityTaskFailed`). These events are persisted in the Temporal server backend, transmitted over the network, and [replayed](terms/replay.md) every time the workflow needs to rebuild its state.
+Activities are not free. Each activity execution generates at least three history events: `ActivityTaskScheduled`, `ActivityTaskStarted`, and `ActivityTaskCompleted` (or `ActivityTaskFailed`). These events are persisted in the Temporal server backend, transmitted over the network, and [replayed](terms/replay.md) every time the workflow rebuilds its state.
 
 The costs add up:
 - **History bloat**: A workflow that schedules hundreds of fine-grained activities accumulates thousands of history events, increasing replay time and pushing toward the [history size limit](<overflowing-workflow-history-size.md>).
@@ -25,8 +25,8 @@ The costs add up:
 
 **Group related operations into a single activity**: If multiple operations naturally belong together and don't individually need Temporal's retry or timeout semantics, combine them. Instead of three activities ("fetch", "validate", "transform"), write one activity ("process") that does all three.
 
-**Use activities at the boundary**: Activities are best used at the boundary between your workflow and external systems (databases, APIs, file systems). Internal logic like validation, transformation, or computation can happen inside the activity or even in the workflow code itself (if it is deterministic and side-effect-free).
+**Use activities at the boundary**: Activities work best at the boundary between your workflow and external systems (databases, APIs, file systems). Internal logic like validation, transformation, or computation can happen inside the activity or in the workflow code itself (if it is deterministic and side-effect-free).
 
 **Ask yourself**: "Does this operation need its own [retry policy](terms/retry-policy.md), timeout, or [heartbeat](terms/heartbeat.md)?" If the answer is no, it probably doesn't need to be a separate activity.
 
-**Don't go too far the other way**: A single activity that runs for 30 minutes and does everything is also problematic because it can't be partially retried and doesn't report progress. The goal is a sensible balance: coarse enough to avoid overhead, fine enough to enable meaningful retries and visibility.
+**Don't go too far the other way**: A single activity that runs for 30 minutes and does everything is also problematic -- it can't be partially retried and doesn't report progress. The goal is a sensible balance: coarse enough to avoid overhead, fine enough to enable meaningful retries and visibility.

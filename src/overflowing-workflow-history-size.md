@@ -1,26 +1,23 @@
 # Overflowing Workflow History Size
 
 > [!TIP]
-> * Workflows are terminated by default when they reach the maximum history size limit (50k events by default).
-> * Large histories take longer to replay, potentially impacting performance when dealing with millions of workflows.
-> * Solution for Long-Running Workflows: Use [ContinueAsNew](terms/continue-as-new.md) to trigger a new workflow instance when certain conditions are met, such as event count, time limits, or a signal reception.
+> * The Temporal server [terminates](terms/terminate.md) workflows that exceed the maximum history size (50k events by default) -- no cleanup runs.
+> * Large histories slow down [replay](terms/replay.md), which compounds across millions of workflows.
+> * Use [ContinueAsNew](terms/continue-as-new.md) to reset the history before it grows too large.
 
 ## What?
-Temporal workflows have hard limits. Default behavior when they are reached is for the server to [terminate](terms/terminate.md) the workflow meaning you don't have a chance for cleanup.
 
-One hard limit is workflow maximum history size. By default, workflows are hard terminated when they cross the 50k events in their history limit. The limit can be tweaked via servers [dynamic configuration](<terms/dynamic-config.md>) values.
+Temporal workflows have hard limits on history size. When a workflow crosses the 50k event limit, the server [terminates](terms/terminate.md) it with no chance for cleanup. You can adjust this limit through [dynamic configuration](terms/dynamic-config.md), but the fundamental constraint remains: histories cannot grow without bound.
 
 ## Why?
 
-[Replay](terms/replay.md) is not a free operation, especially when in memory caches are not hot. Large histories take more time to replay than short ones. 10ms additional replay delay may compound quickly when you run millions of workflows and you suddenly have to replay all of them.
+[Replay](terms/replay.md) is not free, especially when in-memory caches are cold. Large histories take longer to replay than short ones. A 10ms replay delay compounds fast when you run millions of workflows and must replay all of them at once.
 
 ## How?
 
-By default, workflows which are known to accumulate events should be designed with [ContinueAsNew](terms/continue-as-new.md) in mind. You must be able to
+Design workflows that accumulate events to use [ContinueAsNew](terms/continue-as-new.md). Trigger it when:
+- The event count reaches a threshold (e.g. 10,000 events)
+- The workflow has been running longer than a reasonable limit (e.g. 24 hours)
+- A [signal](terms/signals.md) requests it explicitly
 
-Think about triggering [ContinueAsNew](terms/continue-as-new.md) when one of those things:
-- Events counts
-- Time is greater than reasonable limit e.g. 24h.
-- A [signal](terms/signals.md) is received specifically to trigger ContinueAsNew
-
-The timing aspect is important to ensure long running workflows age is capped which greatly simplifies [versioning](terms/versioning.md) and enables [temporal worker kubernetes controller](<terms/temporal-worker-kubernetes-controller.md>) to manage less versions.
+Capping workflow age through time-based triggers also simplifies [versioning](terms/versioning.md) and enables the [Temporal Worker Kubernetes Controller](terms/temporal-worker-kubernetes-controller.md) to manage fewer concurrent versions.

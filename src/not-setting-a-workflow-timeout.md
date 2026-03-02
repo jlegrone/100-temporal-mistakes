@@ -7,7 +7,7 @@
 
 ## What?
 
-When starting a workflow, you can set a `WorkflowExecutionTimeout` that limits how long the entire workflow execution (including all retries and [continue-as-new](terms/continue-as-new.md) chains) can run. If you don't set one, the default is effectively 10 years. In practice, this means the workflow runs until it either completes on its own, fails terminally, or someone manually terminates it.
+When starting a workflow, you can set a `WorkflowExecutionTimeout` that limits how long the entire workflow execution (including all retries and [continue-as-new](terms/continue-as-new.md) chains) can run. If you don't set one, the default is effectively 10 years. The workflow runs until it completes on its own, fails terminally, or someone manually terminates it.
 
 Many teams skip this configuration because their workflows "should" complete in a known timeframe. The workflow processes an order, runs some ETL, or handles a user request -- it'll finish in minutes or hours. Why bother with a timeout?
 
@@ -17,13 +17,13 @@ The problem isn't your workflow under normal conditions. The problem is your wor
 
 Here are some ways a workflow can get stuck without a timeout:
 
-**Bugs in workflow logic.** A conditional branch that never triggers, a loop that never exits, a [signal](terms/signals.md) wait that never receives its signal. Your workflow sits there forever, occupying space in the server's persistence layer and potentially holding external resources.
+**Bugs in workflow logic.** A conditional branch that never triggers, a loop that never exits, a [signal](terms/signals.md) wait that never receives its signal. Your workflow sits there forever, occupying space in the server's persistence layer and holding external resources.
 
-**Abandoned workflows.** A workflow was started for a user action that was later cancelled out of band. Nobody sends the signal or makes the API call to terminate it. Without a timeout, it lingers indefinitely.
+**Abandoned workflows.** A workflow started for a user action that was later cancelled out of band. Nobody sends the signal or makes the API call to terminate it. Without a timeout, it lingers indefinitely.
 
-**Resource accumulation.** One stuck workflow is manageable. A hundred are annoying. Ten thousand -- which can happen quickly if the bug is in a high-volume workflow -- start impacting server performance. Each stuck workflow has [history](terms/event-history.md) that needs to be retained, and in aggregate this can put pressure on your [temporal server backend](terms/temporal-server-backend.md).
+**Resource accumulation.** One stuck workflow is manageable. A hundred are annoying. Ten thousand -- which happens quickly if the bug is in a high-volume workflow -- start impacting server performance. Each stuck workflow has [history](terms/event-history.md) that must be retained, and in aggregate this puts pressure on your [temporal server backend](terms/temporal-server-backend.md).
 
-The execution timeout acts as a safety net. It doesn't replace proper workflow design, but it ensures that no workflow can run forever even if everything else fails. When the timeout fires, the workflow is [terminated](terms/terminate.md) and shows up clearly in your monitoring as timed out.
+The execution timeout acts as a safety net. It doesn't replace proper workflow design, but it ensures that no workflow runs forever even if everything else fails. When the timeout fires, the workflow is [terminated](terms/terminate.md) and shows up clearly in your monitoring as timed out.
 
 ## How?
 

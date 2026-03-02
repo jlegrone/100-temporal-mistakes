@@ -39,4 +39,4 @@ The blast radius scales with how many in-flight workflows exist. A single incorr
 
 **Be conservative with cleanup.** If you're unsure whether all affected workflows have completed, don't remove the old branch yet. The cost of keeping dead code around is low compared to the cost of breaking running workflows.
 
-**Keep patches simple.** Avoid deeply nested patches. If a section of code needs frequent changes, consider restructuring it so the changing logic lives in an activity rather than in workflow code. Activity code can be changed freely without versioning concerns.
+**Keep patches simple.** Avoid deeply nested patches. If a section of code needs frequent changes, restructure it so the changing logic lives in an activity rather than in workflow code. Activity code can change freely without versioning concerns.

@@ -9,13 +9,13 @@
 
 When a workflow is [cancelled](terms/cancellation.md) and you use a [disconnected context for cleanup](not-using-disconnected-context-for-cleanup.md), a common pattern is to start a child workflow to perform compensating actions. The mistake is returning from the parent workflow immediately after calling `ExecuteChildWorkflow()` without waiting for the child to actually start.
 
-`ExecuteChildWorkflow()` returns a future, but the child workflow isn't scheduled on the server the moment you call it. The scheduling happens asynchronously. If the parent workflow completes (returns) before the server processes the child workflow creation, the child may never be started because the parent is already closed.
+`ExecuteChildWorkflow()` returns a future, but the child workflow isn't scheduled on the server the moment you call it. Scheduling happens asynchronously. If the parent workflow completes (returns) before the server processes the child workflow creation, the child may never start because the parent is already closed.
 
 ## Why?
 
-When a parent workflow completes, Temporal stops processing further commands from that workflow execution. If the child workflow creation command hasn't been sent to the server yet -- or hasn't been processed -- it's effectively lost. This is a race condition: sometimes the child starts, sometimes it doesn't, making it particularly tricky to debug.
+When a parent workflow completes, Temporal stops processing further commands from that workflow execution. If the child workflow creation command hasn't been sent to the server yet -- or hasn't been processed -- it's lost. Sometimes the child starts, sometimes it doesn't, making this race condition particularly tricky to debug.
 
-This is especially problematic in cancellation cleanup scenarios where reliability matters most. The whole point of the cleanup child workflow is to run compensating logic, and silently failing to start it defeats the purpose.
+This is especially problematic in cancellation cleanup scenarios where reliability matters most. The whole point of the cleanup child workflow is to run compensating logic -- silently failing to start it defeats the purpose.
 
 ## How?
 

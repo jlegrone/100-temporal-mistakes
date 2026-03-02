@@ -9,22 +9,22 @@
 
 Temporal server relies heavily on its persistence layer (Cassandra, MySQL, or PostgreSQL) for storing [workflow histories](terms/event-history.md), managing [task queues](terms/task-queue.md), and maintaining cluster state. Every workflow start, activity completion, [heartbeat](terms/heartbeat.md), [signal](terms/signals.md), and [query](terms/queries.md) generates database operations.
 
-By default, Temporal does not impose aggressive rate limits on persistence operations. This means the server will issue as many database requests as the workload demands, trusting that the database can handle it. In practice, this trust is misplaced. A sudden spike in workflow starts, a workflow that signals thousands of other workflows in a tight loop, or even normal growth can push the database past its capacity.
+By default, Temporal does not impose aggressive rate limits on persistence operations. The server issues as many database requests as the workload demands, trusting that the database can handle it. That trust is misplaced. A sudden spike in workflow starts, a workflow that signals thousands of other workflows in a tight loop, or even normal growth can push the database past its capacity.
 
 ## Why?
 
 When the persistence layer is overloaded:
 
 - **Latency increases across the board.** All workflows slow down, not just the ones causing the spike. A single misbehaving namespace can degrade the entire cluster.
-- **Timeouts cascade.** Database operations start timing out, which triggers retries, which adds more load, creating a vicious cycle.
+- **Timeouts cascade.** Database operations start timing out, triggering retries that add more load, creating a vicious cycle.
 - **History service shards can get stuck.** If the database is too slow to respond, history shards may stop making progress, causing workflows to appear frozen.
-- **Recovery is slow.** Even after the spike subsides, the database may take time to recover as it processes the backlog, during which the system remains degraded.
+- **Recovery is slow.** Even after the spike subsides, the database takes time to recover as it processes the backlog. The system remains degraded throughout.
 
-Rate limits turn a potential system-wide outage into localized throttling. When a rate limit is hit, the affected requests receive a `ResourceExhausted` error and the caller (SDK or internal service) backs off and retries. The rest of the system continues operating normally.
+Rate limits turn a potential system-wide outage into localized throttling. When a rate limit is hit, affected requests receive a `ResourceExhausted` error and the caller (SDK or internal service) backs off and retries. The rest of the system continues normally.
 
 ## How?
 
-Persistence rate limits are configured via Temporal's [dynamic configuration](terms/dynamic-config.md). The key settings control the maximum number of persistence requests per second at different granularities.
+Configure persistence rate limits via Temporal's [dynamic configuration](terms/dynamic-config.md). The key settings control the maximum persistence requests per second at different granularities.
 
 Key dynamic configuration values to set:
 

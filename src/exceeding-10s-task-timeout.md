@@ -9,7 +9,7 @@
 
 A [workflow task](terms/workflow-task.md) is the unit of work that the Temporal [worker](terms/worker.md) processes when executing workflow code. Each time the worker picks up a workflow task, it [replays](terms/replay.md) the [workflow history](terms/event-history.md) and then executes new workflow code until the next yield point (e.g., waiting for an activity, a timer, or a [signal](terms/signals.md)). By default, the server expects a workflow task to complete within 10 seconds.
 
-If the worker fails to return a result within that window, the server considers the task timed out and reschedules it. The worker picks it up again, replays the same history, hits the same bottleneck, times out again -- and the cycle repeats. The workflow is stuck in a livelock: it is not [terminated](terms/terminate.md), but it cannot make forward progress either.
+If the worker fails to return a result within that window, the server considers the task timed out and reschedules it. The worker picks it up again, replays the same history, hits the same bottleneck, times out again -- and the cycle repeats. The workflow is stuck in a livelock: it is not [terminated](terms/terminate.md), but it cannot make progress either.
 
 You will see this manifest as `WorkflowTaskTimedOut` events accumulating in the workflow history and `workflow_task_schedule_to_start_latency` / `workflow_task_execution_latency` metrics spiking.
 

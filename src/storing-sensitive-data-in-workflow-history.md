@@ -7,7 +7,7 @@
 
 ## What?
 
-Everything that flows through a Temporal workflow is persisted: workflow inputs and outputs, activity inputs and outputs, signal and [update](terms/updates.md) payloads, [query](terms/queries.md) results, [search attributes](terms/search-attributes.md), and memo fields. All of this data is stored in the [Temporal server backend](terms/temporal-server-backend.md) database and is accessible via the Temporal UI, CLI, and API to anyone with the appropriate [namespace](terms/namespace.md) permissions.
+Everything that flows through a Temporal workflow is persisted: workflow inputs and outputs, activity inputs and outputs, signal and [update](terms/updates.md) payloads, [query](terms/queries.md) results, [search attributes](terms/search-attributes.md), and memo fields. This data is stored in the [Temporal server backend](terms/temporal-server-backend.md) database and accessible via the Temporal UI, CLI, and API to anyone with the appropriate [namespace](terms/namespace.md) permissions.
 
 The mistake is treating workflow history like an internal, private data store and passing sensitive information -- passwords, API keys, personally identifiable information, credit card numbers, health records -- directly as workflow or activity parameters.
 
@@ -15,16 +15,16 @@ The mistake is treating workflow history like an internal, private data store an
 
 Sensitive data in workflow history creates multiple risk vectors:
 
-- **Broad visibility.** Anyone with access to the Temporal namespace can inspect workflow histories. In many organizations, operations teams, developers, and on-call engineers all have access. This is far broader than the access controls on your production databases.
+- **Broad visibility.** Anyone with access to the Temporal namespace can inspect workflow histories. Operations teams, developers, and on-call engineers all typically have access -- far broader than the access controls on your production databases.
 - **Persistence and retention.** Workflow histories are retained for the configured namespace retention period (default: 72 hours for closed workflows, indefinitely for open ones). Sensitive data lives in the database for that entire duration.
 - **Compliance violations.** Regulations like GDPR, HIPAA, and PCI-DSS have strict requirements about where sensitive data can be stored, who can access it, and how long it's retained. Workflow history often falls outside the scope of your data governance controls.
-- **Logging and debugging.** Temporal's tooling is designed to make workflow data easily inspectable for debugging purposes. This is a feature for operational data, but a liability for sensitive data.
+- **Logging and debugging.** Temporal's tooling makes workflow data easily inspectable for debugging. This is a feature for operational data, but a liability for sensitive data.
 
 ## How?
 
 ### Use a custom data converter with encryption
 
-Temporal SDKs support custom [data converters](terms/data-converter.md) that can encrypt payloads before they're sent to the server. The data is stored encrypted and only decrypted on [workers](terms/worker.md) that have the encryption key:
+Temporal SDKs support custom [data converters](terms/data-converter.md) that encrypt payloads before sending them to the server. The data is stored encrypted and only decrypted on [workers](terms/worker.md) that have the encryption key:
 
 ```go
 // Configure the client with an encrypting data converter

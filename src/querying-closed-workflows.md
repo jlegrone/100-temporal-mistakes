@@ -7,26 +7,26 @@
 
 ## What?
 
-[Queries](terms/queries.md) are a read-only mechanism to inspect a workflow's current state. Under the hood, the query is dispatched to a worker that has the workflow code registered. The worker [replays](terms/replay.md) the workflow's history to reconstruct its state, then executes the query handler against that state.
+[Queries](terms/queries.md) are a read-only mechanism to inspect a workflow's current state. Under the hood, the query dispatches to a worker with the workflow code registered. The worker [replays](terms/replay.md) the workflow's history to reconstruct its state, then runs the query handler against that state.
 
 For running workflows that are already cached in a worker's memory, this is fast and straightforward. For closed (completed, failed, cancelled, or terminated) workflows, the worker must replay the entire history from scratch to answer the query.
 
 ## Why?
 
-The problem arises when the workflow code has changed between when the workflow ran and when you're querying it. [Replay](terms/replay.md) re-executes the workflow code against the recorded history. If the code has changed in a non-deterministic way (e.g., an activity was added, removed, or reordered without proper [versioning](terms/versioning.md)), replay fails with a [non-determinism](terms/non-determinism.md) error and the query returns an error.
+The problem arises when the workflow code has changed between when the workflow ran and when you query it. [Replay](terms/replay.md) re-executes the workflow code against the recorded history. If the code changed in a non-deterministic way (e.g., an activity was added, removed, or reordered without proper [versioning](terms/versioning.md)), replay fails with a [non-determinism](terms/non-determinism.md) error and the query returns an error.
 
-This means that querying old completed workflows becomes increasingly fragile as the codebase evolves. A query that worked fine yesterday might break today because someone deployed a code change that isn't backwards-compatible with the old workflow's history.
+Querying old completed workflows becomes increasingly fragile as the codebase evolves. A query that worked yesterday might break today because someone deployed a code change that isn't backwards-compatible with the old workflow's history.
 
-The risk is higher for:
+The risk increases for:
 - **Long-lived workflows** that completed months ago, where the code may have changed significantly.
-- **Workflows that weren't properly versioned**, making replay impossible after code changes.
+- **Workflows without proper versioning**, making replay impossible after code changes.
 - **High-throughput systems** where replaying large histories for queries adds unexpected load to workers.
 
 ## How?
 
 1. **Store query-relevant data externally.** If you need to access workflow state after completion, emit the relevant data to an external store (database, search index) during workflow execution. Query the external store instead of the closed workflow.
 
-2. **Use [search attributes](terms/search-attributes.md).** Temporal search attributes are stored on the server and queryable via [visibility](terms/visibility.md) APIs without replaying the workflow. For simple state like status, progress percentage, or business identifiers, search attributes are a better fit than queries.
+2. **Use [search attributes](terms/search-attributes.md).** Temporal search attributes are stored on the server and queryable via [visibility](terms/visibility.md) APIs without replay. For simple state like status, progress percentage, or business identifiers, search attributes fit better than queries.
 
 3. **Maintain backwards-compatible code.** If you must query closed workflows, ensure your workflow code changes are always backwards-compatible using the [versioning](terms/versioning.md) APIs. This requires discipline and increases code complexity over time.
 

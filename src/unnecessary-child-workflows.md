@@ -7,7 +7,7 @@
 
 ## What?
 
-Child workflows are a powerful feature of Temporal, but teams sometimes use them as a default way to decompose work, even when a plain activity would do the job. A common pattern is wrapping a single activity call in a child workflow "just in case" or creating child workflows for every step of a process because it "feels cleaner."
+Child workflows are powerful, but teams sometimes use them as a default way to decompose work, even when a plain activity would do the job. A common pattern is wrapping a single activity call in a child workflow "just in case" or creating child workflows for every step because it "feels cleaner."
 
 ```go
 // Unnecessary: a child workflow that just wraps an activity
@@ -28,9 +28,9 @@ func ParentWorkflow(ctx workflow.Context) error {
 Each child workflow comes with real costs:
 
 1. **Additional history events**: Starting a child workflow generates `StartChildWorkflowExecutionInitiated`, `ChildWorkflowExecutionStarted`, and `ChildWorkflowExecutionCompleted` events in the parent's history, plus the child has its own full workflow history. An activity generates just `ActivityTaskScheduled` and `ActivityTaskCompleted`.
-2. **Coordination overhead**: The parent and child workflows need to coordinate through the Temporal server. This adds latency and consumes server resources compared to scheduling an activity directly.
+2. **Coordination overhead**: The parent and child workflows coordinate through the Temporal server. This adds latency and consumes server resources compared to scheduling an activity directly.
 3. **More complex error handling**: Child workflow failures surface as `ChildWorkflowExecutionError` wrapping the underlying error. You now have two layers of retry configuration, two layers of timeout configuration, and two workflows to reason about when debugging failures.
-4. **Harder to observe**: Instead of seeing a straightforward workflow with activities, operators see a tree of workflows. Tracing a single logical operation now requires jumping between multiple workflow histories.
+4. **Harder to observe**: Instead of a straightforward workflow with activities, operators see a tree of workflows. Tracing a single logical operation requires jumping between multiple workflow histories.
 
 These costs compound quickly when you have many unnecessary child workflows in a single parent.
 

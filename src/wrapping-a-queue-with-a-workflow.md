@@ -24,15 +24,15 @@ func QueueWorkflow(ctx workflow.Context) error {
 }
 ```
 
-On the surface this looks elegant: you get durability, retries, and visibility for free. In practice, it breaks down quickly under any real load.
+On the surface this looks elegant: you get durability, retries, and visibility for free. In practice, it breaks down under any real load.
 
 ## Why?
 
-All updates to a single workflow's history are serialized through a [workflow-level lock](workflow-lock-contention-due-to-concurrent-updates.md). When many signals arrive concurrently, they all compete for this lock. The result is:
+All updates to a single workflow's history are serialized through a [workflow-level lock](workflow-lock-contention-due-to-concurrent-updates.md). When many signals arrive concurrently, they all compete for this lock:
 
-1. **Lock contention**: As signal throughput increases, you'll see a rise in `busy_workflow` errors and dramatically increased end-to-end latency. The workflow becomes a bottleneck.
-2. **Unbounded history growth**: Each signal adds events to the workflow history. A workflow receiving hundreds or thousands of messages will quickly approach the history size limit (50k events by default), at which point the server [terminates](terms/terminate.md) the workflow.
-3. **Replay cost**: If the [worker](terms/worker.md) restarts or the workflow gets evicted from cache, the entire history must be [replayed](terms/replay.md). A workflow with thousands of signal events will take a long time to replay.
+1. **Lock contention**: As signal throughput increases, `busy_workflow` errors rise and end-to-end latency increases dramatically. The workflow becomes a bottleneck.
+2. **Unbounded history growth**: Each signal adds events to the workflow history. A workflow receiving hundreds or thousands of messages quickly approaches the history size limit (50k events by default), at which point the server [terminates](terms/terminate.md) the workflow.
+3. **Replay cost**: If the [worker](terms/worker.md) restarts or the workflow gets evicted from cache, the entire history must be [replayed](terms/replay.md). A workflow with thousands of signal events takes a long time to replay.
 4. **Single point of failure**: All your "queue processing" is concentrated in one workflow on one shard. If that shard has issues, everything stops.
 
 Temporal scales horizontally across many workflows. It does not scale vertically within a single workflow. Using a workflow as a queue fights against the fundamental architecture.
@@ -60,7 +60,7 @@ If the "messages" are really units of work to be processed, consider modeling th
 
 ### Use a dedicated message queue
 
-If you genuinely need message queue semantics (ordering guarantees, consumer groups, backpressure), use a system designed for that purpose (Kafka, SQS, RabbitMQ, etc.) and have Temporal workflows consume from it via activities. Temporal is an orchestration engine, not a message broker.
+If you genuinely need message queue semantics (ordering guarantees, consumer groups, backpressure), use a purpose-built system (Kafka, SQS, RabbitMQ) and have Temporal workflows consume from it via activities. Temporal is an orchestration engine, not a message broker.
 
 ### Partitioned workflows
 

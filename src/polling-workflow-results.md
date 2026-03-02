@@ -26,13 +26,13 @@ for {
 
 Or the equivalent with `GetWorkflowExecutionHistory`, scanning for a `WorkflowExecutionCompleted` event.
 
-This works, but it is wasteful, fragile, and ignores a much better mechanism that every Temporal SDK provides out of the box.
+This works, but it wastes resources, is fragile, and ignores a better mechanism every Temporal SDK provides out of the box.
 
 ## Why?
 
 Polling is problematic for several reasons:
 
-1. **Wasted resources**: Every poll is an RPC to the Temporal server. A polling loop running every few seconds multiplied by many concurrent callers puts unnecessary load on the server and increases API rate limit consumption.
+1. **Wasted resources**: Every poll is an RPC to the Temporal server. A polling loop running every few seconds, multiplied by many concurrent callers, puts unnecessary load on the server and consumes API rate limits.
 2. **Latency tradeoff**: You're forced to choose between frequent polls (more load, lower latency) and infrequent polls (less load, higher latency). Either way, you detect completion later than necessary.
 3. **Error handling complexity**: You need to handle transient RPC errors in your polling loop, decide when to back off, and deal with timeouts. This is boilerplate that obscures your actual business logic.
 4. **Race conditions**: Between detecting completion and fetching the result, the workflow execution could be archived or the run ID could change (if the workflow [continued as new](terms/continue-as-new.md)).
@@ -41,7 +41,7 @@ Polling is problematic for several reasons:
 
 ### From external code (API handlers, scripts, services)
 
-Use the SDK client's blocking result retrieval. Every Temporal SDK provides a method that efficiently waits for a workflow to complete using a long-poll mechanism under the hood:
+Use the SDK client's blocking result retrieval. Every Temporal SDK provides a method that waits efficiently for a workflow to complete using a long-poll mechanism under the hood:
 
 ```go
 // Go SDK
@@ -61,7 +61,7 @@ result = await client.get_workflow_handle(workflow_id).result()
 const result = await client.workflow.getHandle(workflowId).result();
 ```
 
-These methods use the Temporal server's long-poll API internally, which is far more efficient than repeated `Describe` calls. The server holds the connection open and responds immediately when the workflow completes.
+These methods use the Temporal server's long-poll API internally, far more efficient than repeated `Describe` calls. The server holds the connection open and responds immediately when the workflow completes.
 
 ### From within a workflow
 
@@ -76,7 +76,7 @@ func ParentWorkflow(ctx workflow.Context) error {
 }
 ```
 
-Never use activities to poll for workflow results from within a workflow. This wastes activity slots, grows [history](terms/event-history.md) with polling events, and can lead to workflow history overflow for long-running target workflows.
+Never use activities to poll for workflow results from within a workflow. This wastes activity slots, grows [history](terms/event-history.md) with polling events, and leads to workflow history overflow for long-running target workflows.
 
 ### Async notification pattern
 

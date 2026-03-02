@@ -7,24 +7,24 @@
 
 ## What?
 
-When an activity receives a cancellation signal via its context, it is tempting to assume that the parent workflow has been cancelled. After all, workflow cancellation is the most dramatic reason for an activity to be interrupted. But activities can be cancelled for many reasons that have nothing to do with the workflow's lifecycle:
+When an activity receives a cancellation signal via its context, it is tempting to assume the parent workflow has been cancelled. After all, workflow cancellation is the most dramatic reason for an activity to be interrupted. But activities can be cancelled for many reasons unrelated to the workflow's lifecycle:
 
 - **Heartbeat timeout**: the activity failed to heartbeat within its configured `HeartbeatTimeout` and the server considered it stale.
 - **Start-to-close timeout**: the activity exceeded its `StartToCloseTimeout`.
 - **Worker shutdown**: the worker is shutting down gracefully and cancelled all in-flight activities to give them a chance to clean up before the process exits.
 - **Explicit cancellation from the workflow**: the workflow logic decided to cancel a specific activity (e.g. a race pattern where the first result wins and the others are cancelled).
 
-In none of those cases is the workflow itself cancelled.
+In none of these cases is the workflow itself cancelled.
 
 ## Why?
 
-If your activity cancellation handler assumes the workflow is done and acts accordingly -- for example, by skipping compensation logic, by not returning partial results, or by treating the situation as a terminal error -- you'll introduce subtle bugs. The workflow may still be running and waiting for the activity to report back. Returning a misleading error or swallowing a result can cause the workflow to take an incorrect code path, retry unnecessarily, or hang.
+If your activity cancellation handler assumes the workflow is done and acts accordingly -- skipping compensation logic, not returning partial results, or treating the situation as a terminal error -- you'll introduce subtle bugs. The workflow may still be running and waiting for the activity to report back. Returning a misleading error or swallowing a result can cause the workflow to take an incorrect code path, retry unnecessarily, or hang.
 
-This mistake is particularly insidious because it often works fine in tests (where cancellation usually does come from the workflow) and only surfaces in production under timeout or deployment scenarios.
+This mistake is insidious because it often works fine in tests (where cancellation usually does come from the workflow) and only surfaces in production under timeout or deployment scenarios.
 
 ## How?
 
-In Go, the `temporal.IsCanceledError` helper tells you that the context was cancelled but not _why_. To distinguish the reason, you need to check the activity's context and the error type returned by [heartbeating](terms/heartbeat.md):
+In Go, `temporal.IsCanceledError` tells you that the context was cancelled but not _why_. To distinguish the reason, check the activity's context and the error type returned by [heartbeating](terms/heartbeat.md):
 
 1. **Check the context error first.** If `ctx.Err()` returns `context.Canceled`, cancellation was requested. If it returns `context.DeadlineExceeded`, a timeout fired.
 2. **Don't conflate activity cancellation with workflow cancellation.** In your activity code, treat cancellation as "stop what you're doing and return" rather than "the world is ending." Return partial results or a well-defined error that the workflow can interpret.

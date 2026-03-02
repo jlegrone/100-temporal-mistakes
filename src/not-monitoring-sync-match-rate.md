@@ -7,9 +7,9 @@
 
 ## What?
 
-When Temporal's matching service receives a new task, it first checks if there is already a worker polling and waiting for work on that [task queue](terms/task-queue.md). If there is, the task is handed directly to that worker without ever being written to the persistence store. This is called a **sync match** and it is the fast path for task delivery.
+When Temporal's matching service receives a new task, it checks whether a worker is already polling and waiting for work on that [task queue](terms/task-queue.md). If so, the task goes directly to that worker without being written to the persistence store. This is a **sync match** -- the fast path for task delivery.
 
-When no worker is immediately available, the task must be persisted to the database and will be picked up later when a worker eventually polls. This is an **async match** -- it works, but it is slower because it involves a write and a subsequent read from the persistence layer.
+When no worker is immediately available, the task is persisted to the database and picked up later when a worker eventually polls. This is an **async match** -- it works, but it is slower because it involves a database write and a subsequent read.
 
 The sync match rate is the percentage of tasks that take the fast path. Many teams never look at this metric, missing an important signal about the health of their task delivery pipeline.
 
@@ -17,7 +17,7 @@ The sync match rate is the percentage of tasks that take the fast path. Many tea
 
 Sync match rate matters for two reasons:
 
-- **Latency**: A sync-matched task skips the persistence round-trip entirely. This can shave tens of milliseconds off each task delivery, which compounds across a workflow with many sequential tasks.
+- **Latency**: A sync-matched task skips the persistence round-trip entirely. This shaves tens of milliseconds off each task delivery, which compounds across a workflow with many sequential tasks.
 - **Early warning**: Sync match rate tends to degrade before [Schedule-To-Start Latency](not-monitoring-stsl.md) gets bad enough to trigger alerts. If you notice sync match rate dropping from 95% to 70%, your system is telling you that workers are starting to saturate -- even if STSL hasn't visibly spiked yet. This gives you time to react before users notice.
 
 A healthy Temporal deployment typically has a sync match rate above 90% for its primary task queues. If yours is significantly lower, something is off.

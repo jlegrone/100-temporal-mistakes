@@ -7,7 +7,7 @@
 
 ## What?
 
-Temporal does not forcefully interrupt running activities. Activity cancellation is a cooperative protocol: when a cancellation is requested (because the workflow was cancelled, a timeout fired, or the workflow explicitly cancelled the activity), the Temporal server records the cancellation. The worker only learns about it the next time the activity sends a heartbeat. The server responds to that heartbeat with a cancellation indicator, and the activity's context is then cancelled.
+Temporal does not forcefully interrupt running activities. Activity cancellation is a cooperative protocol: when a cancellation is requested (because the workflow was cancelled, a timeout fired, or the workflow explicitly cancelled the activity), the Temporal server records the cancellation. The worker learns about it the next time the activity sends a heartbeat. The server responds to that heartbeat with a cancellation indicator, and the activity's context is then cancelled.
 
 If your activity never heartbeats, the cancellation request sits on the server with no way to reach the worker. The activity continues running to completion, blissfully unaware that it was supposed to stop. You effectively have no cancellation at all.
 
@@ -15,11 +15,11 @@ If your activity never heartbeats, the cancellation request sits on the server w
 
 This matters most for long-running activities -- anything that takes more than a few seconds. Consider these scenarios:
 
-- **Workflow cancellation**: A user cancels a workflow, expecting all in-flight work to stop promptly. An activity without heartbeats keeps running for minutes or hours, consuming resources and potentially producing side effects that should have been avoided.
-- **Timeout-based cancellation**: You configure a `HeartbeatTimeout` expecting that a stuck activity will be detected and cancelled. But if the activity doesn't heartbeat, `HeartbeatTimeout` has no effect -- it can only fire if the server expects heartbeats and stops receiving them.
+- **Workflow cancellation**: A user cancels a workflow, expecting all in-flight work to stop promptly. An activity without heartbeats keeps running for minutes or hours, consuming resources and producing side effects that should have been avoided.
+- **Timeout-based cancellation**: You configure a `HeartbeatTimeout` expecting that a stuck activity will be detected and cancelled. But if the activity doesn't heartbeat, `HeartbeatTimeout` has no effect -- it only fires if the server expects heartbeats and stops receiving them.
 - **Graceful shutdown**: When a worker is shutting down, it cancels in-flight activities. Activities that don't heartbeat won't check for cancellation and may be killed abruptly when the process exits, rather than getting a chance to clean up.
 
-In all these cases, the root cause is the same: cancellation is a message that travels via the heartbeat channel, and if that channel is never used, the message is never delivered.
+In all these cases, the root cause is the same: cancellation travels via the heartbeat channel, and if that channel is never used, the message is never delivered.
 
 ## How?
 
@@ -47,7 +47,7 @@ func LongRunningActivity(ctx context.Context, input Input) error {
 
 1. **Heartbeat at regular intervals.** A good rule of thumb is to heartbeat at least every few seconds for activities that run longer than 10 seconds. The exact interval depends on how quickly you need to respond to cancellation.
 
-2. **Check `ctx.Err()` after heartbeating.** The heartbeat call itself will cancel the context if the server responds with a cancellation signal. After `RecordHeartbeat`, check `ctx.Err()` or simply use the context in your next operation -- it will fail with a `CanceledError` if cancellation was received.
+2. **Check `ctx.Err()` after heartbeating.** The heartbeat call cancels the context if the server responds with a cancellation signal. After `RecordHeartbeat`, check `ctx.Err()` or use the context in your next operation -- it fails with a `CanceledError` if cancellation was received.
 
 3. **Set `HeartbeatTimeout` on the activity options.** Without a `HeartbeatTimeout`, the server has no expectation of heartbeats and won't detect a stuck activity. Set it to a value slightly larger than your expected heartbeat interval:
 

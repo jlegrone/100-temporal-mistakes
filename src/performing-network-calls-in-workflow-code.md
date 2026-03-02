@@ -7,7 +7,7 @@
 
 ## What?
 
-Workflow code must be deterministic because it is re-executed during [replay](terms/replay.md) to reconstruct workflow state. Making network calls -- HTTP requests, database queries, gRPC calls, filesystem reads, or any other I/O -- directly in workflow code violates this requirement.
+Workflow code must be deterministic because it re-executes during [replay](terms/replay.md) to reconstruct workflow state. Making network calls -- HTTP requests, database queries, gRPC calls, filesystem reads, or any other I/O -- directly in workflow code violates this requirement.
 
 A network call is inherently [non-deterministic](terms/non-determinism.md): it might return different data, fail with a different error, have different latency, or time out entirely depending on when it runs. During replay, the call executes again (unlike activity calls, whose results come from history), and the different result causes the workflow to take a different code path, produce different commands, or fail outright.
 
@@ -65,6 +65,6 @@ func MyWorkflow(ctx workflow.Context) error {
 }
 ```
 
-Activities are the correct abstraction for non-deterministic operations. Their results are recorded in [workflow history](terms/event-history.md) and returned directly during replay without re-executing the activity function.
+Activities are the right abstraction for non-deterministic operations. Their results are recorded in [workflow history](terms/event-history.md) and returned directly during replay without re-executing the activity function.
 
 If you need a small piece of non-deterministic data (like a random number or UUID) without the overhead of a full activity, use `workflow.SideEffect`. It executes the function once, records the result, and returns the recorded value on replay. However, for anything involving network I/O, prefer activities because they come with retries, timeouts, and [heartbeating](terms/heartbeat.md) built in.

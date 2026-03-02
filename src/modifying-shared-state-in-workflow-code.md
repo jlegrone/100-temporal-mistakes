@@ -48,7 +48,7 @@ func MyWorkflow(ctx workflow.Context) error {
 }
 ```
 
-**Use workflow state for data that persists across events.** Variables declared in the workflow function naturally survive replay because the function is re-executed and the values are reconstructed from [history](terms/event-history.md). There is no need for external storage to maintain workflow state.
+**Use workflow state for data that persists across events.** Variables declared in the workflow function naturally survive replay because the function re-executes and the values are reconstructed from [history](terms/event-history.md). No external storage is needed to maintain workflow state.
 
 **Use activities for external state.** If your workflow needs to read from or write to a shared resource (a database, a cache, a counter service), do it through an activity. The activity result is recorded in history and replayed deterministically.
 

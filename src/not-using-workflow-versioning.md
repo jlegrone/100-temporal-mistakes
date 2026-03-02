@@ -9,7 +9,7 @@
 
 When you deploy a new version of your workflow code, all currently running workflows will [replay](terms/replay.md) using that new code. If the updated code produces different commands than what was originally recorded in the workflow's [history](terms/event-history.md), Temporal detects the mismatch and raises a [non-determinism](terms/non-determinism.md) error. The workflow gets stuck and stops making progress.
 
-This happens because Temporal relies on deterministic replay to reconstruct workflow state. The workflow code is essentially re-executed from the beginning, and at each step Temporal checks that the commands produced match the events already in history. Changing the sequence, type, or parameters of those commands breaks that contract.
+Temporal relies on deterministic replay to reconstruct workflow state. The workflow code re-executes from the beginning, and at each step Temporal checks that the commands produced match the events already in history. Changing the sequence, type, or parameters of those commands breaks that contract.
 
 Common changes that trigger non-determinism errors include:
 - Adding, removing, or reordering activity calls
@@ -19,7 +19,7 @@ Common changes that trigger non-determinism errors include:
 
 ## Why?
 
-Without [versioning](terms/versioning.md), you can't safely evolve workflow logic while workflows are running. This effectively means you'd have to drain all running workflows before every deployment, which is impractical for long-running workflows that may execute for days, weeks, or even months.
+Without [versioning](terms/versioning.md), you can't safely evolve workflow logic while workflows are running. You'd have to drain all running workflows before every deployment, which is impractical for long-running workflows that may execute for days, weeks, or even months.
 
 Non-determinism errors are particularly painful because they silently break workflows that were previously healthy. You deploy what looks like a harmless change, and suddenly hundreds of in-flight workflows start failing. Recovering from this often requires rolling back the deployment and then manually dealing with workflows that accumulated errors in the meantime.
 

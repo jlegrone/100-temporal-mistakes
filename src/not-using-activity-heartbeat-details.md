@@ -7,13 +7,13 @@
 
 ## What?
 
-Most developers who use activity heartbeats understand their primary purpose: telling the Temporal server that a long-running activity is still alive and hasn't stalled. What many miss is that heartbeats can carry arbitrary data -- progress details that are persisted by the server and made available to the next attempt if the activity needs to be retried.
+Most developers who use activity heartbeats understand their primary purpose: telling the Temporal server that a long-running activity is still alive. What many miss is that heartbeats can carry arbitrary data -- progress details that the server persists and makes available to the next attempt if the activity is retried.
 
 Without heartbeat details, a retried activity starts from scratch. With heartbeat details, a retried activity can pick up where the last attempt left off.
 
 ## Why?
 
-Consider an activity that processes 10,000 records from a database. Without heartbeat details, if the [worker](terms/worker.md) crashes after processing 9,500 records, the next attempt starts over from record 1. That is 9,500 records processed twice for no reason.
+Consider an activity that processes 10,000 records from a database. Without heartbeat details, if the [worker](terms/worker.md) crashes after processing 9,500 records, the next attempt starts from record 1. That is 9,500 records processed twice for no reason.
 
 The same applies to file uploads (re-uploading from byte 0), data migrations (re-migrating already-migrated rows), or any operation where partial progress is meaningful.
 
@@ -55,8 +55,8 @@ func ProcessRecordsActivity(ctx context.Context, input ProcessRecordsInput) erro
 
 A few practical notes:
 
-**Don't heartbeat too frequently**: Heartbeats generate network traffic to the Temporal server. The SDK throttles heartbeats by default (typically to 80% of the [heartbeat timeout](terms/heartbeat-timeout.md) interval), but it is still good practice to heartbeat at reasonable intervals (e.g. every N records or every few seconds) rather than after every single item.
+**Don't heartbeat too frequently**: Heartbeats generate network traffic to the Temporal server. The SDK throttles heartbeats by default (typically to 80% of the [heartbeat timeout](terms/heartbeat-timeout.md) interval), but heartbeat at reasonable intervals (e.g. every N records or every few seconds) rather than after every single item.
 
-**Keep heartbeat details small**: Heartbeat details are serialized and sent over the network. A simple integer index or a small checkpoint struct is fine. Don't stuff the entire state of your activity into the heartbeat.
+**Keep heartbeat details small**: Heartbeat details are serialized and sent over the network. A simple integer index or a small checkpoint struct is fine. Don't stuff your entire activity state into the heartbeat.
 
 **Set a heartbeat timeout**: Heartbeat details are only useful if you have a heartbeat timeout configured on the activity. Without a timeout, the server doesn't monitor heartbeats and won't fail the activity if the worker crashes -- which means no retry and no resumption from heartbeat details.

@@ -15,15 +15,15 @@ func MyWorkflow(ctx workflow.Context, userID string, amount int, currency string
 }
 ```
 
-While this compiles and works, it creates several problems. Each positional argument is serialized as a separate [payload](terms/payload.md) in the Temporal [event history](terms/event-history.md). This means the workflow contract is implicitly defined by the order and types of positional arguments rather than by an explicit named structure.
+While this compiles and works, it creates several problems. Each positional argument is serialized as a separate [payload](terms/payload.md) in the Temporal [event history](terms/event-history.md). The workflow contract is implicitly defined by the order and types of positional arguments rather than by an explicit named structure.
 
 ## Why?
 
-**Cross-SDK portability**: TypeScript and Python SDKs only support a single input argument for workflows and activities. If you need to call a Go workflow from a TypeScript client (or vice versa), multiple positional arguments become a serialization headache. A single struct serializes to a single JSON object that any SDK can deserialize.
+**Cross-SDK portability**: The TypeScript and Python SDKs only support a single input argument for workflows and activities. If you call a Go workflow from a TypeScript client (or vice versa), multiple positional arguments become a serialization headache. A single struct serializes to a single JSON object that any SDK can deserialize.
 
 **Schema evolution**: Adding, removing, or reordering positional arguments is a breaking change. With a single struct, you can add new optional fields without breaking existing callers. You can also deprecate fields gradually.
 
-**Readability**: When you see `StartWorkflow("MyWorkflow", "user-123", 500, "USD")`, it is unclear what each argument means without looking at the function signature. With a struct, `StartWorkflow("MyWorkflow", OrderInput{UserID: "user-123", Amount: 500, Currency: "USD"})` is self-documenting.
+**Readability**: `StartWorkflow("MyWorkflow", "user-123", 500, "USD")` is unclear without looking at the function signature. With a struct, `StartWorkflow("MyWorkflow", OrderInput{UserID: "user-123", Amount: 500, Currency: "USD"})` is self-documenting.
 
 **Testing**: Constructing and asserting on a single input struct is cleaner than juggling multiple arguments.
 

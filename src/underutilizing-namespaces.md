@@ -9,7 +9,7 @@
 
 A Temporal namespace is a logical isolation unit. Each namespace has its own workflow visibility, its own rate limits, its own retention policies, and its own access controls. Workflows in different namespaces are completely invisible to each other.
 
-Despite this, many teams run all of their workflows in a single "default" namespace. Everything -- dev experiments, staging tests, production workflows from different teams with wildly different reliability requirements -- ends up in one big bucket. This is the Temporal equivalent of running all your microservices in one Kubernetes namespace with no resource quotas.
+Despite this, many teams run all their workflows in a single "default" namespace. Everything -- dev experiments, staging tests, production workflows from different teams with wildly different reliability requirements -- ends up in one big bucket. This is the Temporal equivalent of running all your microservices in one Kubernetes namespace with no resource quotas.
 
 ## Why?
 
@@ -17,7 +17,7 @@ Cramming everything into one namespace creates several problems:
 
 - **No rate limit isolation**: One team's runaway workflow can consume the namespace's rate limit budget, starving other teams' workflows. If team A triggers a batch operation that creates 10,000 workflows per second, team B's latency-sensitive payment workflows get throttled.
 - **Noisy visibility**: The workflow list becomes a mess. Finding your team's workflows among thousands of others requires careful [search attribute](terms/search-attributes.md) discipline that most teams don't have.
-- **No access control granularity**: Everyone with access to the namespace can see and operate on everyone else's workflows. An operator trying to cancel a test workflow could accidentally target production workflows if the search query is too broad.
+- **No access control granularity**: Everyone with namespace access can see and operate on everyone else's workflows. An operator trying to cancel a test workflow could accidentally target production workflows with a too-broad search query.
 - **Blast radius**: Configuration changes (retention period, rate limits, archival settings) apply to the entire namespace. Changing retention from 30 days to 7 days because one team doesn't need the history affects all teams.
 - **Operational confusion**: During incidents, it's harder to isolate the impact and triage when all workflows are mixed together.
 

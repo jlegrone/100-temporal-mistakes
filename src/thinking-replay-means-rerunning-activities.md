@@ -7,7 +7,7 @@
 
 ## What?
 
-A very common misconception among Temporal newcomers is believing that when a workflow replays, all of its activities run again. This is not the case. During [replay](terms/replay.md), the workflow code is re-executed from the beginning, but every time it encounters a command to execute an activity, Temporal checks the history and finds the previously recorded result. The activity function itself is never called. The workflow simply receives the same result it got the first time and moves on.
+A common misconception among Temporal newcomers is that when a workflow replays, all of its activities run again. They do not. During [replay](terms/replay.md), the workflow code re-executes from the beginning, but every time it encounters a command to execute an activity, Temporal checks the history and finds the previously recorded result. The activity function itself is never called. The workflow receives the same result it got the first time and moves on.
 
 This confusion often leads to reactions like: "If my workflow has 50 activities and it replays, won't it execute all 50 activities again? That sounds expensive and dangerous!" The answer is no -- replay is purely a local operation that reconstructs the workflow's state by matching commands against recorded history events.
 
@@ -30,7 +30,7 @@ Build the correct mental model of what happens during replay:
 3. **The workflow code continues** with that result, exactly as it did during the original execution.
 4. **This repeats** until the workflow catches up to the point where history ends. From that point forward, new commands (activities, timers, etc.) are executed for real.
 
-In practice, replay is what allows Temporal to recover workflow state after a [worker](terms/worker.md) crash or restart. The worker re-executes the workflow function, replays all the recorded results, and picks up exactly where it left off. No activity runs twice because of this process.
+Replay is what allows Temporal to recover workflow state after a [worker](terms/worker.md) crash or restart. The worker re-executes the workflow function, replays all the recorded results, and picks up exactly where it left off. No activity runs twice because of this process.
 
 The correct reasons to make activities idempotent are:
 - **Retries:** If an activity fails partway through (e.g., the worker crashes after writing to a database but before reporting success), Temporal will retry it on another worker.

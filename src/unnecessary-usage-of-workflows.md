@@ -9,13 +9,13 @@
 
 When teams adopt Temporal, there is a natural temptation to route everything through workflows. After all, if workflows give you retries, observability, and durability, why not use them for everything?
 
-The problem is that Temporal workflows come with overhead. Creating a workflow means persisting a [history](terms/event-history.md), scheduling tasks, consuming server resources, and potentially replaying state. For operations that complete in milliseconds and don't need durability, this overhead is pure cost with no benefit.
+But Temporal workflows come with overhead. Creating a workflow means persisting a [history](terms/event-history.md), scheduling tasks, consuming server resources, and replaying state. For operations that complete in milliseconds and don't need durability, this overhead is pure cost with no benefit.
 
 ## Why?
 
 **Latency**: Starting a workflow, scheduling an activity, and waiting for its completion adds latency compared to a direct function call or API request. For user-facing synchronous operations where response time matters, this overhead can be significant.
 
-**Resource consumption**: Every workflow execution consumes resources on the Temporal server: database storage for the history, shard capacity, and [task queue](terms/task-queue.md) throughput. Routing trivial operations through Temporal wastes these resources and can impact the performance of workflows that actually need them.
+**Resource consumption**: Every workflow execution consumes server resources: database storage for the history, shard capacity, and [task queue](terms/task-queue.md) throughput. Routing trivial operations through Temporal wastes these resources and impacts the performance of workflows that actually need them.
 
 **Complexity**: Wrapping simple operations in workflows adds code (workflow definitions, activity definitions, [worker](terms/worker.md) setup) without adding value. It makes the codebase harder to navigate and increases the surface area for bugs.
 
@@ -33,4 +33,4 @@ Good candidates for workflows include: multi-step business processes, long-runni
 
 Poor candidates include: simple CRUD endpoints, input validation, cache lookups, logging, metrics emission, and any operation where the caller is synchronously waiting for an immediate response.
 
-Temporal is at its best as a control plane for orchestrating complex, long-running, or failure-prone operations. Treat it as such, and keep simple operations simple.
+Temporal works best as a control plane for orchestrating complex, long-running, or failure-prone operations. Treat it as such, and keep simple operations simple.

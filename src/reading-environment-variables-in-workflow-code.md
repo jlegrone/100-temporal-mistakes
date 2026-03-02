@@ -7,7 +7,7 @@
 
 ## What?
 
-Reading environment variables directly in workflow code is a determinism violation. Workflow code is re-executed during [replay](terms/replay.md), and environment variables can return different values depending on which worker handles the replay and what the deployment environment looks like at that time.
+Reading environment variables directly in workflow code is a determinism violation. Workflow code re-executes during [replay](terms/replay.md), and environment variables can return different values depending on which worker handles the replay and what the deployment environment looks like at that time.
 
 ```go
 // BAD: reading env var in workflow code
@@ -71,4 +71,4 @@ func MyWorkflow(ctx workflow.Context) error {
 
 **Read environment variables in activities.** Activity code is not subject to determinism constraints and can freely read environment variables, make network calls, and perform any other non-deterministic operation.
 
-**Read environment variables during worker initialization.** If you need configuration to register workflows or configure options, reading environment variables when the worker starts is perfectly safe -- this code is not replayed.
+**Read environment variables during worker initialization.** If you need configuration to register workflows or set options, reading environment variables when the worker starts is safe -- this code is not replayed.

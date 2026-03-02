@@ -7,9 +7,9 @@
 
 ## What?
 
-[Signals](terms/signals.md) are asynchronous messages sent to a running workflow. They are appended to the workflow's [history](terms/event-history.md) and delivered to the workflow code via signal channels. However, if the workflow completes -- either by returning a result, returning an error, or calling [ContinueAsNew](terms/continue-as-new.md) -- any signals that are sitting in the channel buffer but have not been received by the workflow code are silently dropped.
+[Signals](terms/signals.md) are asynchronous messages sent to a running workflow. They are appended to the workflow's [history](terms/event-history.md) and delivered to the workflow code via signal channels. But if the workflow completes -- by returning a result, returning an error, or calling [ContinueAsNew](terms/continue-as-new.md) -- any signals sitting in the channel buffer that the workflow code has not received are silently dropped.
 
-This is a subtle issue because it creates a race condition: a signal sender believes the signal was delivered (the API call succeeded and the signal was recorded in the history), but the workflow never processes it.
+This creates a race condition: the signal sender believes the signal was delivered (the API call succeeded and the signal was recorded in the history), but the workflow never processes it.
 
 ## Why?
 
@@ -59,10 +59,10 @@ func MyWorkflow(ctx workflow.Context, state MyState) error {
 
 Key points:
 
-**Use non-blocking receive for draining**: The `ReceiveAsync` method (or equivalent in your SDK) checks the channel without blocking. If there are buffered signals, it returns them. If the channel is empty, it returns immediately. This ensures the drain loop terminates.
+**Use non-blocking receive for draining**: `ReceiveAsync` (or equivalent in your SDK) checks the channel without blocking. If there are buffered signals, it returns them. If the channel is empty, it returns immediately. This ensures the drain loop terminates.
 
 **Apply the signals to your state**: Don't just read and discard the signals. Process them the same way you would during normal execution. The state you pass to ContinueAsNew (or use before returning) should reflect all received signals.
 
-**Drain right before completing**: The drain should happen as the last step before the workflow returns or calls ContinueAsNew. Any signals that arrive after the drain but before the completion will be handled by Temporal's built-in mechanism: if a signal is delivered to a completed workflow and the workflow used ContinueAsNew, the signal is delivered to the new execution.
+**Drain right before completing**: Drain as the last step before the workflow returns or calls ContinueAsNew. Signals that arrive after the drain but before completion are handled by Temporal's built-in mechanism: if a signal is delivered to a completed workflow that used ContinueAsNew, the signal goes to the new execution.
 
 **Consider this for all completion paths**: If your workflow can complete in multiple ways (success, error, ContinueAsNew), make sure all paths include signal draining where applicable.
