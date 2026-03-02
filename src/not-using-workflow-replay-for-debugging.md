@@ -7,7 +7,7 @@
 
 ## What?
 
-Temporal's [replay](terms/replay.md) mechanism is not just an internal runtime detail -- it's a debugging tool you can use directly. Every Temporal SDK provides an API to replay a workflow execution from a history file (or history object). You point it at a downloaded history, and the SDK re-executes your workflow code step by step, exactly as it originally ran.
+Temporal's [replay](terms/replay.md) mechanism is not just an internal runtime detail -- it's a debugging tool. Every Temporal SDK provides an API to replay a workflow execution from a history file (or history object). You point it at a downloaded history, and the SDK re-executes your workflow code step by step, exactly as it originally ran.
 
 This means you can:
 
@@ -19,7 +19,7 @@ This means you can:
 
 Debugging workflow code through logs alone is painful. Workflows can run for hours, days, or weeks, interacting with dozens of activities and [child workflows](terms/child-workflow.md). Reproducing the exact sequence of events that led to a bug in a test environment is often impractical.
 
-Replay-based debugging sidesteps all of that. The workflow history *is* the reproduction case -- it contains every activity result, [signal](terms/signals.md), timer, and decision point that the workflow encountered. By replaying it locally, you get a deterministic reproduction every time.
+Replay-based debugging sidesteps all of that. The workflow history *is* the reproduction case -- it contains every activity result, [signal](terms/signals.md), timer, and decision point the workflow encountered. Replaying it locally gives you a deterministic reproduction every time.
 
 Without this technique, teams often resort to:
 

@@ -7,9 +7,9 @@
 
 ## What?
 
-Not all workflow engines support typed inputs and outputs on workflow executions. Temporal does, and it is a powerful feature that is often underused.
+Not all workflow engines support typed inputs and outputs on workflow executions. Temporal does, and this powerful feature is often underused.
 
-A common pattern seen in teams new to Temporal is to start a workflow with no input (or minimal input) and then feed it data through signals or queries after it starts. This turns the workflow into a state machine that waits for external events before it can do anything useful, adding complexity for no real benefit.
+Teams new to Temporal often start a workflow with no input (or minimal input) and then feed it data through signals or queries after it starts. This turns the workflow into a state machine that waits for external events before it can do anything useful, adding complexity for no benefit.
 
 Instead, workflows should accept well-defined typed input structs and return well-defined typed output structs. This makes the workflow's contract explicit and clear from the function signature alone.
 
@@ -17,11 +17,11 @@ Instead, workflows should accept well-defined typed input structs and return wel
 
 Leveraging workflow input and output [payloads](terms/payload.md) provides several benefits:
 
-**Self-documenting workflows**: When a workflow's input type contains all the data it needs, anyone reading the code immediately understands what the workflow expects. No need to trace signal handlers or query handlers to understand the data flow.
+**Self-documenting workflows**: When a workflow's input type contains all the data it needs, anyone reading the code immediately understands what the workflow expects. No need to trace signal or query handlers to understand the data flow.
 
-**Easier testing**: Testing a workflow that takes a typed input and returns a typed output is straightforward. You construct the input, run the workflow, and assert on the output. Testing a workflow that relies on signals arriving in a specific order is significantly more complex.
+**Easier testing**: Testing a workflow that takes a typed input and returns a typed output is straightforward -- construct the input, run the workflow, assert on the output. Testing a workflow that relies on signals arriving in a specific order is significantly more complex.
 
-**Better tooling**: The Temporal UI, CLI (`temporal workflow start`), and observability tools can display and work with typed inputs and outputs. When everything the workflow needs is in its input payload, debugging and inspecting running workflows becomes much easier.
+**Better tooling**: The Temporal UI, CLI (`temporal workflow start`), and observability tools display and work with typed inputs and outputs. When everything the workflow needs is in its input payload, debugging and inspecting running workflows becomes much easier.
 
 **Type safety**: Typed inputs catch errors at compile time (in typed languages) or at deserialization time rather than at runtime deep in your workflow logic.
 

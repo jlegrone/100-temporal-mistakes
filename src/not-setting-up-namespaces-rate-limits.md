@@ -7,23 +7,23 @@
 
 ## What?
 
-Temporal supports multiple namespaces on a single cluster, allowing teams or applications to share infrastructure while maintaining logical isolation. However, without rate limits, this isolation is only logical, not physical. A namespace generating a massive burst of workflow starts, [signals](terms/signals.md), or [queries](terms/queries.md) can consume all available server and database capacity, starving every other namespace on the cluster.
+Temporal supports multiple namespaces on a single cluster, letting teams or applications share infrastructure while maintaining logical isolation. Without rate limits, however, this isolation is only logical, not physical. A namespace generating a massive burst of workflow starts, [signals](terms/signals.md), or [queries](terms/queries.md) can consume all available server and database capacity, starving every other namespace on the cluster.
 
-By default, Temporal's namespace rate limits are either not set or set very high. This means any namespace is free to use as much capacity as it can, and the only backstop is the global persistence rate limit (if configured).
+By default, Temporal's namespace rate limits are either unset or set very high. Any namespace can use as much capacity as it wants, and the only backstop is the global persistence rate limit (if configured).
 
 ## Why?
 
 In multi-tenant environments, resource isolation is critical. Without namespace rate limits:
 
 - **Noisy neighbor problem.** One team running a load test or deploying a bug that starts workflows in a tight loop can bring down workflows for every other team on the cluster.
-- **No predictable performance.** Teams cannot reason about the performance of their workflows because it depends on what every other namespace is doing at the same time.
+- **No predictable performance.** Teams cannot reason about their workflows' performance because it depends on what every other namespace is doing simultaneously.
 - **Incident blast radius is unbounded.** A problem in one namespace becomes a cluster-wide incident affecting all namespaces.
 
 Even in single-tenant setups with multiple namespaces (e.g., separate namespaces for different services), rate limits prevent one service from impacting others during traffic spikes or failure scenarios.
 
 ## How?
 
-Namespace rate limits are configured via Temporal's [dynamic configuration](terms/dynamic-config.md). They can be set globally (as defaults) and overridden per namespace.
+Configure namespace rate limits via Temporal's [dynamic configuration](terms/dynamic-config.md). Set them globally as defaults and override per namespace.
 
 Key dynamic configuration values:
 
@@ -54,7 +54,7 @@ frontend.globalNamespaceRPS:
 
 **Best practices:**
 
-- **Set a reasonable default for all namespaces.** This ensures that any new namespace is automatically rate-limited without manual intervention.
+- **Set a reasonable default for all namespaces.** This ensures any new namespace is automatically rate-limited without manual intervention.
 - **Grant higher limits to namespaces that need them.** Teams can request higher limits based on their expected traffic, and you can increase limits after verifying the cluster has capacity.
 - **Monitor `service_errors_resource_exhausted` metrics by namespace.** This tells you which namespaces are hitting their limits and whether limits need to be adjusted.
 - **Combine with persistence rate limits.** Namespace rate limits control how many requests reach the server, while [persistence rate limits](not-setting-up-persistence-rate-limits.md) protect the database from the total combined load. Both layers are needed for robust protection.

@@ -7,7 +7,7 @@
 
 ## What?
 
-Schedule-To-Start Latency is the delay between the moment Temporal schedules a task ([workflow task](terms/workflow-task.md) or activity task) and the moment a worker actually starts executing it. In a healthy system, this latency is near zero because a worker is almost always available to pick up new tasks immediately. When STSL starts climbing, it means tasks are sitting in a queue waiting for a worker to become available.
+Schedule-To-Start Latency is the delay between when Temporal schedules a task ([workflow task](terms/workflow-task.md) or activity task) and when a worker starts executing it. In a healthy system, this latency is near zero because a worker is almost always available to pick up new tasks immediately. When STSL climbs, tasks are sitting in a queue waiting for a worker.
 
 Many teams deploy Temporal without monitoring this metric, then wonder why their workflows feel slow even though individual activities complete quickly. The bottleneck isn't execution time -- it's time spent waiting in the queue.
 
@@ -18,7 +18,7 @@ STSL is the single best indicator of worker capacity health. Unlike end-to-end w
 When STSL is high:
 - **End-to-end latency degrades** because every task in the workflow pays the queueing penalty. A workflow with 10 sequential activities, each waiting 5 seconds in the queue, adds 50 seconds of pure overhead.
 - **Timeouts can fire prematurely**. The `ScheduleToStart` timeout on activities counts from when the task is scheduled, not when the worker picks it up. High STSL eats into this budget.
-- **Cascading effects** can occur. As tasks pile up, workers may start timing out on [heartbeats](terms/heartbeat.md) for running activities, causing retries that create even more tasks in the queue.
+- **Cascading effects** emerge. As tasks pile up, workers start timing out on [heartbeats](terms/heartbeat.md) for running activities, causing retries that create even more tasks in the queue.
 
 ## How?
 

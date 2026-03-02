@@ -7,7 +7,7 @@
 
 ## What?
 
-In Go, functions commonly return `(result, error)` tuples. It is syntactically valid to return a non-nil value for both. Some developers use this pattern to return partial results alongside an error, for example:
+In Go, functions commonly return `(result, error)` tuples. Returning a non-nil value for both is syntactically valid. Some developers use this pattern to return partial results alongside an error:
 
 ```go
 func MyActivity(ctx context.Context, input Input) (Result, error) {
@@ -24,12 +24,12 @@ In the Temporal Go SDK, when an activity or workflow function returns both a non
 
 ## Why?
 
-The Temporal SDK serializes activity and workflow results into the [event history](terms/event-history.md). When an error is returned, the SDK records a failure event, not a completion event. There is no mechanism to store both a result payload and an error in the same event. The error wins, and the payload is silently dropped.
+The Temporal SDK serializes activity and workflow results into the [event history](terms/event-history.md). When an error is returned, the SDK records a failure event, not a completion event. No mechanism exists to store both a result payload and an error in the same event. The error wins, and the payload is silently dropped.
 
 This is particularly dangerous because:
 
-1. **Silent data loss**: The activity did produce a meaningful (possibly partial) result, but the caller never sees it. There is no warning that the result was discarded.
-2. **Inconsistent behavior with plain Go**: In regular Go code, the caller can inspect both return values. Developers used to this pattern are surprised when Temporal drops the result.
+1. **Silent data loss**: The activity produced a meaningful (possibly partial) result, but the caller never sees it. No warning indicates the result was discarded.
+2. **Inconsistent behavior with plain Go**: In regular Go code, the caller can inspect both return values. Developers accustomed to this pattern are surprised when Temporal drops the result.
 3. **Misleading during development**: If you test your activity function directly (outside of Temporal), the partial result is available. The data loss only manifests when running through the Temporal SDK.
 
 ## Solution
@@ -71,4 +71,4 @@ func MyActivity(ctx context.Context, input Input) (Result, error) {
 
 With this approach, the caller receives the full result (including the partial error description) because the activity completes successfully from Temporal's perspective. The caller can then inspect `Result.PartialErr` and decide how to handle the partial failure.
 
-Note that this guidance is specific to the Go SDK. Other language SDKs may handle this differently based on their language's error handling conventions.
+This guidance is specific to the Go SDK. Other language SDKs may handle this differently based on their error handling conventions.

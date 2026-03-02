@@ -59,4 +59,4 @@ workflow.Sleep(ctx, 10 * time.Minute)
 
 Temporal timers are durable (they survive worker restarts) and deterministic (they produce the same behavior on replay). A `workflow.Sleep` of 10 minutes creates a timer event in history. During replay, the SDK sees the timer event and skips past it instantly rather than waiting again.
 
-Note that in the TypeScript SDK, `Date.now()` and `setTimeout` are automatically patched inside workflow code to be deterministic. However, it is still worth understanding why this matters, because importing an external library that uses raw system time internally can still break determinism.
+In the TypeScript SDK, `Date.now()` and `setTimeout` are automatically patched inside workflow code to be deterministic. However, understanding why this matters is still important, because importing an external library that uses raw system time internally can still break determinism.

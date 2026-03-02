@@ -22,9 +22,9 @@ Without knowing about this API, teams end up writing custom scripts that list wo
 Batch operations solve real operational problems:
 
 - **Incident response at scale**: A bug causes thousands of workflows to get stuck. You need to cancel or reset all of them. Doing this one by one is painfully slow. Batch operations handle the entire set efficiently.
-- **Rate limiting**: The Temporal server enforces rate limits on API calls. A naive script blasting individual requests will quickly hit these limits and either fail or need complex retry logic. Batch operations are handled server-side with proper rate limiting built in.
-- **Atomicity of intent**: A batch operation is a single logical action. You can track its progress, and it won't leave you in a state where half the workflows were processed and the other half weren't because your script crashed.
-- **Auditability**: Batch operations are tracked by the server and visible in the system, giving you a record of what was done and why.
+- **Rate limiting**: The Temporal server enforces rate limits on API calls. A naive script blasting individual requests quickly hits these limits and either fails or needs complex retry logic. Batch operations run server-side with proper rate limiting built in.
+- **Atomicity of intent**: A batch operation is a single logical action. You can track its progress, and it won't leave you with half the workflows processed because your script crashed.
+- **Auditability**: The server tracks batch operations and makes them visible, giving you a record of what was done and why.
 
 ## How?
 
@@ -52,4 +52,4 @@ Batch operations solve real operational problems:
 
 3. **Craft precise visibility queries**. The power of batch operations depends on the quality of your visibility query. Use [search attributes](terms/search-attributes.md) to tag workflows with metadata (team, environment, feature flag, version) so you can target exactly the right set of workflows.
 
-4. **Test your query first**. Before running a batch operation, run the visibility query alone to verify it matches the expected set of workflows. A too-broad query applied to a destructive operation like terminate can cause significant damage.
+4. **Test your query first**. Before running a batch operation, run the visibility query alone to verify it matches the expected workflows. A too-broad query on a destructive operation like terminate causes significant damage.

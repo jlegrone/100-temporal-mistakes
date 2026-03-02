@@ -9,21 +9,21 @@
 
 Temporal's server nodes form a cluster using Ringpop, a protocol based on SWIM (Scalable Weakly-consistent Infection-style Process Group Membership). Ringpop handles membership discovery and consistent hashing, which the server uses to route requests to the correct node (e.g., routing a [workflow task](terms/workflow-task.md) to the history service shard that owns it).
 
-Ringpop communicates over a dedicated port (typically the service's gRPC port + 1) using TCP. This traffic is separate from the gRPC inter-service communication, and has its own TLS configuration. It is common to set up TLS for the gRPC frontend and inter-service connections but overlook Ringpop, leaving cluster membership traffic unencrypted.
+Ringpop communicates over a dedicated port (typically the service's gRPC port + 1) using TCP. This traffic is separate from gRPC inter-service communication and has its own TLS configuration. Teams commonly set up TLS for the gRPC frontend and inter-service connections but overlook Ringpop, leaving cluster membership traffic unencrypted.
 
 ## Why?
 
 An attacker with network access to the Ringpop port could:
 
 - **Observe cluster topology.** Ringpop messages reveal the addresses and roles of all nodes in the cluster.
-- **Inject a rogue node.** Without authentication, a malicious process could join the Ringpop membership ring, potentially disrupting request routing or intercepting internal traffic.
+- **Inject a rogue node.** Without authentication, a malicious process could join the Ringpop membership ring, disrupting request routing or intercepting internal traffic.
 - **Disrupt cluster stability.** By sending crafted membership messages, an attacker could cause nodes to be incorrectly marked as failed, leading to unnecessary resharding and service disruption.
 
 Even in a private network, defense in depth dictates that all internal cluster communication should be encrypted and authenticated. If your security posture requires TLS for gRPC traffic, the same reasoning applies to Ringpop.
 
 ## How?
 
-Ringpop TLS is configured in the Temporal server's YAML configuration file, separately from the gRPC TLS settings. Each service (frontend, history, matching, worker) has its own Ringpop configuration section.
+Configure Ringpop TLS in the Temporal server's YAML configuration file, separately from the gRPC TLS settings. Each service (frontend, history, matching, worker) has its own Ringpop configuration section.
 
 ```yaml
 global:

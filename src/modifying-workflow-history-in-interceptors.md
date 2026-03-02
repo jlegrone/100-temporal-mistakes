@@ -14,13 +14,13 @@ Temporal SDKs support interceptors (sometimes called middleware) that wrap workf
 - Enforcing policies (timeouts, retries).
 - Modifying inputs or outputs.
 
-Because interceptors run as part of the workflow execution pipeline, they participate in the command sequence that gets recorded in history. If an interceptor's behavior changes between the original execution and a [replay](terms/replay.md), the replayed command sequence won't match the recorded [history](terms/event-history.md), resulting in a non-determinism error.
+Because interceptors run as part of the workflow execution pipeline, they participate in the command sequence recorded in history. If an interceptor's behavior changes between the original execution and a [replay](terms/replay.md), the replayed command sequence won't match the recorded [history](terms/event-history.md), resulting in a non-determinism error.
 
 The same risk applies to shared libraries that interceptors (or workflow code) depend on. A seemingly innocent library update can change behavior in ways that break replay.
 
 ## Why?
 
-Interceptors are dangerous in this context precisely because they feel separate from workflow code. A team might carefully version their workflow definitions while freely updating a shared tracing interceptor or a utility library, not realizing that the interceptor is part of the deterministic contract.
+Interceptors are dangerous here precisely because they feel separate from workflow code. A team might carefully version their workflow definitions while freely updating a shared tracing interceptor or a utility library, not realizing that the interceptor is part of the deterministic contract.
 
 Common scenarios that cause problems:
 
@@ -29,13 +29,13 @@ Common scenarios that cause problems:
 - **An interceptor is added or removed** between the original execution and replay. The command sequence changes because the interceptor was adding or modifying commands.
 - **An interceptor conditionally modifies behavior** based on configuration or feature flags that change over time.
 
-In all these cases, the workflow code itself hasn't changed -- but the effective behavior has, and that's what matters for determinism.
+In all these cases, the workflow code hasn't changed -- but the effective behavior has, and that's what matters for determinism.
 
 ## How?
 
 1. **Version interceptor changes like workflow changes.** If an interceptor change alters the command sequence (adding/removing activities, changing how calls are wrapped), use [versioning](terms/versioning.md) to ensure old workflows continue with the old behavior.
 
-2. **Be cautious with shared library updates.** Before updating a library used by interceptors or workflow code, consider whether the update changes any behavior that participates in the command sequence. Review changelogs and test with [replay](terms/replay.md) against existing workflow histories.
+2. **Be cautious with shared library updates.** Before updating a library used by interceptors or workflow code, check whether the update changes any behavior that participates in the command sequence. Review changelogs and test with [replay](terms/replay.md) against existing workflow histories.
 
 3. **Keep interceptors minimal.** The less an interceptor does, the less likely it is to break determinism. Prefer interceptors that only read data (e.g., propagating context) over ones that modify execution flow.
 

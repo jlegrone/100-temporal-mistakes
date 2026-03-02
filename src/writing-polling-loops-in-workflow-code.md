@@ -24,7 +24,7 @@ Each iteration of this loop adds events to the workflow history: at minimum a `T
 
 ## Why?
 
-Temporal workflows are event-sourced. Every operation -- timers, activity calls, [child workflows](terms/child-workflow.md) -- adds events to the history. This history is persisted and [replayed](terms/replay.md) when the workflow needs to be recovered.
+Temporal workflows are event-sourced. Every operation -- timers, activity calls, [child workflows](terms/child-workflow.md) -- adds events to the history. This history is persisted and [replayed](terms/replay.md) when the workflow must recover.
 
 A polling loop that runs every 30 seconds generates roughly 2,880 timer event pairs per day, plus the activity events. A workflow polling for a week could easily accumulate tens of thousands of events, approaching or exceeding the default 50,000 event limit.
 
@@ -64,7 +64,7 @@ selector.Select(ctx)
 
 ### Offload polling to an activity
 
-If you genuinely need to poll an external system, do the polling inside an activity with [heartbeats](terms/heartbeat.md). The activity can poll as frequently as needed without adding events to the workflow history:
+If you genuinely need to poll an external system, poll inside an activity with [heartbeats](terms/heartbeat.md). The activity can poll as frequently as needed without adding events to the workflow history:
 
 ```go
 func PollUntilReady(ctx context.Context) (Result, error) {

@@ -7,7 +7,7 @@
 
 ## What?
 
-Writing deterministic workflow code is one of Temporal's fundamental requirements. Workflow code must produce the same sequence of commands when replayed as it did during the original execution. Violating this rule (by using random numbers, current time, network calls, or non-deterministic data structures directly) causes non-determinism errors that break [replay](terms/replay.md).
+Deterministic workflow code is one of Temporal's fundamental requirements. Workflow code must produce the same sequence of commands when replayed as during the original execution. Violating this rule (by using random numbers, current time, network calls, or non-deterministic data structures directly) causes non-determinism errors that break [replay](terms/replay.md).
 
 The good news is that most Temporal SDKs ship with tools to catch these violations early. The bad news is that many teams either don't know these tools exist or don't enable them.
 
@@ -50,6 +50,6 @@ Go doesn't have a runtime sandbox, but the community provides linting rules that
 
 ### General recommendations
 
-1. **Enable sandbox/linting in CI**: Make determinism checks part of your continuous integration pipeline so violations are caught before code is merged.
-2. **Don't suppress warnings**: When the sandbox or linter flags something, investigate it rather than disabling the check. The warnings exist for a reason.
-3. **Educate the team**: The most common source of non-determinism is developers who are new to Temporal and don't yet understand the replay model. Pair tooling with documentation.
+1. **Enable sandbox/linting in CI**: Make determinism checks part of your CI pipeline so violations are caught before code is merged.
+2. **Don't suppress warnings**: When the sandbox or linter flags something, investigate rather than disabling the check. The warnings exist for a reason.
+3. **Educate the team**: The most common source of non-determinism is developers new to Temporal who don't yet understand the replay model. Pair tooling with documentation.

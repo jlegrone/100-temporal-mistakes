@@ -9,11 +9,11 @@
 
 Temporal's cancellation mechanism is context-based. When a workflow receives a cancellation request, the SDK cancels the root workflow context. Every context derived from it -- including those used by pending activities, child workflows, timers, and selectors -- is cancelled as well.
 
-If your workflow needs to perform cleanup operations after cancellation (sending a notification, releasing a lock, running compensation logic), those operations need a context that is still valid. Using the original context or any of its children will not work: the activity or child workflow will never be scheduled, and the `Get()` call will return a `CanceledError` immediately.
+If your workflow needs to perform cleanup after cancellation (sending a notification, releasing a lock, running compensation logic), those operations need a valid context. Using the original context or any of its children will not work: the activity or child workflow will never be scheduled, and the `Get()` call returns a `CanceledError` immediately.
 
 ## Why?
 
-This is one of the most common cancellation-related mistakes in Temporal workflows. The code to start a cleanup activity looks identical to the code that starts any other activity. There's no compile-time signal that the context is cancelled. The failure mode is silent: the cleanup activity simply doesn't run, and the workflow either completes without cleanup or [deadlocks](<deadlocking-when-workflow-cancelled.md>) depending on how the error is handled.
+This is one of the most common cancellation-related mistakes in Temporal workflows. The code to start a cleanup activity looks identical to any other activity start. There's no compile-time signal that the context is cancelled. The failure mode is silent: the cleanup activity doesn't run, and the workflow either completes without cleanup or [deadlocks](<deadlocking-when-workflow-cancelled.md>) depending on how the error is handled.
 
 The consequences vary depending on what the cleanup was supposed to do:
 
@@ -55,7 +55,7 @@ func MyWorkflow(ctx workflow.Context, input Input) error {
 
 ### Guidelines
 
-1. **Always set a timeout on cleanup activities.** The disconnected context is not cancelled by the workflow, so without a timeout, a stuck cleanup activity could run until its [start-to-close timeout](terms/start-to-close-timeout.md) expires. Keep cleanup bounded and predictable.
+1. **Always set a timeout on cleanup activities.** The disconnected context is not cancelled by the workflow, so without a timeout, a stuck cleanup activity runs until its [start-to-close timeout](terms/start-to-close-timeout.md) expires. Keep cleanup bounded and predictable.
 
 2. **Defer the cancel function.** Even though the context is disconnected from the workflow's cancellation, calling `cancel()` when you're done prevents resource leaks in normal (non-cancelled) execution paths.
 

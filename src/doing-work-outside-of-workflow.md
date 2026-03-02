@@ -36,11 +36,11 @@ err = temporalClient.SignalWorkflow(ctx, workflowID, runID, "channel", result)
 
 ## Why?
 
-The core value of Temporal is durable execution -- your code makes progress even when processes crash, machines fail, or deployments happen. But this guarantee only applies to code that runs inside a workflow or an activity. Any work performed in a caller process (an API handler, a cron job, a CLI tool) is subject to the same failure modes as any ordinary program.
+Temporal's core value is durable execution -- your code makes progress even when processes crash, machines fail, or deployments happen. But this guarantee only applies to code running inside a workflow or activity. Work performed in a caller process (an API handler, a cron job, a CLI tool) is subject to the same failure modes as any ordinary program.
 
-The gap between completing work and starting/signaling a workflow is a window of vulnerability. If the process dies in that gap, you end up with an inconsistent state: side effects have been applied to the external world but Temporal has no record of them and no way to recover.
+The gap between completing work and starting/signaling a workflow is a vulnerability window. If the process dies in that gap, you end up with inconsistent state: side effects have been applied to the external world, but Temporal has no record of them and no way to recover.
 
-This is particularly insidious because it works fine 99.9% of the time. The failures are rare but catastrophic, and they tend to happen exactly when things are already going wrong (under load, during deployments, during infrastructure issues).
+This is particularly insidious because it works fine 99.9% of the time. The failures are rare but catastrophic, and they happen exactly when things are already going wrong (under load, during deployments, during infrastructure issues).
 
 ## How?
 

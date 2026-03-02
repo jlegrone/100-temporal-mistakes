@@ -7,13 +7,13 @@
 
 ## What?
 
-Developers often reach for familiar observability tools inside workflow code -- `log.Info()`, a Prometheus counter, a Datadog span. This works fine during initial execution, but workflow code also runs during [replay](terms/replay.md). Every log statement, every metric increment, and every trace span fires again each time the workflow is replayed.
+Developers often reach for familiar observability tools inside workflow code -- `log.Info()`, a Prometheus counter, a Datadog span. These work fine during initial execution, but workflow code also runs during [replay](terms/replay.md). Every log statement, every metric increment, and every trace span fires again each time the workflow replays.
 
 The result: duplicated logs that make debugging harder, inflated metrics that misrepresent actual activity, and noisy traces that obscure real issues.
 
 ## Why?
 
-When a [worker](terms/worker.md) restarts or a workflow is evicted from cache, the SDK replays the [workflow history](terms/event-history.md) to reconstruct its state. During replay, your workflow code re-executes from the beginning up to the point where new work needs to happen. Any observability calls embedded in that code path fire again.
+When a [worker](terms/worker.md) restarts or a workflow is evicted from cache, the SDK replays the [workflow history](terms/event-history.md) to reconstruct its state. During replay, your workflow code re-executes from the beginning up to the point where new work begins. Any observability calls embedded in that code path fire again.
 
 Consider a workflow that processes 100 items and logs each one. After a single worker restart, you now have 200 log entries for 100 items. After two restarts, 300. With millions of workflows, this noise becomes a real operational problem:
 
@@ -57,4 +57,4 @@ Use the OpenTelemetry [interceptors](terms/interceptor.md) provided by the SDK. 
 
 ### Important caveat
 
-This applies to **workflow code only**. Activity code runs outside the replay mechanism and can safely use any logging, metrics, or tracing library directly. The distinction is important -- don't over-correct by wrapping activity observability in SDK-specific calls when it's unnecessary.
+This applies to **workflow code only**. Activity code runs outside the replay mechanism and can safely use any logging, metrics, or tracing library directly. Don't over-correct by wrapping activity observability in SDK-specific calls when it's unnecessary.

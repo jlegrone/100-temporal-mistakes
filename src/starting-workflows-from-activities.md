@@ -7,19 +7,19 @@
 
 ## What?
 
-A common mistake is using an activity to start another workflow by calling the Temporal SDK client from within the activity function. While this technically works, it misuses the purpose of activities and introduces subtle problems.
+A common mistake is using an activity to start another workflow by calling the Temporal SDK client from within the activity function. While this technically works, it misuses activities and introduces subtle problems.
 
-Activities are designed for interactions with the outside world -- calling APIs, reading files, writing to databases. Starting a Temporal workflow is an internal platform operation that has first-class support in workflow code via child workflows.
+Activities are designed for interactions with the outside world -- calling APIs, reading files, writing to databases. Starting a Temporal workflow is an internal platform operation with first-class support in workflow code via child workflows.
 
 ## Why?
 
 When you start a workflow from an activity, several things go wrong:
 
-1. **Invisible to the parent workflow.** The child workflow start doesn't appear in the parent workflow's [event history](terms/event-history.md). There's no parent-child relationship tracked by Temporal, so you lose visibility into the relationship between the two workflows.
+1. **Invisible to the parent workflow.** The child workflow start doesn't appear in the parent workflow's [event history](terms/event-history.md). Temporal tracks no parent-child relationship, so you lose visibility into the relationship between the two workflows.
 
 2. **Duplicate workflows on retry.** If the activity fails after starting the workflow (e.g., network timeout on the response), the activity will be retried and attempt to start the workflow again. Unless you've carefully set a deterministic [workflow ID](terms/workflow-id.md) with a dedup policy, you'll end up with duplicate workflows.
 
-3. **No [cancellation](terms/cancellation.md) propagation.** Parent-child workflow cancellation propagation is a built-in feature of Temporal, but only works with proper child workflows. A workflow started from an activity is completely detached from the parent.
+3. **No [cancellation](terms/cancellation.md) propagation.** Temporal propagates cancellation from parent to child workflows automatically, but only with proper child workflows. A workflow started from an activity is completely detached from the parent.
 
 4. **No result forwarding.** With child workflows, the parent can await the child's result directly. With an activity-started workflow, you'd need to build your own mechanism to get the result back.
 

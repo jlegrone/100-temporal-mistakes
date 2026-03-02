@@ -9,11 +9,11 @@
 
 In addition to the [50k event count limit](<overflowing-workflow-history-size.md>), Temporal enforces a separate hard limit on the total byte size of a workflow's history. By default, this limit is 50MB (configurable via [dynamic configuration](<terms/dynamic-config.md>)). When a workflow's history exceeds this byte-size threshold, the server [terminates](terms/terminate.md) it -- just like with the event count limit, there is no chance for cleanup.
 
-This means a workflow can be terminated well before reaching 50k events if its individual events carry large [payloads](terms/payload.md). A workflow with only a few hundred activity completions can hit the byte limit if each result contains megabytes of serialized data.
+A workflow can be terminated well before reaching 50k events if its individual events carry large [payloads](terms/payload.md). A workflow with only a few hundred activity completions can hit the byte limit if each result contains megabytes of serialized data.
 
 ## Why?
 
-It is easy to focus solely on the event count limit and overlook the byte-size limit. A workflow that processes modest numbers of activities might seem safe from the 50k event cap, but if those activities return large results (images, documents, serialized datasets, etc.), the cumulative history size in bytes grows quickly.
+Developers often focus solely on the event count limit and overlook the byte-size limit. A workflow that processes modest numbers of activities might seem safe from the 50k event cap, but if those activities return large results (images, documents, serialized datasets, etc.), the cumulative history size in bytes grows quickly.
 
 During [replay](terms/replay.md), the entire history must be fetched from the [server backend](<terms/temporal-server-backend.md>) and deserialized by the [worker](terms/worker.md). Large histories in bytes mean:
 

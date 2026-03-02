@@ -7,17 +7,17 @@
 
 ## What?
 
-A common assumption is that when a workflow times out, it receives some kind of cancellation signal and gets a chance to run cleanup logic -- compensation steps, releasing external resources, notifying downstream services. This is wrong.
+A common assumption is that when a workflow times out, it receives a cancellation signal and gets a chance to run cleanup logic -- compensation steps, releasing external resources, notifying downstream services. This is wrong.
 
-Workflow execution timeouts and run timeouts are enforced by the Temporal server. When the timeout is reached, the server [terminates](terms/terminate.md) the workflow. Termination is the equivalent of `kill -9`: the workflow code simply stops running. No deferred functions execute, no cancellation handlers fire, no cleanup happens.
+The Temporal server enforces workflow execution timeouts and run timeouts. When the timeout fires, the server [terminates](terms/terminate.md) the workflow. Termination is the equivalent of `kill -9`: the workflow code stops running. No deferred functions execute, no cancellation handlers fire, no cleanup happens.
 
-This catches people off guard because activity cancellation works differently. When you cancel a workflow via the API, activities receive a cancellation signal and can perform cleanup. But a timeout-triggered termination skips all of that.
+This catches people off guard because cancellation works differently. When you cancel a workflow via the API, activities receive a cancellation signal and can perform cleanup. But a timeout-triggered termination skips all of that.
 
 ## Why?
 
 If your workflow relies on timeout-triggered cleanup for correctness -- say, releasing a distributed lock, sending a failure notification, or running compensation logic -- none of that code will ever execute when the timeout fires. You end up with leaked resources, inconsistent state, and no indication of what went wrong beyond a "Terminated" status in the UI.
 
-This is particularly dangerous for workflows that hold external state. A workflow that acquires a lease on an external resource and expects to release it on timeout will simply leave that lease dangling forever.
+This is particularly dangerous for workflows that hold external state. A workflow that acquires a lease on an external resource and expects to release it on timeout will leave that lease dangling forever.
 
 ## How?
 

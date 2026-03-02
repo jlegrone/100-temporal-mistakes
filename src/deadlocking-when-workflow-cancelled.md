@@ -9,7 +9,7 @@
 
 When Temporal delivers a cancellation request to a workflow, the SDK cancels the workflow's context. This in turn cancels every derived context, including those associated with pending activities and child workflows. Any `Future.Get()` call on a pending activity will immediately return a `CanceledError`.
 
-The deadlock happens when workflow code is structured to perform cleanup after catching the cancellation but uses the original (now cancelled) context to do it. A common pattern that triggers this:
+The deadlock happens when workflow code performs cleanup after catching the cancellation but uses the original (now cancelled) context. A common pattern that triggers this:
 
 ```go
 func MyWorkflow(ctx workflow.Context, input Input) error {
@@ -31,11 +31,11 @@ func MyWorkflow(ctx workflow.Context, input Input) error {
 }
 ```
 
-When the workflow is cancelled, `MainActivity` returns a `CanceledError`, the function returns, the `defer` fires, and `CleanupActivity` is scheduled with the cancelled context. The activity is never dispatched to a [worker](terms/worker.md). The `Get()` call returns immediately with a `CanceledError`. In many cases the workflow ends up in a state where no forward progress is possible, causing it to deadlock from Temporal's perspective.
+When the workflow is cancelled, `MainActivity` returns a `CanceledError`, the function returns, the `defer` fires, and `CleanupActivity` is scheduled with the cancelled context. The activity is never dispatched to a [worker](terms/worker.md). The `Get()` call returns immediately with a `CanceledError`. The workflow often ends up in a state where no forward progress is possible, causing it to deadlock from Temporal's perspective.
 
 ## Why?
 
-This deadlock is particularly frustrating because the code looks correct at first glance. The `defer` pattern is idiomatic Go and cleanup-after-error is a natural instinct. The problem is that Temporal's cancellation model is cooperative and context-based: once a context is cancelled, nothing scheduled on it will execute.
+This deadlock is frustrating because the code looks correct at first glance. The `defer` pattern is idiomatic Go and cleanup-after-error is a natural instinct. But Temporal's cancellation model is cooperative and context-based: once a context is cancelled, nothing scheduled on it executes.
 
 Deadlocked workflows are stuck. They don't complete, they don't fail, they just sit there consuming resources and cluttering your workflow list. They typically require manual [termination](terms/terminate.md) to clear, which means your cleanup logic never runs at all -- the exact opposite of what you intended.
 

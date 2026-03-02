@@ -7,7 +7,7 @@
 
 ## What?
 
-Temporal workflow IDs serve a dual purpose: they uniquely identify a workflow execution and they provide an [idempotency](terms/idempotency.md) mechanism. By default, starting a workflow with an ID that already has a running execution will be rejected with a `WorkflowExecutionAlreadyStarted` error.
+Temporal workflow IDs serve a dual purpose: they uniquely identify a workflow execution and provide an [idempotency](terms/idempotency.md) mechanism. By default, starting a workflow with an ID that already has a running execution fails with a `WorkflowExecutionAlreadyStarted` error.
 
 The mistake is choosing workflow IDs that don't align with your business semantics -- either too broad, too narrow, or entirely random.
 
@@ -15,7 +15,7 @@ The mistake is choosing workflow IDs that don't align with your business semanti
 
 **IDs that are too broad** cause unintended conflicts. If you use `"process-order"` as your workflow ID for all order processing, only one order can be processed at a time. The second order submission fails because the first workflow is still running.
 
-**IDs that are too narrow or random** (e.g., UUIDs) throw away Temporal's built-in deduplication. If a client retries starting a workflow due to a transient error and uses a different random ID each time, you end up with duplicate workflows processing the same business operation. You then need to build your own deduplication mechanism on top.
+**IDs that are too narrow or random** (e.g., UUIDs) throw away Temporal's built-in deduplication. If a client retries starting a workflow due to a transient error and uses a different random ID each time, you get duplicate workflows processing the same business operation. You then need to build your own deduplication mechanism on top.
 
 **Poorly scoped IDs** also make it harder to find and manage workflows in the Temporal UI or via the API. A workflow ID like `process-order-12345` tells you exactly what it's doing and for which entity. A UUID tells you nothing.
 

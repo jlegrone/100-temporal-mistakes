@@ -14,11 +14,11 @@ Temporal serializes all workflow and activity inputs and outputs using a [data c
 - Language-specific types like Python's `datetime`, `Decimal`, or `set` lose their identity through JSON.
 - Nested structs may deserialize into generic maps or dictionaries instead of typed objects.
 
-This works fine during the initial execution because the code naturally handles the types it expects. But during [replay](terms/replay.md), the SDK deserializes values from [history](terms/event-history.md), and the reconstituted types may not match what the code originally produced.
+This works fine during initial execution because the code naturally handles the types it expects. But during [replay](terms/replay.md), the SDK deserializes values from [history](terms/event-history.md), and the reconstituted types may not match what the code originally produced.
 
 ## Why?
 
-Replay depends on the ability to faithfully reconstruct the state of a workflow execution from its history. When deserialized values don't match the original types, several things can go wrong:
+Replay depends on faithfully reconstructing workflow execution state from history. When deserialized values don't match the original types, several things can go wrong:
 
 1. **Comparison failures**: A value that was a `time.Time` is now a `string`. Comparisons or arithmetic on it may behave differently or fail.
 2. **Type assertion errors**: Code that type-asserts or pattern-matches on the deserialized value may fail during replay even though it worked during the original execution.

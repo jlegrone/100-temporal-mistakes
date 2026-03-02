@@ -7,7 +7,7 @@
 
 ## What?
 
-A common anti-pattern is building a "god workflow" that tries to handle every aspect of a business process in a single workflow execution. For example, an order processing workflow that handles payment, inventory, shipping, notifications, analytics, and customer support ticket creation all in one place.
+A common anti-pattern is building a "god workflow" that handles every aspect of a business process in a single workflow execution. For example, an order processing workflow that handles payment, inventory, shipping, notifications, analytics, and customer support ticket creation all in one place.
 
 While it may seem convenient to have everything in one workflow, this approach breaks down as the system grows.
 
@@ -17,7 +17,7 @@ While it may seem convenient to have everything in one workflow, this approach b
 
 **[Workflow lock contention](<workflow-lock-contention-due-to-concurrent-updates.md>)**: When a single workflow handles many concerns, it often receives concurrent updates ([signals](terms/signals.md), activity completions, [queries](terms/queries.md)) that compete for the workflow lock. This creates contention and increases end-to-end latency.
 
-**Complex versioning**: When you need to change one aspect of the workflow (say, the notification logic), you have to version the entire monolithic workflow. With separate workflows, you only version the one that changed. [ContinueAsNew](terms/continue-as-new.md) also becomes harder to implement when the workflow carries a large amount of diverse state.
+**Complex versioning**: When you need to change one aspect of the workflow (say, the notification logic), you must version the entire monolithic workflow. With separate workflows, you only version the one that changed. [ContinueAsNew](terms/continue-as-new.md) also becomes harder to implement when the workflow carries a large amount of diverse state.
 
 **Single point of failure**: If the workflow gets stuck, [terminates](terms/terminate.md), or hits a bug, every concern it handles is affected. Independent workflows isolate failures.
 
@@ -25,7 +25,7 @@ While it may seem convenient to have everything in one workflow, this approach b
 
 ## How?
 
-**Decompose by concern**: Identify independent concerns and give each one its own workflow. The order workflow handles order state. A separate notification workflow handles notifications. A separate analytics workflow handles event tracking.
+**Decompose by concern**: Identify independent concerns and give each its own workflow. The order workflow handles order state. A separate notification workflow handles notifications. A separate analytics workflow handles event tracking.
 
 **Use child workflows for sub-processes**: When a concern is logically subordinate to a parent process, model it as a child workflow. For example, a payment workflow might spawn a child workflow for each retry strategy or payment method.
 
