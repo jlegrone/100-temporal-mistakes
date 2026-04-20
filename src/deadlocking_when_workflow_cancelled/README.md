@@ -1,9 +1,9 @@
 # Deadlocking When a Workflow Is Canceled
 
 > [!TIP]
-> When a workflow is [canceled](../terms/cancelation.md), blocking calls like `Receive` that don't also listen for `ctx.Done()` will block forever, preventing the workflow from making progress.
+> When a workflow is [canceled](../terms/cancelation.md), any blocking operation that doesn't also check for cancelation will block forever, preventing the workflow from making progress.
 
-When Temporal delivers a cancelation request, the SDK cancels the workflow's context. But operations that block without checking for cancelation -- like `channel.Receive(ctx, ...)` -- will never unblock, because the event they're waiting for will never arrive. The workflow is stuck: it can't complete, can't run cleanup, and will sit there until it hits a workflow timeout or is manually terminated.
+Temporal [cancelation](../terms/cancelation.md) is cooperative. The SDK signals that cancelation was requested, but it's up to the workflow code to notice and respond. If a workflow is blocked waiting for a [signal](../terms/signals.md), a timer, or any other event without also checking for cancelation, it will never unblock -- the event it's waiting for will never arrive. The workflow is stuck: it can't complete, can't run cleanup, and will sit there until it hits a workflow timeout or is manually [terminated](../terms/terminate.md).
 
 <!--SNIPSTART deadlocking-cancelled-bad-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
@@ -27,7 +27,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-The fix: use a `Selector` to listen for both the expected event and `ctx.Done()`, so the workflow unblocks on cancelation:
+The fix: wait for both the expected event and cancelation simultaneously, so the workflow unblocks either way:
 
 <!--SNIPSTART deadlocking-cancelled-good-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
