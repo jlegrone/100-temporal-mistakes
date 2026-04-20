@@ -36,4 +36,4 @@ func ProcessOrderActivity(ctx context.Context, orderID string) error {
 }
 ```
 
-The activity should not try to be smarter than the workflow. Let the workflow decide what cancelation means and orchestrate any cleanup. The activity should simply stop work and return the cancelation error.
+The activity should not try to be smarter than the workflow. Let the workflow decide what cancelation means and orchestrate any cleanup like updating order status. The activity should simply stop work and return the cancelation error. It is appropriate, however, to clean up resources local to the activity itself on cancelation -- for example, closing open files, releasing a lock, or closing a database connection.
