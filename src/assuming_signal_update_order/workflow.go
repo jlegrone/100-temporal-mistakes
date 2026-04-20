@@ -6,21 +6,48 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-// @@@SNIPSTART assuming-signal-update-order-workflow
 // Change represents an update payload with a ULID for ordering.
 type Change struct {
 	ID   string // ULID
 	Data string
 }
 
-func MyWorkflow(ctx workflow.Context) error {
+// @@@SNIPSTART assuming-signal-update-order-workflow-v1
+
+// MyWorkflowV1 accepts all updates regardless of order.
+// If updates arrive out of order, the workflow silently applies them
+// in whatever order they were delivered.
+func MyWorkflowV1(ctx workflow.Context) (string, error) {
+	var lastData string
+
+	err := workflow.SetUpdateHandler(ctx, "apply-change",
+		func(ctx workflow.Context, c Change) error {
+			lastData = c.Data
+			return nil
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+
+	workflow.GetSignalChannel(ctx, "done").Receive(ctx, nil)
+
+	return lastData, nil
+}
+
+// @@@SNIPEND
+
+// @@@SNIPSTART assuming-signal-update-order-workflow-v2
+
+// MyWorkflowV2 rejects out-of-order updates using a ULID-based validator.
+func MyWorkflowV2(ctx workflow.Context) (string, error) {
 	var lastID string
-	var applied []Change
+	var lastData string
 
 	err := workflow.SetUpdateHandlerWithOptions(ctx, "apply-change",
 		func(ctx workflow.Context, c Change) error {
 			lastID = c.ID
-			applied = append(applied, c)
+			lastData = c.Data
 			return nil
 		},
 		workflow.UpdateHandlerOptions{
@@ -33,12 +60,12 @@ func MyWorkflow(ctx workflow.Context) error {
 		},
 	)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Wait for a "done" signal to complete the workflow.
 	workflow.GetSignalChannel(ctx, "done").Receive(ctx, nil)
-	return nil
+
+	return lastData, nil
 }
 
 // @@@SNIPEND
