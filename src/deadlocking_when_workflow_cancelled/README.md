@@ -1,9 +1,9 @@
 # Deadlocking When a Workflow Is Canceled
 
 > [!TIP]
-> When a workflow is [canceled](../terms/cancelation.md), all derived contexts are canceled too. Cleanup code that uses the original context will never execute -- use a [disconnected context](../not_using_disconnected_context_for_cleanup/) instead.
+> When a workflow is [canceled](../terms/cancelation.md), blocking calls like `Receive` that don't also listen for `ctx.Done()` will block forever, preventing the workflow from making progress.
 
-When Temporal delivers a cancellation request, the SDK cancels the workflow's context and every context derived from it. A common mistake is running cleanup in a `defer` using the original context:
+When Temporal delivers a cancelation request, the SDK cancels the workflow's context. But operations that block without checking for cancelation -- like `channel.Receive(ctx, ...)` -- will never unblock, because the event they're waiting for will never arrive. The workflow is stuck: it can't complete, can't run cleanup, and will sit there until it hits a workflow timeout or is manually terminated.
 
 <!--SNIPSTART deadlocking-cancelled-bad-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
@@ -27,7 +27,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-The fix: create a disconnected context that remains valid after cancellation:
+The fix: use a `Selector` to listen for both the expected event and `ctx.Done()`, so the workflow unblocks on cancelation:
 
 <!--SNIPSTART deadlocking-cancelled-good-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
@@ -77,6 +77,4 @@ func TestV2_HandlesGracefulCancelation(t *testing.T) {
 ```
 <!--SNIPEND-->
 
-Deadlocked workflows don't complete or perform graceful cleanup on cancellation -- they block indefinitely until they either hit a workflow timeout or are manually terminated.
-
-See also: [Not Using a Disconnected Context for Cleanup](../not_using_disconnected_context_for_cleanup/).
+See also: [Not Using a Disconnected Context for Cleanup](../not_using_disconnected_context_for_cleanup/) for the related problem of running cleanup activities after cancelation.
