@@ -43,7 +43,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Not setting a workflow timeout (they'll run for 10 years!)](src/not-setting-a-workflow-timeout.md)
 
 ## Cancellation
-- [Assuming activity cancellation means workflow cancellation](src/assuming-activity-cancellation-means-workflow-cancellation.md)
+- [Assuming activity cancellation means workflow cancellation](src/assuming-activity-cancelation-means-workflow-cancelation.md)
 - [Not using ParentClosePolicy when graceful cleanup on cancellation is needed in child workflows](src/not-using-parent-close-policy.md)
 - [Deadlocking when workflow cancelled (handle cancel signal)](src/deadlocking-when-workflow-cancelled.md)
 - [Not using a disconnected context to perform cleanup or other deferred child workflows/activities after workflow cancelled](src/not-using-disconnected-context-for-cleanup.md)

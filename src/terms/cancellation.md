@@ -9,7 +9,7 @@ When a workflow is cancelled, the SDK cancels the workflow's context, which prop
 - [Terminating Rather Than Canceling](../terminating-rather-than-canceling.md)
 - [Deadlocking When Workflow Cancelled](../deadlocking-when-workflow-cancelled.md)
 - [Not Using Disconnected Context for Cleanup](../not-using-disconnected-context-for-cleanup.md)
-- [Assuming Activity Cancellation Means Workflow Cancellation](../assuming-activity-cancellation-means-workflow-cancellation.md)
+- [Assuming Activity Cancellation Means Workflow Cancellation](../assuming-activity-cancelation-means-workflow-cancelation.md)
 - [Not Sending Heartbeats for Cancellation](../not-sending-heartbeats-for-cancellation.md)
 - [Terminate](terminate.md)
 - [Heartbeat](heartbeat.md)
