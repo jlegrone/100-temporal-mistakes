@@ -55,6 +55,8 @@ func MyWorkflowV2(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
+It's also a good idea to write tests that ensure your workflow handles cancellation:
+
 <!--SNIPSTART deadlocking-cancelled-test-->
 [deadlocking_when_workflow_cancelled/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow_test.go)
 ```go
