@@ -6,7 +6,7 @@ During replay, the event history is used to reconstruct the workflow's state by 
 
 ## Related
 
-- [Overflowing Workflow History Size](../overflowing-workflow-history-size.md)
+- [Overflowing Workflow History Length](../overflowing-workflow-history-length.md)
 - [Overflowing Workflow History Bytes](../overflowing-workflow-history-bytes.md)
 - [Passing Too Much Information from Activities](../passing-too-much-information-from-activities.md)
 - [Not Using Continue-As-New](../not-using-continue-as-new.md)

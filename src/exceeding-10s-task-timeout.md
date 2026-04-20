@@ -1,6 +1,6 @@
 # Exceeding the 10-Second Workflow Task Timeout
 
-> [!TIP]
+> **TL;DR**
 > [Workflow tasks](terms/workflow-task.md) must complete within 10 seconds by default. Exceeding this causes a livelock: the task times out, gets retried, [replays](terms/replay.md), hits the same bottleneck, and times out again.
 
 A workflow task is the unit of work a [worker](terms/worker.md) processes when executing workflow code. Each time, the worker replays the full [history](terms/event-history.md) and then executes new code until the next yield point. If this takes more than 10 seconds, the server reschedules the task and the cycle repeats. You'll see `WorkflowTaskTimedOut` events accumulating in history.
@@ -14,4 +14,4 @@ Solutions:
 - Ensure workflow caching is effective so subsequent tasks skip replay
 - Increase `WorkflowTaskTimeout` only as a last resort -- it's a band-aid for a deeper design issue
 
-See also: [Performing Expensive Computation in Workflow Code](performing-expensive-computation-in-workflow-code.md), [Overflowing Workflow History Size](overflowing-workflow-history-size.md).
+See also: [Performing Expensive Computation in Workflow Code](performing-expensive-computation-in-workflow-code.md), [Overflowing Workflow History Length](overflowing-workflow-history-length.md).

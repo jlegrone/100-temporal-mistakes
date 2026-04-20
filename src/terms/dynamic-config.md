@@ -4,7 +4,7 @@ Dynamic configuration allows Temporal server operators to change server behavior
 
 ## Related
 
-- [Overflowing workflow history size](../overflowing-workflow-history-size.md)
+- [Overflowing workflow history length](../overflowing-workflow-history-length.md)
 - [Overflowing workflow history bytes](../overflowing-workflow-history-bytes.md)
 - [Not setting up persistence rate limits](../not-setting-up-persistence-rate-limits.md)
 - [Not setting up namespaces rate limits](../not-setting-up-namespaces-rate-limits.md)

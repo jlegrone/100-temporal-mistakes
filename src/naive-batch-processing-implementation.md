@@ -1,7 +1,7 @@
 # Naive Batch Processing Implementation
 
-> [!TIP]
-> Concentrating all batch work in a single workflow causes [history overflow](overflowing-workflow-history-size.md) and [lock contention](workflow-lock-contention-due-to-concurrent-updates.md). Distribute work across [child workflows](terms/child-workflow.md) and pass references, not data.
+> **TL;DR**
+> Concentrating all batch work in a single workflow causes [history overflow](overflowing-workflow-history-length.md) and [lock contention](workflow-lock-contention-due-to-concurrent-updates.md). Distribute work across [child workflows](terms/child-workflow.md) and pass references, not data.
 
 Batch processing workflows that split data and process it all within a single workflow quickly hit Temporal's limits. Activities completing concurrently compete for the workflow lock, and large histories push against the 50k event limit.
 

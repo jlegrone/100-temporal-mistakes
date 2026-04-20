@@ -3,7 +3,7 @@
 A collection of common mistakes made when using [Temporal](https://temporal.io) and how to avoid them. This is a work in progress!
 
 ## Workflow Limits
-- [Overflowing workflow history length](src/overflowing-workflow-history-size.md)
+- [Overflowing workflow history length](src/overflowing-workflow-history-length.md)
 - [Overflowing workflow history bytes](src/overflowing-workflow-history-bytes.md)
 - [Overflowing maximum individual payload size](src/overflowing-maximum-individual-payload-size.md)
 - [Shard contention due to concurrent updates](src/workflow-lock-contention-due-to-concurrent-updates.md)
