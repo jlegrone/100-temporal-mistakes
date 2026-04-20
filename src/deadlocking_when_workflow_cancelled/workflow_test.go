@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
-	enumspb "go.temporal.io/api/enums/v1"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal"
 	"github.com/stretchr/testify/require"
+	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/temporal"
 )
 
 func TestV1_CompletesWhenSignaled(t *testing.T) {
-	env := internal.NewTestWorkflowEnvironment(t)
+	env := testsuite.NewTestWorkflowEnvironment(t)
 
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow("done", nil)
@@ -26,7 +26,7 @@ func TestV1_CompletesWhenSignaled(t *testing.T) {
 }
 
 func TestV1_DeadlocksOnCancelation(t *testing.T) {
-	env := internal.NewTestWorkflowEnvironment(t)
+	env := testsuite.NewTestWorkflowEnvironment(t)
 
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
@@ -45,7 +45,7 @@ func TestV1_DeadlocksOnCancelation(t *testing.T) {
 }
 
 func TestV2_CompletesWhenSignaled(t *testing.T) {
-	env := internal.NewTestWorkflowEnvironment(t)
+	env := testsuite.NewTestWorkflowEnvironment(t)
 
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow("done", nil)
@@ -61,7 +61,7 @@ func TestV2_CompletesWhenSignaled(t *testing.T) {
 // @@@SNIPSTART deadlocking-cancelled-test
 
 func TestV2_HandlesGracefulCancelation(t *testing.T) {
-	env := internal.NewTestWorkflowEnvironment(t)
+	env := testsuite.NewTestWorkflowEnvironment(t)
 
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()

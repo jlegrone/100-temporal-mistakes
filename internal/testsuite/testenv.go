@@ -1,4 +1,4 @@
-package internal
+package testsuite
 
 import (
 	"go.temporal.io/sdk/log"

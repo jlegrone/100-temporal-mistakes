@@ -60,7 +60,7 @@ func MyWorkflowV2(ctx workflow.Context) error {
 ```go
 
 func TestV2_HandlesGracefulCancelation(t *testing.T) {
-	env := internal.NewTestWorkflowEnvironment(t)
+	env := testsuite.NewTestWorkflowEnvironment(t)
 
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
