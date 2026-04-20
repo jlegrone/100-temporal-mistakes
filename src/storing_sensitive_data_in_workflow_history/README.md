@@ -8,7 +8,7 @@ Everything that flows through a Temporal workflow is persisted: workflow inputs 
 The most robust approach is to keep sensitive data out of Temporal entirely: store it in a system with proper access controls (a secrets manager, an encrypted database) and pass only references through workflows:
 
 <!--SNIPSTART storing-sensitive-data-good-->
-[storing_sensitive_data_in_workflow_history/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/storing_sensitive_data_in_workflow_history/example.go)
+[storing_sensitive_data_in_workflow_history/client.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/storing_sensitive_data_in_workflow_history/client.go)
 ```go
 
 // Good: pass a reference, not the data
@@ -22,7 +22,7 @@ type ProcessPaymentInputGood struct {
 <!--SNIPEND-->
 
 <!--SNIPSTART storing-sensitive-data-bad-->
-[storing_sensitive_data_in_workflow_history/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/storing_sensitive_data_in_workflow_history/example.go)
+[storing_sensitive_data_in_workflow_history/client.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/storing_sensitive_data_in_workflow_history/client.go)
 ```go
 
 // Bad: pass the sensitive data directly

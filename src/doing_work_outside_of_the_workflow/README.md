@@ -6,10 +6,10 @@
 A common pattern when first adopting Temporal is performing meaningful work in the caller process before starting a workflow:
 
 <!--SNIPSTART doing-work-outside-bad-->
-[doing_work_outside_of_the_workflow/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/examples.go)
+[doing_work_outside_of_the_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/workflow.go)
 ```go
 // Dangerous: work done outside the workflow
-func dangerousExample(ctx context.Context, temporalClient client.Client, db database, data Data, options client.StartWorkflowOptions) error {
+func DangerousExample(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
 	record, err := db.Insert(ctx, data)
 	if err != nil {
 		return err
@@ -27,10 +27,10 @@ Temporal's durability only applies to code running inside a workflow or activity
 Move the work inside the workflow instead:
 
 <!--SNIPSTART doing-work-outside-good-->
-[doing_work_outside_of_the_workflow/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/examples.go)
+[doing_work_outside_of_the_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/workflow.go)
 ```go
 // Better: start the workflow first, let it do the work durably
-func betterExample(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
+func BetterExample(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
 	_, err := temporalClient.ExecuteWorkflow(ctx, options, MyWorkflow, data)
 	return err
 }

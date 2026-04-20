@@ -6,9 +6,9 @@
 Local activities retry within the same workflow task, which has a default 10-second timeout. When a local activity fails and retries with backoff, each attempt eats into that budget. If retries exceed the timeout, the workflow task times out, gets rescheduled, [replays](../terms/replay.md), hits the local activity again, and the retry cycle restarts from zero. The local activity never gets enough time to exhaust its retries.
 
 <!--SNIPSTART fallible-local-activities-good-->
-[fallible_local_activities/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/fallible_local_activities/examples.go)
+[fallible_local_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/fallible_local_activities/activity.go)
 ```go
-func goodLocalActivity(ctx workflow.Context, input any) (any, error) {
+func GoodLocalActivity(ctx workflow.Context, input any) (any, error) {
 	// Good: local activity for a fast, reliable operation
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 2 * time.Second,
@@ -22,9 +22,9 @@ func goodLocalActivity(ctx workflow.Context, input any) (any, error) {
 <!--SNIPEND-->
 
 <!--SNIPSTART fallible-local-activities-bad-->
-[fallible_local_activities/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/fallible_local_activities/examples.go)
+[fallible_local_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/fallible_local_activities/activity.go)
 ```go
-func badLocalActivity(ctx workflow.Context, request any) error {
+func BadLocalActivity(ctx workflow.Context, request any) error {
 	// Bad: local activity for an unreliable external call
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 30 * time.Second,

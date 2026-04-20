@@ -8,7 +8,7 @@ Developers often reach for familiar observability tools inside workflow code -- 
 Every Temporal SDK provides replay-aware alternatives. Use the SDK's workflow logger, which automatically skips emission during replay:
 
 <!--SNIPSTART not-using-temporal-sdk-for-observability-good-->
-[not_using_temporal_sdk_for_observability/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_using_temporal_sdk_for_observability/example.go)
+[not_using_temporal_sdk_for_observability/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_using_temporal_sdk_for_observability/workflow.go)
 ```go
 
 // Good: use the SDK's replay-aware workflow logger.

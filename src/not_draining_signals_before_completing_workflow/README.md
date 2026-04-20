@@ -8,11 +8,13 @@ Signals are recorded in [history](../terms/event-history.md) and the API call su
 Before completing or calling ContinueAsNew, use non-blocking receive to drain pending signals:
 
 <!--SNIPSTART not-draining-signals-drain-example-->
-[not_draining_signals_before_completing_workflow/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_draining_signals_before_completing_workflow/examples.go)
+[not_draining_signals_before_completing_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_draining_signals_before_completing_workflow/workflow.go)
 ```go
-func drainSignalsBeforeContinueAsNew(ctx workflow.Context, signalCh workflow.ReceiveChannel, state State) error {
+
+// DrainSignalsBeforeContinueAsNew drains pending signals before calling ContinueAsNew.
+func DrainSignalsBeforeContinueAsNew(ctx workflow.Context, signalCh workflow.ReceiveChannel, state State) error {
 	// Check if it's time to continue as new
-	if shouldContinueAsNew(ctx) {
+	if ShouldContinueAsNew(ctx) {
 		// Drain any remaining signals before continuing
 		for {
 			var signal MySignal

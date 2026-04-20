@@ -8,7 +8,7 @@ Some Temporal SDKs allow defining workflow and activity functions with multiple 
 Always wrap inputs into a single struct, and return a single result struct rather than multiple return values (beyond the error):
 
 <!--SNIPSTART using-more-than-one-input-response-payload-workflow-->
-[using_more_than_one_input_response_payload/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_more_than_one_input_response_payload/example.go)
+[using_more_than_one_input_response_payload/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_more_than_one_input_response_payload/workflow.go)
 ```go
 
 // Avoid this
@@ -36,7 +36,7 @@ func MyWorkflowGood(ctx workflow.Context, input MyWorkflowInput) error {
 <!--SNIPEND-->
 
 <!--SNIPSTART using-more-than-one-input-response-payload-activity-->
-[using_more_than_one_input_response_payload/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_more_than_one_input_response_payload/example.go)
+[using_more_than_one_input_response_payload/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_more_than_one_input_response_payload/workflow.go)
 ```go
 
 // Avoid this

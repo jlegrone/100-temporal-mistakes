@@ -8,7 +8,7 @@ In Go, returning both a non-nil value and a non-nil error is syntactically valid
 Return either a result or an error, never both:
 
 <!--SNIPSTART returning-both-payload-and-error-good-->
-[returning_both_payload_and_error/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/returning_both_payload_and_error/example.go)
+[returning_both_payload_and_error/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/returning_both_payload_and_error/activity.go)
 ```go
 
 // Good: return either a result or an error, never both.
@@ -26,7 +26,7 @@ func MyActivity(ctx context.Context, input Input) (Result, error) {
 If you need to communicate partial results alongside a failure, encode the partial result into the result struct itself:
 
 <!--SNIPSTART returning-both-payload-and-error-partial-->
-[returning_both_payload_and_error/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/returning_both_payload_and_error/example.go)
+[returning_both_payload_and_error/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/returning_both_payload_and_error/activity.go)
 ```go
 
 // Good: encode partial results into the result struct itself.

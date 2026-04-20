@@ -8,11 +8,16 @@ Temporal SDKs communicate with the Temporal server over gRPC. Out of the box, th
 Configure TLS on all SDK clients. In Go:
 
 <!--SNIPSTART not-setting-up-tls-good-->
-[not_setting_up_tls/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_setting_up_tls/example.go)
+[not_setting_up_tls/client.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_setting_up_tls/client.go)
 ```go
 
 // Good: configure TLS on all SDK clients.
-var clientOptions = client.Options{
+var (
+	certPool   *x509.CertPool
+	clientCert tls.Certificate
+)
+
+var ClientOptions = client.Options{
 	HostPort: "temporal.example.com:7233",
 	ConnectionOptions: client.ConnectionOptions{
 		TLS: &tls.Config{

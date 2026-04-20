@@ -6,7 +6,7 @@
 Performing heavy computation directly in workflow code -- large data transformations, complex calculations, parsing large files -- can cause the workflow task to exceed its timeout. The server reschedules the task, the [worker](../terms/worker.md) [replays](../terms/replay.md) the full [history](../terms/event-history.md), hits the same expensive computation, times out again, and the cycle repeats. Replay makes this worse: the computation runs on every replay, compounding the cost.
 
 <!--SNIPSTART expensive-computation-bad-->
-[performing_expensive_computation_in_workflow_code/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/performing_expensive_computation_in_workflow_code/examples.go)
+[performing_expensive_computation_in_workflow_code/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/performing_expensive_computation_in_workflow_code/workflow.go)
 ```go
 // BAD: expensive computation in workflow code
 func MyWorkflowBad(ctx workflow.Context, data []Record) error {
@@ -18,7 +18,7 @@ func MyWorkflowBad(ctx workflow.Context, data []Record) error {
 <!--SNIPEND-->
 
 <!--SNIPSTART expensive-computation-good-->
-[performing_expensive_computation_in_workflow_code/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/performing_expensive_computation_in_workflow_code/examples.go)
+[performing_expensive_computation_in_workflow_code/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/performing_expensive_computation_in_workflow_code/workflow.go)
 ```go
 // TransformActivity moves the expensive computation into an activity.
 func TransformActivity(_ context.Context, data []Record) (Result, error) {

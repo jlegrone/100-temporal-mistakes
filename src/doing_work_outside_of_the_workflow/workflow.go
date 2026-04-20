@@ -15,9 +15,11 @@ type Record struct {
 	ID string
 }
 
-type database struct{}
+// Database is a stub for a database client.
+type Database struct{}
 
-func (database) Insert(_ context.Context, _ Data) (Record, error) {
+// Insert inserts a record into the database.
+func (Database) Insert(_ context.Context, _ Data) (Record, error) {
 	return Record{}, nil
 }
 
@@ -28,7 +30,7 @@ func InsertRecord(_ context.Context, _ Data) (Record, error) {
 
 // @@@SNIPSTART doing-work-outside-bad
 // Dangerous: work done outside the workflow
-func dangerousExample(ctx context.Context, temporalClient client.Client, db database, data Data, options client.StartWorkflowOptions) error {
+func DangerousExample(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
 	record, err := db.Insert(ctx, data)
 	if err != nil {
 		return err
@@ -42,7 +44,7 @@ func dangerousExample(ctx context.Context, temporalClient client.Client, db data
 
 // @@@SNIPSTART doing-work-outside-good
 // Better: start the workflow first, let it do the work durably
-func betterExample(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
+func BetterExample(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
 	_, err := temporalClient.ExecuteWorkflow(ctx, options, MyWorkflow, data)
 	return err
 }

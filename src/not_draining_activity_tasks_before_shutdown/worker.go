@@ -8,7 +8,7 @@ import (
 )
 
 // @@@SNIPSTART not-draining-activity-tasks-example
-func newWorkerWithGracefulStop(c client.Client) worker.Worker {
+func NewWorkerWithGracefulStop(c client.Client) worker.Worker {
 	return worker.New(c, "my-task-queue", worker.Options{
 		WorkerStopTimeout: 5 * time.Minute,
 	})

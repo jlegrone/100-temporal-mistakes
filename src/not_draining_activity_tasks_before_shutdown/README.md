@@ -6,9 +6,9 @@
 During deployments, workers are stopped and replaced. Without a drain period, the server doesn't know activities failed until their timeout expires, then retries from scratch -- wasting all completed work. This is especially painful for long-running activities where losing minutes of progress per deployment adds up.
 
 <!--SNIPSTART not-draining-activity-tasks-example-->
-[not_draining_activity_tasks_before_shutdown/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_draining_activity_tasks_before_shutdown/examples.go)
+[not_draining_activity_tasks_before_shutdown/worker.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_draining_activity_tasks_before_shutdown/worker.go)
 ```go
-func newWorkerWithGracefulStop(c client.Client) worker.Worker {
+func NewWorkerWithGracefulStop(c client.Client) worker.Worker {
 	return worker.New(c, "my-task-queue", worker.Options{
 		WorkerStopTimeout: 5 * time.Minute,
 	})

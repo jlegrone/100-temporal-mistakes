@@ -10,9 +10,9 @@ Local activities execute directly within the current workflow task on the same [
 - **No load balancing**: They run on the current worker only, unlike normal activities dispatched through the [task queue](../terms/task-queue.md).
 
 <!--SNIPSTART using-local-activities-example-->
-[using_local_activities/examples.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_local_activities/examples.go)
+[using_local_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_local_activities/activity.go)
 ```go
-func localActivityExample(ctx workflow.Context, input any) (any, error) {
+func LocalActivityExample(ctx workflow.Context, input any) (any, error) {
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
 	})

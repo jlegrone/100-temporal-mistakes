@@ -25,7 +25,7 @@ func SomeWorkflow(_ workflow.Context, _ MyInput) error {
 
 // @@@SNIPSTART starting-workflows-from-activities-good
 // GOOD: child workflow from workflow code
-func goodExample(ctx workflow.Context, input MyInput) (MyResult, error) {
+func GoodExample(ctx workflow.Context, input MyInput) (MyResult, error) {
 	childFuture := workflow.ExecuteChildWorkflow(ctx, MyChildWorkflow, input)
 	var result MyResult
 	err := childFuture.Get(ctx, &result)

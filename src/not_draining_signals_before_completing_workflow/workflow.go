@@ -13,7 +13,8 @@ type State struct{}
 // Apply processes a signal and updates the state.
 func (s *State) Apply(_ MySignal) {}
 
-func shouldContinueAsNew(_ workflow.Context) bool {
+// ShouldContinueAsNew checks whether the workflow should continue as new.
+func ShouldContinueAsNew(_ workflow.Context) bool {
 	return false
 }
 
@@ -23,9 +24,11 @@ func MyWorkflow(_ workflow.Context, _ State) error {
 }
 
 // @@@SNIPSTART not-draining-signals-drain-example
-func drainSignalsBeforeContinueAsNew(ctx workflow.Context, signalCh workflow.ReceiveChannel, state State) error {
+
+// DrainSignalsBeforeContinueAsNew drains pending signals before calling ContinueAsNew.
+func DrainSignalsBeforeContinueAsNew(ctx workflow.Context, signalCh workflow.ReceiveChannel, state State) error {
 	// Check if it's time to continue as new
-	if shouldContinueAsNew(ctx) {
+	if ShouldContinueAsNew(ctx) {
 		// Drain any remaining signals before continuing
 		for {
 			var signal MySignal

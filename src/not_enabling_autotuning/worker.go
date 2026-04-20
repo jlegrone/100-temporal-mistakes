@@ -4,10 +4,6 @@ import (
 	"go.temporal.io/sdk/worker"
 )
 
-// sysInfoProvider is a placeholder for a real SysInfoProvider implementation.
-// In production, use contrib/sysinfo.SysInfoProvider() from the SDK.
-var sysInfoProvider worker.SysInfoProvider
-
 // @@@SNIPSTART not-enabling-autotuning-good
 
 // Good: use resource-based autotuning instead of static concurrency settings.

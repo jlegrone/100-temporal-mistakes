@@ -8,7 +8,7 @@ Activities often fetch or produce data -- database records, API responses, file 
 Design activity return types the same way you'd design an API response -- include only the fields the caller needs:
 
 <!--SNIPSTART passing-too-much-information-from-activities-bad-->
-[passing_too_much_information_from_activities/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/passing_too_much_information_from_activities/example.go)
+[passing_too_much_information_from_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/passing_too_much_information_from_activities/activity.go)
 ```go
 
 // Bad: returning the full record
@@ -20,7 +20,7 @@ func LookupCustomerBad(ctx context.Context, customerID string) (*Customer, error
 <!--SNIPEND-->
 
 <!--SNIPSTART passing-too-much-information-from-activities-good-->
-[passing_too_much_information_from_activities/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/passing_too_much_information_from_activities/example.go)
+[passing_too_much_information_from_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/passing_too_much_information_from_activities/activity.go)
 ```go
 
 // Good: returning only what the workflow needs

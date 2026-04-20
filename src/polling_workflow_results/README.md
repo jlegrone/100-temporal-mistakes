@@ -8,7 +8,7 @@ Repeatedly calling `DescribeWorkflowExecution` or `GetWorkflowExecutionHistory` 
 Every Temporal SDK provides a blocking method that waits efficiently for completion:
 
 <!--SNIPSTART polling-workflow-results-good-->
-[polling_workflow_results/example.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/polling_workflow_results/example.go)
+[polling_workflow_results/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/polling_workflow_results/workflow.go)
 ```go
 
 // Good: use the SDK's blocking GetWorkflow method.

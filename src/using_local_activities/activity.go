@@ -13,7 +13,7 @@ func QuickLookup(_ context.Context, _ any) (any, error) {
 }
 
 // @@@SNIPSTART using-local-activities-example
-func localActivityExample(ctx workflow.Context, input any) (any, error) {
+func LocalActivityExample(ctx workflow.Context, input any) (any, error) {
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 5 * time.Second,
 	})
