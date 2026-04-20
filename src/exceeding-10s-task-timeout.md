@@ -11,7 +11,7 @@ Solutions:
 - Keep workflow code lightweight -- move computation to activities
 - Use [ContinueAsNew](terms/continue-as-new.md) to bound history size and reduce replay time
 - Batch large fan-outs: schedule a batch, yield, schedule the next batch
-- Ensure workflow caching is effective so subsequent tasks skip replay
+- Ensure [workflow caching](https://docs.temporal.io/develop/worker-performance#workflow-cache-tuning) is effective so subsequent tasks skip replay -- if `sticky_cache_size` is consistently at the configured max, the cache is full and workflows are being evicted -- increase the cache size if workers have free RAM
 - Increase `WorkflowTaskTimeout` only as a last resort -- it's a band-aid for a deeper design issue
 
 See also: [Performing Expensive Computation in Workflow Code](performing-expensive-computation-in-workflow-code.md), [Overflowing Workflow History Length](overflowing-workflow-history-length.md).
