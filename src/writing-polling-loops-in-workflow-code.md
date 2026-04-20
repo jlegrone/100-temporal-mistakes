@@ -1,6 +1,6 @@
 # Writing Polling Loops in Workflow Code
 
-> **TL;DR**
+> [!TIP]
 > Polling loops with `workflow.Sleep()` add timer events to [history](terms/event-history.md) on every iteration, bloating it over time. Use [signals](terms/signals.md) to push state changes, or offload polling to an activity.
 
 A loop that periodically checks a condition via `workflow.Sleep()` generates roughly 2,880 timer event pairs per day, plus activity events for each check. A workflow polling for a week can easily exceed the 50,000 event [history limit](overflowing-workflow-history-length.md).

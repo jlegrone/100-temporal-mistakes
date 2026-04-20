@@ -1,6 +1,6 @@
 # Wrapping a Queue with a Workflow
 
-> **TL;DR**
+> [!TIP]
 > Using a single workflow as a message queue (receiving [signals](terms/signals.md) as "messages") creates a scalability bottleneck. Temporal scales horizontally across many workflows, not vertically within one.
 
 A tempting pattern is using a long-running workflow as a message queue: external systems send signals and the workflow processes them one by one. On the surface this gives you durability and retries for free, but it breaks down under real load.

@@ -1,6 +1,6 @@
 # Not Using ContinueAsNew
 
-> **TL;DR**
+> [!TIP]
 > Long-running workflows accumulate events in their history, leading to longer [replay](terms/replay.md) times and eventually hitting the [history length limit](overflowing-workflow-history-length.md). [ContinueAsNew](terms/continue-as-new.md) resets the history and also limits the age of your code, simplifying [versioning](terms/versioning.md).
 
 Every action in a Temporal workflow -- scheduling an activity, receiving a [signal](terms/signals.md), firing a timer -- adds events to the [history](terms/event-history.md). For workflows that run indefinitely (event listeners, polling loops, subscription managers, recurring jobs), history grows without bound. Without [ContinueAsNew](terms/continue-as-new.md), the workflow eventually hits the 50k event limit and the server [terminates](terms/terminate.md) it. Even before that, large histories degrade performance: a [worker](terms/worker.md) replaying a [workflow task](terms/workflow-task.md) must process the entire history, and a workflow with 40,000 events takes significantly longer than one with 200. The longer a workflow runs, the more code versions it spans, requiring compatibility with code paths written months ago.

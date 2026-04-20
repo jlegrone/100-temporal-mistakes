@@ -1,6 +1,6 @@
 # Overflowing Workflow History Bytes
 
-> **TL;DR**
+> [!TIP]
 > Temporal enforces a maximum history size in bytes (50MB by default), separate from the [event count limit](overflowing-workflow-history-length.md). Large activity results, signal payloads, and workflow inputs are the most common culprits.
 
 In addition to the [50k event count limit](overflowing-workflow-history-length.md), Temporal enforces a hard limit on the total byte size of a workflow's history (50MB by default, configurable via [dynamic configuration](terms/dynamic-config.md)). When exceeded, the server [terminates](terms/terminate.md) the workflow with no chance for cleanup. A workflow can hit this limit well before 50k events if individual events carry large [payloads](terms/payload.md) -- a few hundred activity completions with megabyte-sized results are enough. During [replay](terms/replay.md), the entire history must be fetched and deserialized by the [worker](terms/worker.md), so large histories in bytes mean higher network bandwidth, longer replay times, and increased memory pressure.

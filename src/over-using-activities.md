@@ -1,6 +1,6 @@
 # Over-Using Activities
 
-> **TL;DR**
+> [!TIP]
 > Every activity creates [history](terms/event-history.md) events, requires serialization, and adds a round-trip to the server. Batch related work into fewer, coarser-grained activities instead of creating one per tiny operation.
 
 A common mistake is treating activities like function calls -- creating separate activities for "get user", "validate fields", "format response", and "log result" instead of a single "process user" activity. This comes from applying single-responsibility principles without accounting for the cost model of activities.
