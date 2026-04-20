@@ -1,36 +1,12 @@
 # Preventing Activity Retries
 
 > [!TIP]
-> * Without a [heartbeat timeout](terms/heartbeat-timeout.md), Temporal can't detect a stuck activity and won't retry it until the start-to-close timeout expires.
-> * Without a [start-to-close timeout](terms/start-to-close-timeout.md), you have no per-attempt timeout -- a single hung attempt blocks the activity for the entire schedule-to-close duration.
-> * Setting start-to-close equal to [schedule-to-close](terms/schedule-to-close-timeout.md) effectively gives you only one attempt since both expire at the same time.
+> Three common timeout misconfigurations silently prevent activities from retrying: no [heartbeat timeout](terms/heartbeat-timeout.md), no [start-to-close timeout](terms/start-to-close-timeout.md), or start-to-close equal to [schedule-to-close](terms/schedule-to-close-timeout.md).
 
-## What?
+**No heartbeat timeout**: Without a heartbeat timeout, Temporal can't detect a stuck activity. If a [worker](terms/worker.md) deadlocks or hangs on an unresponsive service, you wait the full start-to-close duration before a retry. Set a heartbeat timeout on any long-running activity -- a small multiple of your expected [heartbeat](terms/heartbeat.md) interval.
 
-Temporal's activity retry mechanism is one of its most powerful features, but it only works when you configure timeouts correctly. Three common misconfigurations silently prevent activities from retrying as expected.
+**No start-to-close timeout**: Without a per-attempt limit, a single hung attempt consumes the entire schedule-to-close budget, leaving no room for retries. Always set a start-to-close timeout reflecting the maximum duration of a single attempt.
 
-### Not setting a heartbeat timeout
+**Start-to-close equal to schedule-to-close**: If both are 30 seconds, the first attempt uses the full budget and the schedule-to-close expires simultaneously -- no time remains for a second attempt. Schedule-to-close should be significantly larger, at minimum `start-to-close * max_attempts` plus margin for backoff. Better yet, base it on how long you're willing to wait for eventual success.
 
-Long-running activities should report [heartbeats](terms/heartbeat.md) to let the server know they're still making progress. Without a heartbeat timeout, Temporal cannot detect that an activity is stuck -- say, the [worker](terms/worker.md) process is deadlocked, the network connection is hanging, or the activity is blocked on an unresponsive downstream service. Temporal waits for the entire start-to-close timeout to expire before considering the attempt failed and retrying. If your activity normally completes in 10 seconds but gets stuck, you'll wait the full start-to-close duration (potentially minutes or hours) before a retry kicks in.
-
-### Not setting a start-to-close timeout
-
-The start-to-close timeout limits how long a single activity attempt can run. If you only set a schedule-to-close timeout, there is no per-attempt limit. A single attempt can consume the entire schedule-to-close budget, leaving no room for retries. This turns your activity into a one-shot execution with a deadline rather than a retriable operation.
-
-### Setting start-to-close equal to schedule-to-close
-
-This is a subtle but common mistake. The schedule-to-close timeout covers all attempts; start-to-close covers each individual attempt. If both are set to 30 seconds, the first attempt runs for up to 30 seconds, at which point the schedule-to-close timeout has also expired. No time budget remains for a second attempt.
-
-## Why?
-
-All three misconfigurations have the same effect: they prevent Temporal from doing what it does best -- automatically retrying failed operations. Instead of fast recovery from transient failures, you get slow failures, no retries, or both.
-
-This matters most in production when downstream services have intermittent issues. A properly configured activity detects a stuck attempt via heartbeat timeout in 30 seconds, retries, and succeeds on the second attempt -- total time under a minute. A misconfigured one waits 10 minutes for the start-to-close timeout, then fails because the schedule-to-close timeout is also 10 minutes. No retry, just a slow failure.
-
-## How?
-
-**Set a heartbeat timeout** on any activity that runs longer than a few seconds. The heartbeat timeout should be a small multiple of your expected heartbeat interval. If you heartbeat every 10 seconds, set the heartbeat timeout to 30-60 seconds.
-
-**Always set a start-to-close timeout** that reflects the maximum duration of a single attempt. This should be generous enough to handle slow responses but short enough to allow multiple retries within your schedule-to-close window.
-
-**Set schedule-to-close to be significantly larger than start-to-close.** As a rule of thumb, schedule-to-close should be at least `start-to-close * max_attempts` plus some margin. If you want 3 retries with a 1-minute start-to-close timeout, set schedule-to-close to at least 5 minutes. Better yet, set schedule-to-close based on how long you're willing to wait for the activity to eventually succeed, factoring in backoff delays between retries.
+See also: [Setting Too-Short Timeouts](setting-too-short-timeouts.md).

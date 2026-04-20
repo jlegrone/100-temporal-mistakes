@@ -1,53 +1,21 @@
 # Not Waiting for Child Workflows to Start
 
 > [!TIP]
-> * When using a [disconnected context](terms/disconnected-context.md) for cleanup, you must wait for the [child workflow](terms/child-workflow.md) to actually start before the parent returns.
-> * `GetChildWorkflowExecution()` resolves when the child is scheduled on the server -- use it as your synchronization point.
-> * If the parent completes before the child is scheduled, the child may never be created.
+> `ExecuteChildWorkflow()` doesn't immediately schedule the [child workflow](terms/child-workflow.md). If the parent completes before the server processes the creation, the child may never start.
 
-## What?
+When using a [disconnected context](terms/disconnected-context.md) for cleanup after [cancellation](terms/cancellation.md), a common mistake is returning from the parent immediately after calling `ExecuteChildWorkflow()`. Scheduling happens asynchronously -- if the parent returns first, the child creation command is lost.
 
-When a workflow is [cancelled](terms/cancellation.md) and you use a [disconnected context for cleanup](not-using-disconnected-context-for-cleanup.md), a common pattern is to start a child workflow to perform compensating actions. The mistake is returning from the parent workflow immediately after calling `ExecuteChildWorkflow()` without waiting for the child to actually start.
-
-`ExecuteChildWorkflow()` returns a future, but the child workflow isn't scheduled on the server the moment you call it. Scheduling happens asynchronously. If the parent workflow completes (returns) before the server processes the child workflow creation, the child may never start because the parent is already closed.
-
-## Why?
-
-When a parent workflow completes, Temporal stops processing further commands from that workflow execution. If the child workflow creation command hasn't been sent to the server yet -- or hasn't been processed -- it's lost. Sometimes the child starts, sometimes it doesn't, making this race condition particularly tricky to debug.
-
-This is especially problematic in cancellation cleanup scenarios where reliability matters most. The whole point of the cleanup child workflow is to run compensating logic -- silently failing to start it defeats the purpose.
-
-## How?
-
-Use `GetChildWorkflowExecution()` on the child workflow future to wait until the child has been successfully scheduled:
+Use `GetChildWorkflowExecution()` to wait until the child is actually scheduled:
 
 ```go
-func MyWorkflow(ctx workflow.Context) error {
-    err := workflow.ExecuteActivity(ctx, MyActivity).Get(ctx, nil)
-    if err != nil && temporal.IsCanceledError(ctx.Err()) {
-        // Create a disconnected context for cleanup
-        disconnectedCtx, cancel := workflow.NewDisconnectedContext(ctx)
-        defer cancel()
+// Start the cleanup child workflow
+childFuture := workflow.ExecuteChildWorkflow(disconnectedCtx, CleanupWorkflow, input)
 
-        // Start the cleanup child workflow
-        childFuture := workflow.ExecuteChildWorkflow(disconnectedCtx, CleanupWorkflow, cleanupInput)
-
-        // Wait for the child to be scheduled on the server
-        // This is the critical step -- don't skip it!
-        if err := childFuture.GetChildWorkflowExecution().Get(disconnectedCtx, nil); err != nil {
-            return fmt.Errorf("failed to start cleanup workflow: %w", err)
-        }
-
-        // Now it's safe to return -- the child will continue running
-        // independently even after the parent completes.
-        return nil
-    }
-    return err
+// Wait for the child to be scheduled -- this is the critical step
+if err := childFuture.GetChildWorkflowExecution().Get(disconnectedCtx, nil); err != nil {
+    return fmt.Errorf("failed to start cleanup workflow: %w", err)
 }
+// Now safe to return -- the child runs independently
 ```
 
-The key distinction:
-- `childFuture.Get()` waits for the child workflow to **complete** (blocks until the child finishes).
-- `childFuture.GetChildWorkflowExecution().Get()` waits for the child workflow to **start** (blocks only until the server confirms scheduling).
-
-If you want fire-and-forget semantics (parent doesn't need the child's result), waiting for the child to start is the minimum you must do. If you need the child's result, wait for `childFuture.Get()` instead, which implicitly also waits for the child to start.
+The key distinction: `childFuture.Get()` waits for the child to **complete**; `childFuture.GetChildWorkflowExecution().Get()` waits only for the child to **start**. For fire-and-forget semantics, waiting for the start is the minimum.

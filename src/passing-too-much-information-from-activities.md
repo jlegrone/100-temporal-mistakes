@@ -1,39 +1,19 @@
 # Passing Too Much Information from Activities
 
 > [!TIP]
-> * Activity results are persisted in [workflow history](terms/event-history.md) -- every byte counts toward history size limits and [replay](terms/replay.md) performance.
-> * Return only what the workflow actually needs: IDs, status codes, small summaries.
-> * Store large data externally (database, blob storage) and pass references instead of full [payloads](terms/payload.md).
+> Activity results are persisted in [workflow history](terms/event-history.md) -- every byte counts toward history size limits and [replay](terms/replay.md) performance. Return only what the workflow actually needs, and store large data externally.
 
-## What?
+Activities often fetch or produce data -- database records, API responses, file contents -- and a common mistake is returning all of it when the workflow only needs a small subset. Every activity result is serialized and stored as an event in the workflow history, then replayed in full when a workflow resumes. Oversized results push the workflow closer to the [history size limit](overflowing-workflow-history-size.md), slow down replay, risk hitting the [individual payload size limit](overflowing-maximum-individual-payload-size.md), and increase storage costs across millions of executions.
 
-Activities often fetch or produce data -- database records, API responses, file contents, computation results. A common mistake is returning all of that data directly as the activity result, even when the workflow only needs a small subset.
+Design activity return types the same way you'd design an API response -- include only the fields the caller needs:
 
-For example, an activity that looks up a customer might return the entire customer record (addresses, order history, preferences, profile image metadata) when the workflow only needs the customer ID and subscription tier to make a routing decision.
-
-## Why?
-
-Every activity result is serialized and stored as an event in the workflow history. The [worker](terms/worker.md) [replays](terms/replay.md) that history when a workflow resumes after a restart or rebalance. Large activity results have compounding effects:
-
-1. **History bloat**: Each oversized result pushes the workflow closer to the [history size limit](overflowing-workflow-history-size.md). Workflows that would otherwise run for weeks hit the 50k event or size cap prematurely.
-2. **Slower replay**: Replaying a workflow fetches and processes the entire history. Larger payloads mean more data transferred over the network and more time spent deserializing.
-3. **Payload size limits**: Individual payloads that exceed the gRPC size limit (4MB by default) will be rejected outright, causing the workflow to [stop making progress](overflowing-maximum-individual-payload-size.md).
-4. **Storage costs**: All that data lives in your [Temporal server backend](terms/temporal-server-backend.md). Multiply a 500KB activity result by millions of workflow executions and the storage adds up.
-
-## How?
-
-Design activity return types the same way you'd design an API response -- include only the fields the caller needs.
-
-**Before** (returning everything):
 ```go
+// Before: returning the full record
 func LookupCustomer(ctx context.Context, customerID string) (*Customer, error) {
-    // Returns the full customer record: addresses, orders, preferences, ...
     return db.GetCustomer(ctx, customerID)
 }
-```
 
-**After** (returning what the workflow needs):
-```go
+// After: returning only what the workflow needs
 type CustomerSummary struct {
     ID               string
     SubscriptionTier string
@@ -53,6 +33,6 @@ func LookupCustomer(ctx context.Context, customerID string) (*CustomerSummary, e
 }
 ```
 
-If a downstream activity genuinely needs the full data, have that activity fetch it directly rather than passing it through the workflow. The workflow is an orchestrator -- it should pass references, not bulk data.
+If a downstream activity genuinely needs the full data, have it fetch the data directly rather than passing it through the workflow. For large data that must flow through the system, store it externally (S3, a database, a cache) and pass only a reference (a URL, an ID, a key) as the activity result.
 
-For cases where large data must flow through the system, store it externally (S3, a database, a cache) and pass the reference (a URL, an ID, a key) as the activity result.
+See also: [Overflowing maximum individual payload size](overflowing-maximum-individual-payload-size.md), [Overflowing workflow history bytes](overflowing-workflow-history-bytes.md).

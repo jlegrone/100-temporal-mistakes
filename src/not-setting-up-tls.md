@@ -1,44 +1,24 @@
 # Not Setting Up TLS
 
 > [!TIP]
-> * By default, all Temporal SDK-to-server communication is unencrypted, meaning workflow data travels in plaintext over the network.
-> * In any production environment, TLS must be configured for [worker](terms/worker.md)-to-server and client-to-server connections.
-> * Temporal supports mutual TLS (mTLS) for both authentication and encryption, which you should enable when possible.
+> By default, all Temporal SDK-to-server communication is unencrypted. In any production environment, TLS must be configured for [worker](terms/worker.md)-to-server and client-to-server connections.
 
-## What?
+Temporal SDKs communicate with the Temporal server over gRPC. Out of the box, these connections are unencrypted -- all data flowing between your workers and the server (workflow inputs, activity outputs, [heartbeat](terms/heartbeat.md) [payloads](terms/payload.md), etc.) travels in plaintext. Even if you use a custom [data converter](terms/data-converter.md) to encrypt payloads at the application level, metadata such as [workflow IDs](terms/workflow-id.md), [task queue](terms/task-queue.md) names, and [namespace](terms/namespace.md) names still travel in the clear without TLS. Beyond confidentiality, TLS provides integrity (protection against tampering) and, with mutual TLS, authentication -- without mTLS, any process that can reach the Temporal server's gRPC port can start workflows, send [signals](terms/signals.md), or [terminate](terms/terminate.md) running workflows.
 
-Temporal SDKs communicate with the Temporal server over gRPC. Out of the box, these connections are unencrypted. All data flowing between your workers and the server (workflow inputs, activity outputs, [heartbeat](terms/heartbeat.md) [payloads](terms/payload.md), etc.) travels in plaintext. Anyone with network access can observe or tamper with this traffic.
-
-This applies to all SDK connections: workers polling for tasks, clients starting workflows, and clients querying workflow state.
-
-## Why?
-
-Workflow payloads often contain sensitive business data: customer information, financial records, internal identifiers. Even if you use a custom [data converter](terms/data-converter.md) to encrypt payloads at the application level, metadata such as [workflow IDs](terms/workflow-id.md), [task queue](terms/task-queue.md) names, [namespace](terms/namespace.md) names, and Temporal headers still travel in the clear without TLS.
-
-Beyond confidentiality, TLS also provides integrity (protection against tampering) and, with mutual TLS, authentication (verifying the identity of both client and server). Without mTLS, any process that can reach the Temporal server's gRPC port can start workflows, send [signals](terms/signals.md), or [terminate](terms/terminate.md) running workflows.
-
-In production, running without TLS typically violates security compliance requirements (SOC 2, HIPAA, PCI-DSS, etc.) regardless of whether the traffic stays within a private network.
-
-## How?
-
-**Configure TLS on the Temporal server.** The server configuration accepts certificate and key files for its frontend gRPC service. At a minimum, provide a server certificate and key.
-
-**Configure TLS on all SDK clients.** Each SDK provides connection options for specifying TLS settings. In Go:
+Configure TLS on all SDK clients. In Go:
 
 ```go
 clientOptions := client.Options{
     HostPort:  "temporal.example.com:7233",
     ConnectionOptions: client.ConnectionOptions{
         TLS: &tls.Config{
-            // Server CA certificate to verify the server
-            RootCAs: certPool,
-            // Client certificate for mutual TLS
+            RootCAs:      certPool,
             Certificates: []tls.Certificate{clientCert},
         },
     },
 }
 ```
 
-**Use mutual TLS (mTLS) when possible.** mTLS adds client authentication on top of encryption. The server verifies the client's certificate, ensuring only authorized workers and clients can connect. This matters especially when your Temporal server is accessible from multiple networks or when you want to enforce per-namespace access controls based on client certificates.
+Use mutual TLS (mTLS) when possible -- the server verifies the client's certificate, ensuring only authorized workers and clients can connect. If you self-host Temporal, also configure TLS for inter-service communication between the frontend, history, matching, and worker services.
 
-**Don't forget inter-service communication.** If you self-host Temporal, the server consists of multiple internal services (frontend, history, matching, worker) that communicate with each other. Configure TLS for these inter-service connections too. See also [Not enabling Ringpop TLS](not-enabling-ringpop-tls.md) for the often-overlooked cluster membership protocol.
+See also: [Not Enabling Ringpop TLS](not-enabling-ringpop-tls.md) for the often-overlooked cluster membership protocol.

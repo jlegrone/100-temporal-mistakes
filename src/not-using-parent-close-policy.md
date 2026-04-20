@@ -1,38 +1,9 @@
 # Not Using ParentClosePolicy
 
 > [!TIP]
-> * By default, [child workflows](terms/child-workflow.md) are [terminated](terms/terminate.md) when their parent completes, fails, or is [cancelled](terms/cancellation.md) -- giving them no chance for cleanup.
-> * If child workflows need to perform graceful cleanup, you must set `ParentClosePolicy` to `REQUEST_CANCEL` or `ABANDON`.
-> * Choose the policy based on whether the child needs to react to the parent's closure or should simply continue independently.
+> By default, [child workflows](terms/child-workflow.md) are [terminated](terms/terminate.md) (hard-killed) when their parent completes, fails, or is [cancelled](terms/cancellation.md). Set `ParentClosePolicy` to `REQUEST_CANCEL` or `ABANDON` if children need cleanup.
 
-## What?
-
-When a parent workflow completes, fails, or is cancelled, Temporal applies a `ParentClosePolicy` to each running child workflow. The default policy is `TERMINATE` -- a hard kill. The child workflow stops immediately with no opportunity to run cleanup logic, defer blocks, or compensation activities.
-
-Many developers start a child workflow expecting it to handle its own lifecycle gracefully, but never configure the `ParentClosePolicy`. When the parent finishes before the child, the child is silently terminated and any cleanup logic it would have run is lost.
-
-## Why?
-
-The default `TERMINATE` policy is a reasonable safety net -- it prevents orphaned child workflows from running indefinitely after their parent is gone. But it is the wrong choice when child workflows need to:
-
-- Release external resources (locks, reservations, temporary files).
-- Send notifications or acknowledgements.
-- Run compensation logic to undo partial work.
-- Complete in-flight operations that must not be interrupted.
-
-A terminated workflow cannot do any of this. Its pending activities are immediately abandoned and its code never executes another line. If your child workflow had important cleanup to perform, that cleanup does not happen.
-
-## How?
-
-Temporal offers three `ParentClosePolicy` values:
-
-| Policy | Behavior |
-|---|---|
-| `TERMINATE` (default) | Child is immediately [terminated](terms/terminate.md). No cleanup. |
-| `REQUEST_CANCEL` | Child receives a cancellation request and can handle it gracefully. |
-| `ABANDON` | Child continues running independently, unaffected by the parent's closure. |
-
-Set the policy when starting the child workflow:
+The default `TERMINATE` policy silently kills child workflows with no opportunity to run cleanup logic, compensation activities, or defer blocks. This is a reasonable safety net against orphans, but the wrong choice when children need to release resources, send notifications, or complete in-flight work.
 
 ```go
 childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
@@ -41,8 +12,10 @@ childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 future := workflow.ExecuteChildWorkflow(childCtx, ChildWorkflow, input)
 ```
 
-**Choose `REQUEST_CANCEL`** when the child should be notified that the parent is gone and should wind down gracefully. The child workflow receives a cancellation signal and can use a [disconnected context](<not-using-disconnected-context-for-cleanup.md>) to perform cleanup activities before completing.
+| Policy | Behavior |
+|---|---|
+| `TERMINATE` (default) | Child is immediately killed. No cleanup. |
+| `REQUEST_CANCEL` | Child receives a cancellation request and can handle it gracefully via a [disconnected context](not-using-disconnected-context-for-cleanup.md). |
+| `ABANDON` | Child continues running independently, unaffected by parent closure. |
 
-**Choose `ABANDON`** when the child workflow's lifecycle is genuinely independent and it should continue running regardless of what happens to the parent. Be mindful that abandoned child workflows can become long-lived orphans if they don't have their own termination conditions.
-
-**Stick with `TERMINATE`** (or don't set anything) only when you are certain the child has no cleanup needs and you want the simplest possible behavior.
+Choose `REQUEST_CANCEL` when the child should wind down gracefully. Choose `ABANDON` when the child's lifecycle is genuinely independent. Stick with `TERMINATE` only when you're certain the child has no cleanup needs.

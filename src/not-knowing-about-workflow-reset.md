@@ -1,48 +1,22 @@
 # Not Knowing About Workflow Reset
 
 > [!TIP]
-> * Workflow reset allows you to [replay](terms/replay.md) a workflow from a specific point in its history, effectively "rewinding" it.
-> * This is invaluable for recovering from bugs -- fix the code, then reset the workflow to before the bad decision was made.
-> * Many teams don't know this feature exists and resort to manual workarounds when workflows go down the wrong path.
+> Workflow reset lets you rewind a workflow to a specific point in its history and continue forward with fixed code. It is invaluable for recovering from bugs without losing the work already completed.
 
-## What?
+Temporal records the complete history of every workflow execution. Workflow reset leverages this history to re-execute a workflow from a chosen point, discarding everything that happened after it. Events up to the reset point are preserved and [replayed](terms/replay.md); events after it are discarded; and the workflow continues executing from that point with whatever [worker](terms/worker.md) code is currently deployed. Think of it like `git reset` -- you rewind to a known good state and replay from there.
 
-Temporal records the complete history of every workflow execution. Workflow reset leverages this history to re-execute a workflow from a chosen point, discarding everything that happened after that point. The workflow picks up from the reset point and continues forward using the current (presumably fixed) code.
+Without knowing about reset, teams facing a workflow that went down the wrong path are left with bad options: [terminate](terms/terminate.md) and restart (losing all progress), manual compensation (error-prone and unscalable), or waiting it out (hoping for a recovery path that may never come). Reset gives you a targeted recovery mechanism: fix the bug, deploy the fix, and reset affected workflows to just before the faulty logic executed. Combined with [batch operations](not-knowing-about-batch-operations-api.md), you can reset hundreds of affected workflows at once.
 
-Concretely, when you reset a workflow to event N in its history:
-- Events up to N are preserved and replayed.
-- Events after N are discarded.
-- The workflow continues executing from that point with whatever [worker](terms/worker.md) code is currently deployed.
+To use reset, examine the [workflow history](terms/event-history.md) to find the event ID just before the workflow took the wrong path, then reset via the CLI:
 
-Think of it like `git reset` -- you rewind to a known good state and replay from there.
+```bash
+temporal workflow reset \
+  --workflow-id my-workflow \
+  --run-id abc123 \
+  --event-id 42 \
+  --reason "Resetting to before bug in payment logic"
+```
 
-## Why?
+Deploy your fix first -- if you reset before fixing the code, the workflow will hit the same bug again. Activities that completed before the reset point will not re-execute (their recorded results are replayed), but activities after the reset point will, so make sure activity implementations are [idempotent](terms/idempotency.md). You can also use reset types like `LastWorkflowTask`, `LastContinuedAsNew`, or `BadBinary` to simplify targeting.
 
-Without knowing about reset, teams facing a workflow that went down the wrong path due to a bug are left with bad options:
-
-- **[Terminate](terms/terminate.md) and restart**: Loses all progress. If the workflow completed expensive operations (payments, external API calls, provisioning), you may not be able to redo them.
-- **Manual compensation**: Writing ad-hoc scripts or manually fixing state is error-prone and doesn't scale.
-- **Waiting it out**: Hoping the workflow will eventually reach a recovery path, which may never happen if the bug is in a critical decision point.
-
-Reset gives you a targeted recovery mechanism. You fix the bug in your workflow code, deploy the fix, and reset the affected workflows to the point just before the faulty logic executed. The workflows then proceed correctly using the new code.
-
-Combined with [batch operations](not-knowing-about-batch-operations-api.md), this is particularly powerful -- if a bug affected hundreds of workflows, you can reset them all at once.
-
-## How?
-
-1. **Identify the reset point**. Examine the [workflow history](terms/event-history.md) in the Temporal UI or via `tctl` to find the event ID just before the workflow took the wrong path. Typically you'll want to reset to a [workflow task](terms/workflow-task.md) completed event.
-
-2. **Reset via CLI or API**:
-   ```bash
-   # Reset a single workflow to a specific event ID
-   tctl workflow reset --workflow-id my-workflow --run-id abc123 --event-id 42 --reason "Resetting to before bug in payment logic"
-
-   # Reset to the last workflow task before a failure
-   tctl workflow reset --workflow-id my-workflow --run-id abc123 --reset-type LastWorkflowTask --reason "Recovering from bug fix deployed in v2.3.1"
-   ```
-
-3. **Deploy your fix first**. Reset replays history and then continues with current code. If you reset before deploying the fix, the workflow will just hit the same bug again.
-
-4. **Understand the implications**: activities that already completed before the reset point will not re-execute -- their recorded results are replayed. Activities after the reset point will be re-executed. Make sure activity implementations are [idempotent](terms/idempotency.md) or that re-execution is acceptable.
-
-5. **Use reset types** to simplify targeting: `LastWorkflowTask`, `LastContinuedAsNew`, `BadBinary`, or a specific `EventId`. The `BadBinary` option is especially useful when you know which binary version introduced the bug.
+See also: [Not Knowing About the Batch Operations API](not-knowing-about-batch-operations-api.md).
