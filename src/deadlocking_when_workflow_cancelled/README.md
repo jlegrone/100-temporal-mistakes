@@ -8,13 +8,14 @@ When Temporal delivers a cancellation request, the SDK cancels the workflow's co
 <!--SNIPSTART deadlocking-cancelled-bad-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
 ```go
-// BUG: ctx is already canceled in the defer
-func MyWorkflowV1(ctx workflow.Context, input any) {
-	defer func() {
-		err := workflow.ExecuteActivity(ctx, CleanupActivity, input).Get(ctx, nil)
-		// Always returns CanceledError -- cleanup never runs
-		_ = err
-	}()
+
+// MyWorkflowV1 blocks forever if canceled. The Receive call blocks
+// until a signal arrives, but once the workflow is canceled, no signal
+// will ever be delivered.
+func MyWorkflowV1(ctx workflow.Context) error {
+	var done bool
+	workflow.GetSignalChannel(ctx, "done").Receive(ctx, &done)
+	return nil
 }
 
 ```
@@ -25,12 +26,16 @@ The fix: create a disconnected context that remains valid after cancellation:
 <!--SNIPSTART deadlocking-cancelled-good-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
 ```go
-func MyWorkflowV2(ctx workflow.Context, input any) {
-	defer func() {
-		disconnectedCtx, cancel := workflow.NewDisconnectedContext(ctx)
-		defer cancel()
-		_ = workflow.ExecuteActivity(disconnectedCtx, CleanupActivity, input).Get(disconnectedCtx, nil)
-	}()
+
+// MyWorkflowV2 uses a selector to unblock on either the signal
+// or cancellation.
+func MyWorkflowV2(ctx workflow.Context) error {
+	ch := workflow.GetSignalChannel(ctx, "done")
+	selector := workflow.NewSelector(ctx)
+	selector.AddReceive(ch, func(c workflow.ReceiveChannel, more bool) {})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
+	selector.Select(ctx)
+	return ctx.Err()
 }
 
 ```

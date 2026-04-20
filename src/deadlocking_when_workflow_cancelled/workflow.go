@@ -1,35 +1,47 @@
 package deadlocking_when_workflow_cancelled
 
 import (
-	"context"
-
 	"go.temporal.io/sdk/workflow"
 )
 
-// CleanupActivity performs cleanup after workflow cancellation.
-func CleanupActivity(_ context.Context, _ any) error {
-	return nil
-}
-
 // @@@SNIPSTART deadlocking-cancelled-bad
-// BUG: ctx is already canceled in the defer
-func MyWorkflowV1(ctx workflow.Context, input any) {
-	defer func() {
-		err := workflow.ExecuteActivity(ctx, CleanupActivity, input).Get(ctx, nil)
-		// Always returns CanceledError -- cleanup never runs
-		_ = err
-	}()
+
+// MyWorkflowV1 blocks forever if canceled. The Receive call blocks
+// until a signal arrives, but once the workflow is canceled, no signal
+// will ever be delivered.
+func MyWorkflowV1(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
+	log.Debug("waiting for done signal")
+
+	ch := workflow.GetSignalChannel(ctx, "done")
+
+	ch.Receive(ctx, nil)
+	log.Debug("received done signal")
+
+	return nil
 }
 
 // @@@SNIPEND
 
 // @@@SNIPSTART deadlocking-cancelled-good
-func MyWorkflowV2(ctx workflow.Context, input any) {
-	defer func() {
-		disconnectedCtx, cancel := workflow.NewDisconnectedContext(ctx)
-		defer cancel()
-		_ = workflow.ExecuteActivity(disconnectedCtx, CleanupActivity, input).Get(disconnectedCtx, nil)
-	}()
+
+// MyWorkflowV2 uses a selector to unblock on either the signal
+// or cancellation.
+func MyWorkflowV2(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
+	log.Debug("waiting for done signal")
+
+	ch := workflow.GetSignalChannel(ctx, "done")
+	selector := workflow.NewSelector(ctx)
+
+	selector.AddReceive(ch, func(c workflow.ReceiveChannel, more bool) {
+		log.Debug("received done signal")
+	})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
+		log.Warn("received done", "error", ctx.Err())
+	})
+	selector.Select(ctx)
+	return ctx.Err()
 }
 
 // @@@SNIPEND
