@@ -7,7 +7,7 @@ Because payloads are persisted and transmitted, their size directly impacts hist
 ## Related
 
 - [Overflowing Maximum Individual Payload Size](../overflowing-maximum-individual-payload-size.md)
-- [Passing Too Much Information from Activities](../passing-too-much-information-from-activities.md)
+- [Passing Too Much Information from Activities](../passing_too_much_information_from_activities/)
 - [Lossy Payload Serialization](../lossy-payload-serialization.md)
 - [Breaking Changes to Payloads](../breaking-changes-to-payloads.md)
 - [Data Converter](data-converter.md)

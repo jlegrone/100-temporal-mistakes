@@ -14,4 +14,4 @@ Solutions:
 - Ensure [workflow caching](https://docs.temporal.io/develop/worker-performance#workflow-cache-tuning) is effective so subsequent tasks skip replay -- if `sticky_cache_size` is consistently at the configured max, the cache is full and workflows are being evicted -- increase the cache size if workers have free RAM
 - Increase `WorkflowTaskTimeout` only as a last resort -- it's a band-aid for a deeper design issue
 
-See also: [Performing Expensive Computation in Workflow Code](performing-expensive-computation-in-workflow-code.md), [Overflowing Workflow History Length](overflowing-workflow-history-length.md).
+See also: [Performing Expensive Computation in Workflow Code](../performing_expensive_computation_in_workflow_code/), [Overflowing Workflow History Length](overflowing-workflow-history-length.md).

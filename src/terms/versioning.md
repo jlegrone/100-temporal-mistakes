@@ -8,9 +8,9 @@ Worker Versioning (also called Build ID-based versioning) is a server-side featu
 
 ## Related
 
-- [Not using workflow versioning](../not-using-workflow-versioning.md)
+- [Not using workflow versioning](../not_using_workflow_versioning/README.md)
 - [Incorrect workflow patching](../incorrect-workflow-patching.md)
-- [Not validating replay safety before deployments](../not-validating-replay-safety-before-deployments.md)
+- [Not validating replay safety before deployments](../not_validating_replay_safety_before_deployments/README.md)
 - [Breaking changes to payloads](../breaking-changes-to-payloads.md)
 - [Replay](replay.md)
 - [Non-determinism](non-determinism.md)

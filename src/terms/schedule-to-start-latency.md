@@ -9,7 +9,7 @@ High STSL indicates that workers cannot keep up with the incoming task rate. Thi
 - [Not Monitoring STSL](../not-monitoring-stsl.md)
 - [Not Monitoring Sync Match Rate](../not-monitoring-sync-match-rate.md)
 - [Starting Workflows on Wrong Task Queue](../starting-workflows-on-wrong-task-queue.md)
-- [Not Enabling Autotuning](../not-enabling-autotuning.md)
+- [Not Enabling Autotuning](../not_enabling_autotuning/)
 - [Task Queue](task-queue.md)
 - [Worker](worker.md)
 - [Activity Task](activity-task.md)

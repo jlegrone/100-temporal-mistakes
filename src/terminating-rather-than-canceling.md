@@ -7,4 +7,4 @@ When operators need to stop a workflow, many default to termination because it f
 
 Cancellation is cooperative: the workflow receives a cancellation request, catches it, runs compensation logic, and completes gracefully. Default to `tctl workflow cancel` or the "Cancel" action in the UI. Reserve termination for true emergencies where the workflow is stuck in a tight loop or causing active harm. Consider restricting terminate permissions via [namespace](terms/namespace.md)-level access controls.
 
-See also: [Not Using a Disconnected Context for Cleanup](not-using-disconnected-context-for-cleanup.md).
+See also: [Not Using a Disconnected Context for Cleanup](not_using_disconnected_context_for_cleanup/README.md).

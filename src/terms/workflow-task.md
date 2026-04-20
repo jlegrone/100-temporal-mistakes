@@ -7,8 +7,8 @@ Workflow tasks have a default timeout of 10 seconds. If a workflow task takes lo
 ## Related
 
 - [Exceeding 10s Task Timeout](../exceeding-10s-task-timeout.md)
-- [Performing Expensive Computation in Workflow Code](../performing-expensive-computation-in-workflow-code.md)
-- [Using Local Activities](../using-local-activities.md)
+- [Performing Expensive Computation in Workflow Code](../performing_expensive_computation_in_workflow_code/)
+- [Using Local Activities](../using_local_activities/)
 - [Activity Task](activity-task.md)
 - [Replay](replay.md)
 - [Event History](event-history.md)

@@ -8,8 +8,8 @@ During replay, the event history is used to reconstruct the workflow's state by 
 
 - [Overflowing Workflow History Length](../overflowing-workflow-history-length.md)
 - [Overflowing Workflow History Bytes](../overflowing-workflow-history-bytes.md)
-- [Passing Too Much Information from Activities](../passing-too-much-information-from-activities.md)
-- [Not Using Continue-As-New](../not-using-continue-as-new.md)
+- [Passing Too Much Information from Activities](../passing_too_much_information_from_activities/)
+- [Not Using Continue-As-New](../not_using_continue_as_new/README.md)
 - [Downloading History with Decode Payloads](../downloading-history-with-decode-payloads.md)
 - [Replay](replay.md)
 - [Continue-As-New](continue-as-new.md)

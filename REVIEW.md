@@ -17,7 +17,7 @@ All 76 mistakes have been condensed to the target format (TLDR + 1-3 paragraphs,
 - [ ] **#5 Thinking Replay Means Re-Running Activities** ([`thinking-replay-means-rerunning-activities.md`](src/thinking-replay-means-rerunning-activities.md))
   - [ ] Verify "speculative execution" is still accurate terminology
 
-- [x] **Assuming Activity Cancellation Means Workflow Cancellation** ([`assuming-activity-cancelation-means-workflow-cancelation.md`](src/assuming-activity-cancelation-means-workflow-cancelation.md))
+- [x] **Assuming Activity Cancellation Means Workflow Cancellation** ([`assuming-activity-cancelation-means-workflow-cancelation`](src/assuming_activity_cancelation_means_workflow_cancelation/))
   - [x] ~~Replace code example~~ — now shows an activity that incorrectly updates DB status on cancellation instead of letting the workflow orchestrate cleanup
 
 - [ ] **#12 Not Using Static Analysis or the Sandboxed SDK** ([`not-using-static-analysis-sandboxed-sdk.md`](src/not-using-static-analysis-sandboxed-sdk.md))

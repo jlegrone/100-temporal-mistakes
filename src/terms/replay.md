@@ -7,10 +7,10 @@ Because workflow code is re-executed during replay, it must be deterministic -- 
 ## Related
 
 - [Thinking replay means rerunning activities](../thinking-replay-means-rerunning-activities.md)
-- [Not using workflow replay for debugging](../not-using-workflow-replay-for-debugging.md)
-- [Not using workflow versioning](../not-using-workflow-versioning.md)
-- [Performing network calls in workflow code](../performing-network-calls-in-workflow-code.md)
-- [Using system time instead of workflow time](../using-system-time-instead-of-workflow-time.md)
+- [Not using workflow replay for debugging](../not_using_workflow_replay_for_debugging/)
+- [Not using workflow versioning](../not_using_workflow_versioning/README.md)
+- [Performing network calls in workflow code](../performing_network_calls_in_workflow_code/README.md)
+- [Using system time instead of workflow time](../using_system_time_instead_of_workflow_time/README.md)
 - [Event History](event-history.md)
 - [Non-determinism](non-determinism.md)
 - [Versioning](versioning.md)

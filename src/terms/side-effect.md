@@ -8,9 +8,9 @@ MutableSideEffect is a variant that can be updated over time -- it re-executes o
 
 ## Related
 
-- [Not Using Return Value in Side Effect](../not-using-return-value-in-side-effect.md)
-- [Reading Environment Variables in Workflow Code](../reading-environment-variables-in-workflow-code.md)
-- [Performing Network Calls in Workflow Code](../performing-network-calls-in-workflow-code.md)
+- [Not Using Return Value in Side Effect](../not_using_return_value_in_side_effect/README.md)
+- [Reading Environment Variables in Workflow Code](../reading_environment_variables_in_workflow_code/README.md)
+- [Performing Network Calls in Workflow Code](../performing_network_calls_in_workflow_code/README.md)
 - [Replay](replay.md)
 - [Non-Determinism](non-determinism.md)
 - [Event History](event-history.md)

@@ -7,4 +7,4 @@ Every [payload](terms/payload.md) type that flows through Temporal is serialized
 
 Treat payload types with the same discipline you'd apply to a database schema or a public API contract. Add optional fields with sensible defaults; don't remove or rename existing ones. If a field must change type, add a new field alongside the old one and handle both during deserialization. Use schema-friendly serialization like Protobuf, which has explicit rules for backwards-compatible evolution. When a payload change is truly necessary, use [versioning](terms/versioning.md) to branch your workflow logic so that old histories are processed with old types and new workflows use the new types. Test with real history from running workflows before deploying.
 
-See also: [Lossy payload serialization](lossy-payload-serialization.md), [Using more than one input/response payload](using-more-than-one-input-response-payload.md).
+See also: [Lossy payload serialization](lossy-payload-serialization.md), [Using more than one input/response payload](using_more_than_one_input_response_payload/).

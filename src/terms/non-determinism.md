@@ -6,12 +6,12 @@ Common sources of non-determinism include: network calls, system time (`time.Now
 
 ## Related
 
-- [Performing Network Calls in Workflow Code](../performing-network-calls-in-workflow-code.md)
-- [Using System Time Instead of Workflow Time](../using-system-time-instead-of-workflow-time.md)
-- [Reading Environment Variables in Workflow Code](../reading-environment-variables-in-workflow-code.md)
-- [Modifying Shared State in Workflow Code](../modifying-shared-state-in-workflow-code.md)
+- [Performing Network Calls in Workflow Code](../performing_network_calls_in_workflow_code/README.md)
+- [Using System Time Instead of Workflow Time](../using_system_time_instead_of_workflow_time/README.md)
+- [Reading Environment Variables in Workflow Code](../reading_environment_variables_in_workflow_code/README.md)
+- [Modifying Shared State in Workflow Code](../modifying_shared_state_in_workflow_code/README.md)
 - [Not Using Static Analysis / Sandboxed SDK](../not-using-static-analysis-sandboxed-sdk.md)
-- [Not Using Workflow Versioning](../not-using-workflow-versioning.md)
+- [Not Using Workflow Versioning](../not_using_workflow_versioning/README.md)
 - [Replay](replay.md)
 - [Versioning](versioning.md)
 - [Side Effect](side-effect.md)

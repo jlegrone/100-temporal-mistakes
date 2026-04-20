@@ -7,7 +7,7 @@ A Data Converter is the component responsible for serializing and deserializing 
 - [Lossy payload serialization](../lossy-payload-serialization.md)
 - [Breaking changes to payloads](../breaking-changes-to-payloads.md)
 - [Overflowing maximum individual payload size](../overflowing-maximum-individual-payload-size.md)
-- [Storing sensitive data in workflow history](../storing-sensitive-data-in-workflow-history.md)
+- [Storing sensitive data in workflow history](../storing_sensitive_data_in_workflow_history/)
 - [Downloading history with decode payloads](../downloading-history-with-decode-payloads.md)
 - [Payload](payload.md)
 - [Large Payload Codec](large-payload-codec.md)

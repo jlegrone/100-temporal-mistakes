@@ -20,4 +20,4 @@ global:
 
 Use dedicated certificates rather than reusing gRPC certificates for finer-grained control. Ringpop TLS is all-or-nothing within a cluster -- if some nodes have it enabled and others don't, they cannot communicate and the cluster will split. Plan for certificate rotation to avoid cluster downtime when certificates expire.
 
-See also: [Not Setting Up TLS](not-setting-up-tls.md) for securing client-to-server and inter-service gRPC connections.
+See also: [Not Setting Up TLS](not_setting_up_tls/) for securing client-to-server and inter-service gRPC connections.

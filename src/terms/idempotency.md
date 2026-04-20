@@ -7,8 +7,8 @@ Common strategies for achieving idempotency include: using idempotency keys (uni
 ## Related
 
 - [Not Making Activities Idempotent](../not-making-activities-idempotent.md)
-- [Doing Work Outside of Workflow](../doing-work-outside-of-workflow.md)
+- [Doing Work Outside of Workflow](../doing_work_outside_of_the_workflow/)
 - [Not Knowing About Workflow Reset](../not-knowing-about-workflow-reset.md)
-- [Starting Workflows from Activities](../starting-workflows-from-activities.md)
+- [Starting Workflows from Activities](../starting_workflows_from_activities/)
 - [Activity Task](activity-task.md)
 - [Retry Policy](retry-policy.md)

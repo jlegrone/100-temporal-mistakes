@@ -6,7 +6,7 @@ Activity tasks have their own set of timeouts (schedule-to-start, start-to-close
 
 ## Related
 
-- [Not Draining Activity Tasks Before Shutdown](../not-draining-activity-tasks-before-shutdown.md)
+- [Not Draining Activity Tasks Before Shutdown](../not_draining_activity_tasks_before_shutdown/)
 - [Not Monitoring STSL](../not-monitoring-stsl.md)
 - [Preventing Activity Retries](../preventing-activity-retries.md)
 - [Over-Using Activities](../over-using-activities.md)

@@ -6,8 +6,8 @@ Local activities are appropriate for short, fast, reliable operations like readi
 
 ## Related
 
-- [Using Local Activities](../using-local-activities.md)
-- [Fallible Local Activities](../fallible-local-activities.md)
+- [Using Local Activities](../using_local_activities/)
+- [Fallible Local Activities](../fallible_local_activities/)
 - [Exceeding 10s Task Timeout](../exceeding-10s-task-timeout.md)
 - [Activity Task](activity-task.md)
 - [Workflow Task](workflow-task.md)

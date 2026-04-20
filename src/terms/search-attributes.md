@@ -8,7 +8,7 @@ Search attributes are the recommended way to expose workflow state for querying,
 
 - [Depending on List Workflow API](../depending-on-list-workflow-api.md)
 - [Querying Closed Workflows](../querying-closed-workflows.md)
-- [Storing Sensitive Data in Workflow History](../storing-sensitive-data-in-workflow-history.md)
+- [Storing Sensitive Data in Workflow History](../storing_sensitive_data_in_workflow_history/)
 - [Visibility](visibility.md)
 - [Queries](queries.md)
 - [Event History](event-history.md)

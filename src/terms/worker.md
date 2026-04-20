@@ -6,8 +6,8 @@ Workers are deployed and scaled independently of the Temporal server. Multiple w
 
 ## Related
 
-- [Not Draining Activity Tasks Before Shutdown](../not-draining-activity-tasks-before-shutdown.md)
-- [Not Enabling Autotuning](../not-enabling-autotuning.md)
+- [Not Draining Activity Tasks Before Shutdown](../not_draining_activity_tasks_before_shutdown/)
+- [Not Enabling Autotuning](../not_enabling_autotuning/)
 - [Not Monitoring STSL](../not-monitoring-stsl.md)
 - [Starting Workflows on Wrong Task Queue](../starting-workflows-on-wrong-task-queue.md)
 - [Task Queue](task-queue.md)

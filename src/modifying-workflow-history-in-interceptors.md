@@ -7,4 +7,4 @@ Temporal SDK interceptors wrap workflow and activity execution for cross-cutting
 
 Interceptors are dangerous precisely because they feel separate from workflow code. A team might carefully version their workflow definitions while freely updating a shared tracing interceptor. To avoid this: version interceptor changes the same way you version workflow changes, keep interceptors minimal (prefer read-only context propagation over execution flow modification), avoid feature flags in interceptors (the flag becomes part of the deterministic contract), and test interceptor changes with replay tests against existing workflow histories before deploying.
 
-See also: [Not Validating Replay Safety Before Deployments](not-validating-replay-safety-before-deployments.md).
+See also: [Not Validating Replay Safety Before Deployments](not_validating_replay_safety_before_deployments/README.md).

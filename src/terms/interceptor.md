@@ -7,7 +7,7 @@ Because interceptors execute during both normal execution and replay, they are p
 ## Related
 
 - [Modifying Workflow History in Interceptors](../modifying-workflow-history-in-interceptors.md)
-- [Not Using Temporal SDK for Observability](../not-using-temporal-sdk-for-observability.md)
+- [Not Using Temporal SDK for Observability](../not_using_temporal_sdk_for_observability/)
 - [Replay](replay.md)
 - [Non-determinism](non-determinism.md)
 - [Versioning](versioning.md)

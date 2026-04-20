@@ -10,8 +10,8 @@ The default TERMINATE policy catches many teams off guard when they expect child
 
 ## Related
 
-- [Not Using Parent Close Policy](../not-using-parent-close-policy.md)
-- [Not Waiting for Child Workflows to Start](../not-waiting-for-child-workflows-to-start.md)
+- [Not Using Parent Close Policy](../not_using_parent_close_policy/README.md)
+- [Not Waiting for Child Workflows to Start](../not_waiting_for_child_workflows_to_start/README.md)
 - [Unnecessary Child Workflows](../unnecessary-child-workflows.md)
 - [Child Workflow](child-workflow.md)
 - [Terminate](terminate.md)

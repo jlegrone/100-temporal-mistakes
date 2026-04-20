@@ -7,8 +7,8 @@ The heartbeat timeout is distinct from the start-to-close timeout. It provides f
 ## Related
 
 - [Preventing Activity Retries](../preventing-activity-retries.md)
-- [Not Sending Heartbeats from Activities You Want to Cancel](../not-sending-heartbeats-for-cancellation.md)
-- [Not Using Activity Heartbeat Details](../not-using-activity-heartbeat-details.md)
+- [Not Sending Heartbeats from Activities You Want to Cancel](../not_sending_heartbeats_for_cancellation/README.md)
+- [Not Using Activity Heartbeat Details](../not_using_activity_heartbeat_details/README.md)
 - [Heartbeat](heartbeat.md)
 - [Start-to-Close Timeout](start-to-close-timeout.md)
 - [Schedule-to-Close Timeout](schedule-to-close-timeout.md)

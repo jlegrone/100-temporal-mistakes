@@ -6,10 +6,10 @@ Heartbeats serve three purposes: liveness detection (the server knows the activi
 
 ## Related
 
-- [Not Sending Heartbeats for Cancellation](../not-sending-heartbeats-for-cancellation.md)
-- [Not Using Activity Heartbeat Details](../not-using-activity-heartbeat-details.md)
+- [Not Sending Heartbeats for Cancellation](../not_sending_heartbeats_for_cancellation/README.md)
+- [Not Using Activity Heartbeat Details](../not_using_activity_heartbeat_details/README.md)
 - [Preventing Activity Retries](../preventing-activity-retries.md)
-- [Not Draining Activity Tasks Before Shutdown](../not-draining-activity-tasks-before-shutdown.md)
+- [Not Draining Activity Tasks Before Shutdown](../not_draining_activity_tasks_before_shutdown/)
 - [Activity Task](activity-task.md)
 - [Heartbeat Timeout](heartbeat-timeout.md)
 - [Start-to-Close Timeout](start-to-close-timeout.md)

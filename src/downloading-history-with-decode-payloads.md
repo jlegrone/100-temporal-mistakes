@@ -15,4 +15,4 @@ temporal workflow show --workflow-id my-workflow --run-id abc123 --output json >
 temporal workflow show --workflow-id my-workflow --run-id abc123 --output json --codec-endpoint http://localhost:8081 > history_readable.json
 ```
 
-See also: [Not Using Workflow Replay for Debugging](not-using-workflow-replay-for-debugging.md), [Not Validating Replay Safety Before Deployments](not-validating-replay-safety-before-deployments.md).
+See also: [Not Using Workflow Replay for Debugging](not_using_workflow_replay_for_debugging/), [Not Validating Replay Safety Before Deployments](not_validating_replay_safety_before_deployments/README.md).

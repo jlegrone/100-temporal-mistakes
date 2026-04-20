@@ -6,7 +6,7 @@ The Temporal Server backend refers to the persistence layer that stores workflow
 
 - [Not setting up persistence rate limits](../not-setting-up-persistence-rate-limits.md)
 - [Overflowing maximum individual payload size](../overflowing-maximum-individual-payload-size.md)
-- [Storing sensitive data in workflow history](../storing-sensitive-data-in-workflow-history.md)
+- [Storing sensitive data in workflow history](../storing_sensitive_data_in_workflow_history/)
 - [Dynamic Config](dynamic-config.md)
 - [Event History](event-history.md)
 - [Namespace](namespace.md)

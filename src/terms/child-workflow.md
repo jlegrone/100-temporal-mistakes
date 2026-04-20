@@ -9,10 +9,10 @@ The `ParentClosePolicy` controls what happens to child workflows when the parent
 ## Related
 
 - [Unnecessary Child Workflows](../unnecessary-child-workflows.md)
-- [Not Using Parent Close Policy](../not-using-parent-close-policy.md)
-- [Not Waiting for Child Workflows to Start](../not-waiting-for-child-workflows-to-start.md)
+- [Not Using Parent Close Policy](../not_using_parent_close_policy/README.md)
+- [Not Waiting for Child Workflows to Start](../not_waiting_for_child_workflows_to_start/README.md)
 - [Doing Too Many Things in One Workflow](../doing-too-many-things-in-one-workflow.md)
-- [Polling Workflow Results](../polling-workflow-results.md)
+- [Polling Workflow Results](../polling_workflow_results/)
 - [Parent Close Policy](parent-close-policy.md)
 - [Event History](event-history.md)
 - [Task Queue](task-queue.md)

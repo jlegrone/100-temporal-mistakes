@@ -5,8 +5,8 @@ The worker controller is [an open source Datadog project](https://github.com/Dat
 
 ## Related
 
-- [Not using ContinueAsNew](../not-using-continue-as-new.md)
-- [Not using workflow versioning](../not-using-workflow-versioning.md)
+- [Not using ContinueAsNew](../not_using_continue_as_new/README.md)
+- [Not using workflow versioning](../not_using_workflow_versioning/README.md)
 - [Versioning](versioning.md)
 - [Worker](worker.md)
 - [ContinueAsNew](continue-as-new.md)

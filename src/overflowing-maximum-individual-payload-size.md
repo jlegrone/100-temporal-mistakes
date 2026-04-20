@@ -7,4 +7,4 @@ Every workflow and activity input and output is serialized by the [data converte
 
 To avoid this, trim inputs and outputs to the minimum the caller needs. Store large data in an external system (a database, blob storage, or local disk via [sessions](terms/sessions.md)) and pass references (IDs, URLs) as your workflow and activity inputs. If larger payloads are genuinely required for use in workflow code, an [external storage codec](https://docs.temporal.io/external-storage) can offload them to external storage at the serialization layer. For data-intensive workloads, consider whether Temporal is the right tool or if a purpose-built data pipeline is more appropriate.
 
-See also: [Passing too much information from activities](passing-too-much-information-from-activities.md), [Overflowing workflow history bytes](overflowing-workflow-history-bytes.md).
+See also: [Passing too much information from activities](passing_too_much_information_from_activities/), [Overflowing workflow history bytes](overflowing-workflow-history-bytes.md).

@@ -4,10 +4,10 @@ Signals are asynchronous messages sent to a running workflow execution. They cre
 
 ## Related
 
-- [Not draining signals before completing workflow](../not-draining-signals-before-completing-workflow.md)
+- [Not draining signals before completing workflow](../not_draining_signals_before_completing_workflow/)
 - [Assuming signal/update order](../assuming_signal_update_order/)
 - [Workflow lock contention due to concurrent updates](../workflow-lock-contention-due-to-concurrent-updates.md)
-- [Wrapping a queue with a workflow](../wrapping-a-queue-with-a-workflow.md)
+- [Wrapping a queue with a workflow](../wrapping_a_queue_with_a_workflow/README.md)
 - [Updates](updates.md)
 - [Queries](queries.md)
 - [Event History](event-history.md)

@@ -8,6 +8,6 @@ Workflow IDs should be scoped to the business entity they represent -- broad eno
 
 - [Not Properly Scoping Semantic Workflow IDs](../not-properly-scoping-semantic-workflow-ids.md)
 - [Depending on List Workflow API](../depending-on-list-workflow-api.md)
-- [Starting Workflows from Activities](../starting-workflows-from-activities.md)
+- [Starting Workflows from Activities](../starting_workflows_from_activities/)
 - [Namespace](namespace.md)
 - [Idempotency](idempotency.md)

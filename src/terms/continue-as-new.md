@@ -4,10 +4,10 @@ ContinueAsNew completes the current workflow execution and immediately starts a 
 
 ## Related
 
-- [Not using ContinueAsNew](../not-using-continue-as-new.md)
+- [Not using ContinueAsNew](../not_using_continue_as_new/README.md)
 - [Overflowing workflow history length](../overflowing-workflow-history-length.md)
-- [Not draining signals before completing workflow](../not-draining-signals-before-completing-workflow.md)
-- [Writing polling loops in workflow code](../writing-polling-loops-in-workflow-code.md)
+- [Not draining signals before completing workflow](../not_draining_signals_before_completing_workflow/)
+- [Writing polling loops in workflow code](../writing_polling_loops_in_workflow_code/README.md)
 - [Replay](replay.md)
 - [Versioning](versioning.md)
 - [Event History](event-history.md)
