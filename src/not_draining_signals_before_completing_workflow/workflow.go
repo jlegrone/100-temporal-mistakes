@@ -13,11 +13,6 @@ type State struct{}
 // Apply processes a signal and updates the state.
 func (s *State) Apply(_ MySignal) {}
 
-// ShouldContinueAsNew checks whether the workflow should continue as new.
-func ShouldContinueAsNew(_ workflow.Context) bool {
-	return false
-}
-
 // MyWorkflow is a placeholder for the ContinueAsNew target.
 func MyWorkflow(_ workflow.Context, _ State) error {
 	return nil
@@ -27,8 +22,7 @@ func MyWorkflow(_ workflow.Context, _ State) error {
 
 // DrainSignalsBeforeContinueAsNew drains pending signals before calling ContinueAsNew.
 func DrainSignalsBeforeContinueAsNew(ctx workflow.Context, signalCh workflow.ReceiveChannel, state State) error {
-	// Check if it's time to continue as new
-	if ShouldContinueAsNew(ctx) {
+	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
 		// Drain any remaining signals before continuing
 		for {
 			var signal MySignal

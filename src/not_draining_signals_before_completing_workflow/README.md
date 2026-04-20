@@ -13,8 +13,7 @@ Before completing or calling ContinueAsNew, use non-blocking receive to drain pe
 
 // DrainSignalsBeforeContinueAsNew drains pending signals before calling ContinueAsNew.
 func DrainSignalsBeforeContinueAsNew(ctx workflow.Context, signalCh workflow.ReceiveChannel, state State) error {
-	// Check if it's time to continue as new
-	if ShouldContinueAsNew(ctx) {
+	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
 		// Drain any remaining signals before continuing
 		for {
 			var signal MySignal

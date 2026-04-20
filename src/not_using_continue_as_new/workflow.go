@@ -13,8 +13,7 @@ func SubscriptionWorkflow(ctx workflow.Context, state SubscriptionState) error {
 	for {
 		// ... do work ...
 
-		// Check if it's time to continue as new
-		if workflow.GetInfo(ctx).GetCurrentHistoryLength() > 10000 {
+		if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
 			return workflow.NewContinueAsNewError(ctx, SubscriptionWorkflow, state)
 		}
 	}
