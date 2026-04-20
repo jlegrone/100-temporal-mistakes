@@ -70,7 +70,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Polling workflow results](src/polling-workflow-results.md)
 	- Just use child workflows, or the SDK client from outside a worker!
 - [Starting workflows from activities](src/starting-workflows-from-activities.md)
-- [Assuming signals/updates will be received in a specific order](src/assuming-signal-update-order.md)
+- [Assuming signals/updates will be received in a specific order](src/assuming_signal_update_order/)
 - [Not properly scoping semantic workflow IDs](src/not-properly-scoping-semantic-workflow-ids.md)
 - [Not waiting for child workflows to start before exiting when using disconnected context](src/not-waiting-for-child-workflows-to-start.md)
 - [Writing polling loops in workflow code](src/writing-polling-loops-in-workflow-code.md)

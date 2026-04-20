@@ -4,7 +4,7 @@ Updates are a synchronous communication mechanism for workflows, combining the w
 
 ## Related
 
-- [Assuming signal/update order](../assuming-signal-update-order.md)
+- [Assuming signal/update order](../assuming_signal_update_order/)
 - [Workflow lock contention due to concurrent updates](../workflow-lock-contention-due-to-concurrent-updates.md)
 - [Signals](signals.md)
 - [Queries](queries.md)

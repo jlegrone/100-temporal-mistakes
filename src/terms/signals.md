@@ -5,7 +5,7 @@ Signals are asynchronous messages sent to a running workflow execution. They cre
 ## Related
 
 - [Not draining signals before completing workflow](../not-draining-signals-before-completing-workflow.md)
-- [Assuming signal/update order](../assuming-signal-update-order.md)
+- [Assuming signal/update order](../assuming_signal_update_order/)
 - [Workflow lock contention due to concurrent updates](../workflow-lock-contention-due-to-concurrent-updates.md)
 - [Wrapping a queue with a workflow](../wrapping-a-queue-with-a-workflow.md)
 - [Updates](updates.md)
