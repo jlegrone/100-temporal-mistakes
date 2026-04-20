@@ -1,9 +1,7 @@
 # Not Understanding Why You're Using Temporal
 
 > [!TIP]
-> * Temporal solves specific problems: reliable execution of long-running processes, durable state management, and fault-tolerant orchestration.
-> * Without understanding these value propositions, teams either misuse Temporal where simpler tools work or under-use it by not leveraging its guarantees.
-> * Take the time to map Temporal's strengths to your actual needs before adopting it.
+> Temporal trades simplicity for specific guarantees -- durability, reliability, and visibility. Without understanding these trade-offs, teams are prone to misuse Temporal where simpler tools work just as well, or under-use it by not leveraging its programming model.
 
 ## What?
 

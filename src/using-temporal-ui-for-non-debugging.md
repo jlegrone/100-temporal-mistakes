@@ -1,9 +1,7 @@
 # Using the Temporal UI for Non-Debugging Purposes
 
 > [!TIP]
-> * The Temporal Web UI is designed for debugging and operational visibility, not as an application interface.
-> * Building user-facing workflows around manual UI interactions (triggering [signals](terms/signals.md), [updates](terms/updates.md), or starting workflows from the UI) creates a fragile, non-scalable system.
-> * Build proper API layers and application UIs that interact with Temporal programmatically.
+> The Temporal Web UI is an operator debugging tool, not an application interface. Build proper API layers for workflow interactions instead of having end users send signals or start workflows through the UI.
 
 ## What?
 

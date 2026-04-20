@@ -5,6 +5,7 @@ I would like to pace myself with the review, and only focus on one broad categor
 Please come up with a plan for the review, starting with sorting every mistake into a category, ordering the categories, ordering the mistakes within each category, and then walking me through each mistake one at a time.
 
 When reviewing each mistake, I would like to inspect the rendered markdown myself. You should also look for suggestions according to:
+0. TLDR section -- should be 1-2 sentences, succinct, and read clearly.
 1. Style (sentence structure and format should follow closely from https://github.com/teivah/100-go-mistakes as an example)
 2. Correctness. In particular, look out for potential hallucinations that cannot be backed up by primary sources, either official temporal docs https://docs.temporal.io, sdk examples https://github.com/temporalio/samples-go https://github.com/temporalio/samples-typescript, or package documentation https://pkg.go.dev/go.temporal.io/sdk). For assertions that can be fact-checked, suggest links directly to the authoritative source (using wikipedia style references).
 3. Demonstration of value/impact. It should be clear why each mistake is worth avoiding.

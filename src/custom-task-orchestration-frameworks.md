@@ -1,9 +1,7 @@
 # Building Custom Task Orchestration Frameworks on Top of Temporal
 
 > [!TIP]
-> * Avoid building generic DSL engines or workflow-of-workflow abstractions that replicate what Temporal already provides.
-> * Custom orchestration layers add complexity, bugs, and maintenance burden while obscuring Temporal's built-in capabilities.
-> * If Temporal's programming model doesn't suit your needs, evaluate existing declarative workflow solutions before building your own.
+> Custom orchestration layers on top of Temporal (DSL engines, YAML-driven executors, generic task graph frameworks) end up reimplementing what the SDK already provides, but with worse developer experience than other off the shelf declarative workflow engines.
 
 ## What?
 

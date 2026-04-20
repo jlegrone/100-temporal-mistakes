@@ -1,9 +1,7 @@
 # Unnecessary Usage of Workflows
 
 > [!TIP]
-> * Not every operation needs the durability guarantees that Temporal provides.
-> * Simple CRUD operations, synchronous request-response handlers, and fast operations don't benefit from workflow orchestration.
-> * The overhead of workflow creation, history persistence, and [replay](terms/replay.md) is not free -- use workflows when you genuinely need durability, retries, or long-running coordination.
+> Workflow creation, history persistence, and replay are not free. Use workflows when you genuinely need durability, reliable retries, or coordination across failures -- not for every operation in your system.
 
 ## What?
 
@@ -25,7 +23,7 @@ But Temporal workflows come with overhead. Creating a workflow means persisting 
 
 Before reaching for a workflow, ask:
 - **Does this operation need to survive process crashes?** If a failure just means the user retries their request, you probably don't need a workflow.
-- **Does this operation take more than a few seconds?** If it completes in milliseconds, direct execution is fine.
+- **Does this operation need to be retried reliably if it fails?** If the caller can simply retry the request, or the failure is acceptable, a workflow adds no value. But even a fast operation benefits from a workflow if it must succeed despite crashes or restarts.
 - **Does this operation span multiple services or steps that need coordination?** If it is a single database write or API call, a workflow adds no value.
 - **Do you need to track the state of this operation over time?** If you don't need to query progress or wait for completion asynchronously, a workflow is overkill.
 
