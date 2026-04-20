@@ -1,7 +1,7 @@
 # Assuming Workflow Timeouts Allow Graceful Cleanup
 
 > [!TIP]
-> When a [workflow execution timeout](terms/workflow-execution-timeout.md) fires, Temporal [terminates](terms/terminate.md) the workflow -- it does not [cancel](terms/cancellation.md) it. No cleanup code runs.
+> When a [workflow execution timeout](terms/workflow-execution-timeout.md) fires, Temporal [terminates](terms/terminate.md) the workflow -- it does not [cancel](terms/cancelation.md) it. No cleanup code runs.
 
 A common assumption is that a timed-out workflow receives a cancellation signal and gets a chance to run compensation logic, release resources, or send notifications. This is wrong. Timeout-triggered termination is the equivalent of `kill -9`: no deferred functions execute, no cancellation handlers fire. If your workflow holds external state (a distributed lock, a lease), it will be left dangling.
 

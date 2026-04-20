@@ -3,7 +3,7 @@
 > [!TIP]
 > `ExecuteChildWorkflow()` doesn't immediately schedule the [child workflow](terms/child-workflow.md). If the parent completes before the server processes the creation, the child may never start.
 
-When using a [disconnected context](terms/disconnected-context.md) for cleanup after [cancellation](terms/cancellation.md), a common mistake is returning from the parent immediately after calling `ExecuteChildWorkflow()`. Scheduling happens asynchronously -- if the parent returns first, the child creation command is lost.
+When using a [disconnected context](terms/disconnected-context.md) for cleanup after [cancellation](terms/cancelation.md), a common mistake is returning from the parent immediately after calling `ExecuteChildWorkflow()`. Scheduling happens asynchronously -- if the parent returns first, the child creation command is lost.
 
 Use `GetChildWorkflowExecution()` to wait until the child is actually scheduled:
 

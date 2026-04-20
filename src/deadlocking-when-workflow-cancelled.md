@@ -1,7 +1,7 @@
 # Deadlocking When a Workflow Is Cancelled
 
 > [!TIP]
-> When a workflow is [cancelled](terms/cancellation.md), all derived contexts are cancelled too. Cleanup code that uses the original context will never execute -- use a [disconnected context](not-using-disconnected-context-for-cleanup.md) instead.
+> When a workflow is [cancelled](terms/cancelation.md), all derived contexts are cancelled too. Cleanup code that uses the original context will never execute -- use a [disconnected context](not-using-disconnected-context-for-cleanup.md) instead.
 
 When Temporal delivers a cancellation request, the SDK cancels the workflow's context and every context derived from it. A common mistake is running cleanup in a `defer` using the original context:
 

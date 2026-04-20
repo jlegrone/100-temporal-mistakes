@@ -1,7 +1,7 @@
 # Not Sending Heartbeats for Cancellation
 
 > [!TIP]
-> Activity [cancellation](terms/cancellation.md) is cooperative -- the server notifies the [worker](terms/worker.md) during the next [heartbeat](terms/heartbeat.md) response. If an activity doesn't heartbeat, it won't learn about cancellation until it completes naturally.
+> Activity [cancellation](terms/cancelation.md) is cooperative -- the server notifies the [worker](terms/worker.md) during the next [heartbeat](terms/heartbeat.md) response. If an activity doesn't heartbeat, it won't learn about cancellation until it completes naturally.
 
 Temporal does not forcefully interrupt running activities. When cancellation is requested, the server records it and delivers the signal in the next heartbeat response. If your activity never heartbeats, cancellation sits on the server with no way to reach the worker. The activity continues running, consuming resources and producing side effects that should have been avoided.
 

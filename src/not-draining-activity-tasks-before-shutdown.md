@@ -11,7 +11,7 @@ w := worker.New(c, "my-task-queue", worker.Options{
 })
 ```
 
-Make sure your deployment orchestrator (Kubernetes `terminationGracePeriodSeconds`, ECS stop timeout) gives the worker at least as much time as the drain period. Activities that [heartbeat](terms/heartbeat.md) detect [cancellation](terms/cancellation.md) (triggered by shutdown) and save progress, so they resume from the last checkpoint on retry rather than starting over.
+Make sure your deployment orchestrator (Kubernetes `terminationGracePeriodSeconds`, ECS stop timeout) gives the worker at least as much time as the drain period. Activities that [heartbeat](terms/heartbeat.md) detect [cancellation](terms/cancelation.md) (triggered by shutdown) and save progress, so they resume from the last checkpoint on retry rather than starting over.
 
 Match the drain timeout to your longest reasonable activity duration. Activities that run for hours should already be heartbeating and checkpointing, so a shorter drain is fine as long as they can exit promptly.
 

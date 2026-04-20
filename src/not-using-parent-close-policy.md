@@ -1,7 +1,7 @@
 # Not Using ParentClosePolicy
 
 > [!TIP]
-> By default, [child workflows](terms/child-workflow.md) are [terminated](terms/terminate.md) (hard-killed) when their parent completes, fails, or is [cancelled](terms/cancellation.md). Set `ParentClosePolicy` to `REQUEST_CANCEL` or `ABANDON` if children need cleanup.
+> By default, [child workflows](terms/child-workflow.md) are [terminated](terms/terminate.md) (hard-killed) when their parent completes, fails, or is [cancelled](terms/cancelation.md). Set `ParentClosePolicy` to `REQUEST_CANCEL` or `ABANDON` if children need cleanup.
 
 The default `TERMINATE` policy silently kills child workflows with no opportunity to run cleanup logic, compensation activities, or defer blocks. This is a reasonable safety net against orphans, but the wrong choice when children need to release resources, send notifications, or complete in-flight work.
 

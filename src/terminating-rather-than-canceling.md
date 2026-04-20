@@ -1,7 +1,7 @@
 # Terminating Rather Than Canceling
 
 > [!TIP]
-> [Termination](terms/terminate.md) is `kill -9` -- no cleanup runs. [Cancellation](terms/cancellation.md) is cooperative -- the workflow can run compensation logic before completing. Default to cancellation.
+> [Termination](terms/terminate.md) is `kill -9` -- no cleanup runs. [Cancellation](terms/cancelation.md) is cooperative -- the workflow can run compensation logic before completing. Default to cancellation.
 
 When operators need to stop a workflow, many default to termination because it feels decisive. But termination denies the workflow any opportunity to clean up: resources held (database locks, cloud infrastructure) aren't released, multi-step processes are left partially completed, and the workflow's final state tells you nothing about what was happening.
 

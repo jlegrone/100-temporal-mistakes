@@ -1,7 +1,7 @@
 # Not Using a Disconnected Context for Cleanup
 
 > [!TIP]
-> Activities or [child workflows](terms/child-workflow.md) started with a cancelled context are never dispatched. Use `workflow.NewDisconnectedContext()` for any cleanup that must run after [cancellation](terms/cancellation.md).
+> Activities or [child workflows](terms/child-workflow.md) started with a cancelled context are never dispatched. Use `workflow.NewDisconnectedContext()` for any cleanup that must run after [cancellation](terms/cancelation.md).
 
 When a workflow is cancelled, the root context and all descendants are cancelled. If cleanup code (compensation, resource release, notifications) uses the original context, it silently fails -- the activity is never scheduled and `Get()` returns `CanceledError` immediately.
 
