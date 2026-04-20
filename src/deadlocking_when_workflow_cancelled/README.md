@@ -13,8 +13,14 @@ When Temporal delivers a cancellation request, the SDK cancels the workflow's co
 // until a signal arrives, but once the workflow is canceled, no signal
 // will ever be delivered.
 func MyWorkflowV1(ctx workflow.Context) error {
-	var done bool
-	workflow.GetSignalChannel(ctx, "done").Receive(ctx, &done)
+	log := workflow.GetLogger(ctx)
+	log.Debug("waiting for done signal")
+
+	ch := workflow.GetSignalChannel(ctx, "done")
+
+	ch.Receive(ctx, nil)
+	log.Debug("received done signal")
+
 	return nil
 }
 
@@ -30,12 +36,42 @@ The fix: create a disconnected context that remains valid after cancellation:
 // MyWorkflowV2 uses a selector to unblock on either the signal
 // or cancellation.
 func MyWorkflowV2(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
+	log.Debug("waiting for done signal")
+
 	ch := workflow.GetSignalChannel(ctx, "done")
 	selector := workflow.NewSelector(ctx)
-	selector.AddReceive(ch, func(c workflow.ReceiveChannel, more bool) {})
-	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
+
+	selector.AddReceive(ch, func(c workflow.ReceiveChannel, more bool) {
+		log.Debug("received done signal")
+	})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
+		log.Warn("received done", "error", ctx.Err())
+	})
 	selector.Select(ctx)
 	return ctx.Err()
+}
+
+```
+<!--SNIPEND-->
+
+<!--SNIPSTART deadlocking-cancelled-test-->
+[deadlocking_when_workflow_cancelled/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow_test.go)
+```go
+
+func TestV2_HandlesGracefulCancelation(t *testing.T) {
+	env := internal.NewTestWorkflowEnvironment(t)
+
+	env.RegisterDelayedCallback(func() {
+		env.CancelWorkflow()
+	}, time.Second)
+
+	env.ExecuteWorkflow(MyWorkflowV2)
+	err := env.GetWorkflowError()
+
+	require.True(t, env.IsWorkflowCompleted())
+	require.Error(t, err)
+	require.True(t, temporal.IsCanceledError(err), fmt.Sprintf("Expected canceled error, got: %v", err))
 }
 
 ```
