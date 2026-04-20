@@ -9,7 +9,7 @@
 
 When teams adopt Temporal, there is a natural temptation to route everything through workflows. After all, if workflows give you retries, observability, and durability, why not use them for everything?
 
-But Temporal workflows come with overhead. Creating a workflow means persisting a [history](terms/event-history.md), scheduling tasks, consuming server resources, and replaying state. For operations that complete in milliseconds and don't need durability, this overhead is pure cost with no benefit.
+But Temporal workflows come with overhead. Creating a workflow means persisting a [history](terms/event-history.md), scheduling tasks, consuming server resources, and replaying state. For operations that don't need to be durably retried, this overhead is pure cost with no benefit.
 
 ## Why?
 
