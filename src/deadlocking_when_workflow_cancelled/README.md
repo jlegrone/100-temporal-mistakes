@@ -77,6 +77,6 @@ func TestV2_HandlesGracefulCancelation(t *testing.T) {
 ```
 <!--SNIPEND-->
 
-Deadlocked workflows don't complete or fail -- they sit consuming resources and typically require manual [termination](../terms/terminate.md), which means the cleanup you intended never runs at all.
+Deadlocked workflows don't complete or perform graceful cleanup on cancellation -- they block indefinitely until they either hit a workflow timeout or are manually terminated.
 
 See also: [Not Using a Disconnected Context for Cleanup](../not_using_disconnected_context_for_cleanup/).
