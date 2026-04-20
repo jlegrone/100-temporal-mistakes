@@ -9,7 +9,7 @@ import (
 // @@@SNIPSTART using-system-time-bad
 
 // BAD: system time in workflow code
-func MyWorkflowBadTime(ctx workflow.Context) error {
+func MyWorkflowV1Time(ctx workflow.Context) error {
 	now := time.Now() // Different on replay!
 	if now.Hour() < 12 {
 		// Morning logic
@@ -22,7 +22,7 @@ func MyWorkflowBadTime(ctx workflow.Context) error {
 // @@@SNIPSTART using-system-time-good
 
 // GOOD: workflow time
-func MyWorkflowGoodTime(ctx workflow.Context) error {
+func MyWorkflowV2Time(ctx workflow.Context) error {
 	now := workflow.Now(ctx) // Same value on replay
 	if now.Hour() < 12 {
 		// Morning logic -- deterministic
@@ -35,7 +35,7 @@ func MyWorkflowGoodTime(ctx workflow.Context) error {
 // @@@SNIPSTART using-system-time-sleep-bad
 
 // BAD: language-native sleep
-func MyWorkflowBadSleep(ctx workflow.Context) error {
+func MyWorkflowV1Sleep(ctx workflow.Context) error {
 	time.Sleep(10 * time.Minute)
 	return nil
 }
@@ -45,7 +45,7 @@ func MyWorkflowBadSleep(ctx workflow.Context) error {
 // @@@SNIPSTART using-system-time-sleep-good
 
 // GOOD: durable timer
-func MyWorkflowGoodSleep(ctx workflow.Context) error {
+func MyWorkflowV2Sleep(ctx workflow.Context) error {
 	if err := workflow.Sleep(ctx, 10*time.Minute); err != nil {
 		return err
 	}

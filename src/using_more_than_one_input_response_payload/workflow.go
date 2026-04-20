@@ -12,7 +12,7 @@ type MyActivityInput struct{}
 // @@@SNIPSTART using-more-than-one-input-response-payload-workflow
 
 // Avoid this
-func MyWorkflowBad(ctx workflow.Context, userID string, amount int, currency string) error {
+func MyWorkflowV1(ctx workflow.Context, userID string, amount int, currency string) error {
 	// ...
 	_ = userID
 	_ = amount
@@ -27,7 +27,7 @@ type MyWorkflowInput struct {
 	Currency string
 }
 
-func MyWorkflowGood(ctx workflow.Context, input MyWorkflowInput) error {
+func MyWorkflowV2(ctx workflow.Context, input MyWorkflowInput) error {
 	// ...
 	return nil
 }
@@ -37,7 +37,7 @@ func MyWorkflowGood(ctx workflow.Context, input MyWorkflowInput) error {
 // @@@SNIPSTART using-more-than-one-input-response-payload-activity
 
 // Avoid this
-func MyActivityBad(ctx context.Context, input MyActivityInput) (string, int, error) {
+func MyActivityV1(ctx context.Context, input MyActivityInput) (string, int, error) {
 	// ...
 	return "", 0, nil
 }
@@ -48,7 +48,7 @@ type MyActivityOutput struct {
 	Count  int
 }
 
-func MyActivityGood(ctx context.Context, input MyActivityInput) (MyActivityOutput, error) {
+func MyActivityV2(ctx context.Context, input MyActivityInput) (MyActivityOutput, error) {
 	// ...
 	return MyActivityOutput{}, nil
 }

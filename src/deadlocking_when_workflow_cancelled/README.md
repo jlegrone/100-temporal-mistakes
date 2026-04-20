@@ -9,7 +9,7 @@ When Temporal delivers a cancellation request, the SDK cancels the workflow's co
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
 ```go
 // BUG: ctx is already canceled in the defer
-func BadCleanup(ctx workflow.Context, input any) {
+func MyWorkflowV1(ctx workflow.Context, input any) {
 	defer func() {
 		err := workflow.ExecuteActivity(ctx, CleanupActivity, input).Get(ctx, nil)
 		// Always returns CanceledError -- cleanup never runs
@@ -25,7 +25,7 @@ The fix: create a disconnected context that remains valid after cancellation:
 <!--SNIPSTART deadlocking-cancelled-good-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
 ```go
-func GoodCleanup(ctx workflow.Context, input any) {
+func MyWorkflowV2(ctx workflow.Context, input any) {
 	defer func() {
 		disconnectedCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()

@@ -13,7 +13,7 @@ type Task struct{}
 
 // @@@SNIPSTART wrapping-a-queue-with-a-workflow-fanout
 
-func StartTaskWorkflow(ctx context.Context, temporalClient client.Client, taskID string, task Task) error {
+func StartTask(ctx context.Context, temporalClient client.Client, taskID string, task Task) error {
 	_, err := temporalClient.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
 		ID: fmt.Sprintf("task-%s", taskID),
 	}, ProcessTaskWorkflow, task)

@@ -10,7 +10,7 @@ Reading environment variables directly in workflow code is a determinism violati
 ```go
 
 // BAD: reading env var in workflow code
-func MyWorkflowBad(ctx workflow.Context) error {
+func MyWorkflowV1(ctx workflow.Context) error {
 	region := os.Getenv("AWS_REGION")
 	if region == "us-east-1" {
 		// Route to US activities
@@ -31,7 +31,7 @@ type WorkflowInput struct {
 	Region string
 }
 
-func MyWorkflowGood(ctx workflow.Context, input WorkflowInput) error {
+func MyWorkflowV2(ctx workflow.Context, input WorkflowInput) error {
 	if input.Region == "us-east-1" {
 		// Deterministic -- value is recorded in the start event
 	}

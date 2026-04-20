@@ -8,8 +8,8 @@ Local activities retry within the same workflow task, which has a default 10-sec
 <!--SNIPSTART fallible-local-activities-good-->
 [fallible_local_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/fallible_local_activities/activity.go)
 ```go
-func GoodLocalActivity(ctx workflow.Context, input any) (any, error) {
-	// Good: local activity for a fast, reliable operation
+func MyWorkflowV2(ctx workflow.Context, input any) (any, error) {
+	// Good: use a local activity for a fast, reliable operation
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 2 * time.Second,
 	})
@@ -24,8 +24,8 @@ func GoodLocalActivity(ctx workflow.Context, input any) (any, error) {
 <!--SNIPSTART fallible-local-activities-bad-->
 [fallible_local_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/fallible_local_activities/activity.go)
 ```go
-func BadLocalActivity(ctx workflow.Context, request any) error {
-	// Bad: local activity for an unreliable external call
+func MyWorkflowV1(ctx workflow.Context, request any) error {
+	// Bad: use a local activity for an unreliable external call
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{

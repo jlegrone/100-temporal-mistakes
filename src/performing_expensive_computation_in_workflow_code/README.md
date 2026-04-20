@@ -9,7 +9,7 @@ Performing heavy computation directly in workflow code -- large data transformat
 [performing_expensive_computation_in_workflow_code/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/performing_expensive_computation_in_workflow_code/workflow.go)
 ```go
 // BAD: expensive computation in workflow code
-func MyWorkflowBad(ctx workflow.Context, data []Record) error {
+func MyWorkflowV1(ctx workflow.Context, data []Record) error {
 	result := expensiveTransformation(data) // Takes 30 seconds
 	return workflow.ExecuteActivity(ctx, StoreResult, result).Get(ctx, nil)
 }
@@ -26,7 +26,7 @@ func TransformActivity(_ context.Context, data []Record) (Result, error) {
 }
 
 // GOOD: move it to an activity
-func MyWorkflowGood(ctx workflow.Context, data []Record) error {
+func MyWorkflowV2(ctx workflow.Context, data []Record) error {
 	var result Result
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: 10 * time.Minute,

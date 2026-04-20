@@ -13,7 +13,7 @@ Instead, fan out to individual workflows per message (or per batch), spreading w
 [wrapping_a_queue_with_a_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/wrapping_a_queue_with_a_workflow/workflow.go)
 ```go
 
-func StartTaskWorkflow(ctx context.Context, temporalClient client.Client, taskID string, task Task) error {
+func StartTask(ctx context.Context, temporalClient client.Client, taskID string, task Task) error {
 	_, err := temporalClient.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
 		ID: fmt.Sprintf("task-%s", taskID),
 	}, ProcessTaskWorkflow, task)

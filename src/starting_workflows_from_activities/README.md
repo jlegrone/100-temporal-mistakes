@@ -9,7 +9,7 @@ Activities are designed for interactions with the outside world -- calling APIs,
 [starting_workflows_from_activities/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/starting_workflows_from_activities/workflow.go)
 ```go
 // GOOD: child workflow from workflow code
-func GoodExample(ctx workflow.Context, input MyInput) (MyResult, error) {
+func MyWorkflowV2(ctx workflow.Context, input MyInput) (MyResult, error) {
 	childFuture := workflow.ExecuteChildWorkflow(ctx, MyChildWorkflow, input)
 	var result MyResult
 	err := childFuture.Get(ctx, &result)

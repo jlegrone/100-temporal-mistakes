@@ -30,7 +30,7 @@ func InsertRecord(_ context.Context, _ Data) (Record, error) {
 
 // @@@SNIPSTART doing-work-outside-bad
 // Dangerous: work done outside the workflow
-func DangerousExample(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
+func ExampleV1(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
 	record, err := db.Insert(ctx, data)
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ func DangerousExample(ctx context.Context, temporalClient client.Client, db Data
 
 // @@@SNIPSTART doing-work-outside-good
 // Better: start the workflow first, let it do the work durably
-func BetterExample(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
+func ExampleV2(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
 	_, err := temporalClient.ExecuteWorkflow(ctx, options, MyWorkflow, data)
 	return err
 }

@@ -12,7 +12,7 @@ A Temporal worker runs many workflow executions concurrently in the same process
 // BAD: shared mutable state
 var processedCount int
 
-func MyWorkflowBad(ctx workflow.Context) error {
+func MyWorkflowV1(ctx workflow.Context) error {
 	processedCount++ // Data race! Non-deterministic on replay!
 	if processedCount > 100 {
 		if err := workflow.ExecuteActivity(ctx, AlertActivity).Get(ctx, nil); err != nil {
@@ -31,7 +31,7 @@ func MyWorkflowBad(ctx workflow.Context) error {
 ```go
 
 // GOOD: local state
-func MyWorkflowGood(ctx workflow.Context) error {
+func MyWorkflowV2(ctx workflow.Context) error {
 	processedCount := 0 // Local to this workflow execution
 	_ = processedCount
 	// ...

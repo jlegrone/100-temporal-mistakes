@@ -16,7 +16,7 @@ type Config struct {
 // @@@SNIPSTART performing-network-calls-bad
 
 // BAD: network call in workflow code
-func MyWorkflowBad(ctx workflow.Context) error {
+func MyWorkflowV1(ctx workflow.Context) error {
 	resp, err := http.Get("https://api.example.com/config")
 	_ = resp
 	_ = err
@@ -42,7 +42,7 @@ func FetchConfigActivity(ctx context.Context) (Config, error) {
 	return config, err
 }
 
-func MyWorkflowGood(ctx workflow.Context) error {
+func MyWorkflowV2(ctx workflow.Context) error {
 	var config Config
 	if err := workflow.ExecuteActivity(ctx, FetchConfigActivity).Get(ctx, &config); err != nil {
 		return err

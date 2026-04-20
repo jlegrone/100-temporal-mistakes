@@ -1,6 +1,8 @@
 package not_using_workflow_versioning
 
 import (
+	"context"
+
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -31,7 +33,7 @@ func MyWorkflow(ctx workflow.Context, input Input) error {
 // @@@SNIPEND
 
 // OldActivity is a stub activity.
-func OldActivity(_ Input) (Result, error) { return Result{}, nil }
+func OldActivity(_ context.Context, _ Input) (Result, error) { return Result{}, nil }
 
 // NewActivity is a stub activity.
-func NewActivity(_ Input) (Result, error) { return Result{}, nil }
+func NewActivity(_ context.Context, _ Input) (Result, error) { return Result{}, nil }

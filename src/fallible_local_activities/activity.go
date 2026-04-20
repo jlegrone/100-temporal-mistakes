@@ -19,8 +19,8 @@ func CallExternalAPI(_ context.Context, _ any) error {
 }
 
 // @@@SNIPSTART fallible-local-activities-good
-func GoodLocalActivity(ctx workflow.Context, input any) (any, error) {
-	// Good: local activity for a fast, reliable operation
+func MyWorkflowV2(ctx workflow.Context, input any) (any, error) {
+	// Good: use a local activity for a fast, reliable operation
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 2 * time.Second,
 	})
@@ -32,8 +32,8 @@ func GoodLocalActivity(ctx workflow.Context, input any) (any, error) {
 // @@@SNIPEND
 
 // @@@SNIPSTART fallible-local-activities-bad
-func BadLocalActivity(ctx workflow.Context, request any) error {
-	// Bad: local activity for an unreliable external call
+func MyWorkflowV1(ctx workflow.Context, request any) error {
+	// Bad: use a local activity for an unreliable external call
 	localCtx := workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
 		ScheduleToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{

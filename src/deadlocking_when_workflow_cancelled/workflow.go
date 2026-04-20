@@ -13,7 +13,7 @@ func CleanupActivity(_ context.Context, _ any) error {
 
 // @@@SNIPSTART deadlocking-cancelled-bad
 // BUG: ctx is already canceled in the defer
-func BadCleanup(ctx workflow.Context, input any) {
+func MyWorkflowV1(ctx workflow.Context, input any) {
 	defer func() {
 		err := workflow.ExecuteActivity(ctx, CleanupActivity, input).Get(ctx, nil)
 		// Always returns CanceledError -- cleanup never runs
@@ -24,7 +24,7 @@ func BadCleanup(ctx workflow.Context, input any) {
 // @@@SNIPEND
 
 // @@@SNIPSTART deadlocking-cancelled-good
-func GoodCleanup(ctx workflow.Context, input any) {
+func MyWorkflowV2(ctx workflow.Context, input any) {
 	defer func() {
 		disconnectedCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()

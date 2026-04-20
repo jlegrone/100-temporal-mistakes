@@ -9,7 +9,7 @@ A common pattern when first adopting Temporal is performing meaningful work in t
 [doing_work_outside_of_the_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/workflow.go)
 ```go
 // Dangerous: work done outside the workflow
-func DangerousExample(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
+func ExampleV1(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
 	record, err := db.Insert(ctx, data)
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ Move the work inside the workflow instead:
 [doing_work_outside_of_the_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/workflow.go)
 ```go
 // Better: start the workflow first, let it do the work durably
-func BetterExample(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
+func ExampleV2(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
 	_, err := temporalClient.ExecuteWorkflow(ctx, options, MyWorkflow, data)
 	return err
 }
