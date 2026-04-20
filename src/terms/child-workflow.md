@@ -4,7 +4,7 @@ A child workflow is a workflow execution started from within another workflow (t
 
 Child workflows are useful for breaking down large workflows into smaller pieces (avoiding history size limits), providing independent failure isolation, enabling different versioning lifecycles, and working around the constraint that a single workflow's history has size limits.
 
-The `ParentClosePolicy` controls what happens to child workflows when the parent completes or is cancelled/terminated: `TERMINATE` (default) immediately terminates the child, `REQUEST_CANCEL` sends a cancellation request, and `ABANDON` lets the child continue running independently.
+The `ParentClosePolicy` controls what happens to child workflows when the parent completes or is canceled/terminated: `TERMINATE` (default) immediately terminates the child, `REQUEST_CANCEL` sends a cancellation request, and `ABANDON` lets the child continue running independently.
 
 ## Related
 

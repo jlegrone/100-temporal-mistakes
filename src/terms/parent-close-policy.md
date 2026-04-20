@@ -1,6 +1,6 @@
 # Parent Close Policy
 
-ParentClosePolicy determines what happens to a child workflow when its parent workflow execution completes, fails, times out, is cancelled, or is terminated. There are three options:
+ParentClosePolicy determines what happens to a child workflow when its parent workflow execution completes, fails, times out, is canceled, or is terminated. There are three options:
 
 - **TERMINATE** (default): The child workflow is immediately terminated. No cleanup code runs.
 - **REQUEST_CANCEL**: A cancellation request is sent to the child workflow, giving it a chance to perform cleanup.
