@@ -1,25 +1,45 @@
 package assuming_workflow_timeouts_allow_graceful_cleanup
 
 import (
+	"context"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 )
 
-// LongRunningWorkflow represents a child workflow that completes
-// when it receives a "done" signal.
+// LongRunningWorkflow simulates a child workflow that takes a long time.
 func LongRunningWorkflow(ctx workflow.Context) error {
-	workflow.GetSignalChannel(ctx, "done").Receive(ctx, nil)
+	return workflow.Sleep(ctx, 24*time.Hour)
+}
+
+// CompensateActivity runs compensation logic.
+func CompensateActivity(_ context.Context) error {
 	return nil
 }
 
 // @@@SNIPSTART assuming-workflow-timeouts-bad
 
-// MyWorkflowV1 relies on the workflow execution timeout for its
-// business deadline. When the timeout fires, the workflow is
-// terminated -- no cleanup runs.
+// MyWorkflowV1 relies on the workflow execution timeout as its
+// business deadline. It tries to compensate when the workflow is
+// canceled, but when the timeout fires Temporal terminates the
+// workflow -- the compensation never runs.
 func MyWorkflowV1(ctx workflow.Context) error {
-	return workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil)
+	log := workflow.GetLogger(ctx)
+
+	err := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil)
+	if err != nil {
+		// This code is unreachable on timeout: the workflow is terminated,
+		// not canceled, so none of this executes.
+		log.Warn("compensating")
+		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
+		defer cancel()
+		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
+			StartToCloseTimeout: 10 * time.Second,
+		})
+		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
+		return err
+	}
+	return nil
 }
 
 // @@@SNIPEND
@@ -29,14 +49,11 @@ func MyWorkflowV1(ctx workflow.Context) error {
 // MyWorkflowV2 uses an internal timer as the business deadline.
 // If the timer fires before the child workflow completes, the
 // workflow can react gracefully instead of being terminated.
-func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
+func MyWorkflowV2(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-		WorkflowID: "long-running",
-	})
-	childFuture := workflow.ExecuteChildWorkflow(childCtx, LongRunningWorkflow)
-	timer := workflow.NewTimer(ctx, deadline)
+	childFuture := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
+	deadline := workflow.NewTimer(ctx, 30*time.Minute)
 
 	selector := workflow.NewSelector(ctx)
 
@@ -44,8 +61,8 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 	selector.AddFuture(childFuture, func(f workflow.Future) {
 		log.Info("child workflow completed")
 	})
-	selector.AddFuture(timer, func(f workflow.Future) {
-		log.Warn("deadline exceeded", "deadline", deadline)
+	selector.AddFuture(deadline, func(f workflow.Future) {
+		log.Warn("deadline exceeded")
 		timedOut = true
 	})
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
@@ -57,7 +74,7 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 		return ctx.Err()
 	}
 	if timedOut {
-		return workflow.NewContinueAsNewError(ctx, MyWorkflowV2, deadline)
+		return workflow.NewContinueAsNewError(ctx, MyWorkflowV2)
 	}
 	return childFuture.Get(ctx, nil)
 }

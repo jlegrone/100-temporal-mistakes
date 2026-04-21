@@ -11,11 +11,27 @@ A workflow that relies on the execution timeout as its business deadline will be
 [assuming_workflow_timeouts_allow_graceful_cleanup/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow.go)
 ```go
 
-// MyWorkflowV1 relies on the workflow execution timeout for its
-// business deadline. When the timeout fires, the workflow is
-// terminated -- no cleanup runs.
+// MyWorkflowV1 relies on the workflow execution timeout as its
+// business deadline. It tries to compensate when the workflow is
+// canceled, but when the timeout fires Temporal terminates the
+// workflow -- the compensation never runs.
 func MyWorkflowV1(ctx workflow.Context) error {
-	return workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil)
+	log := workflow.GetLogger(ctx)
+
+	err := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil)
+	if err != nil {
+		// This code is unreachable on timeout: the workflow is terminated,
+		// not canceled, so none of this executes.
+		log.Warn("compensating")
+		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
+		defer cancel()
+		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
+			StartToCloseTimeout: 10 * time.Second,
+		})
+		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
+		return err
+	}
+	return nil
 }
 
 ```
@@ -30,14 +46,11 @@ If you need graceful behavior on timeout, implement the deadline yourself with a
 // MyWorkflowV2 uses an internal timer as the business deadline.
 // If the timer fires before the child workflow completes, the
 // workflow can react gracefully instead of being terminated.
-func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
+func MyWorkflowV2(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-		WorkflowID: "long-running",
-	})
-	childFuture := workflow.ExecuteChildWorkflow(childCtx, LongRunningWorkflow)
-	timer := workflow.NewTimer(ctx, deadline)
+	childFuture := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
+	deadline := workflow.NewTimer(ctx, 30*time.Minute)
 
 	selector := workflow.NewSelector(ctx)
 
@@ -45,8 +58,8 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 	selector.AddFuture(childFuture, func(f workflow.Future) {
 		log.Info("child workflow completed")
 	})
-	selector.AddFuture(timer, func(f workflow.Future) {
-		log.Warn("deadline exceeded", "deadline", deadline)
+	selector.AddFuture(deadline, func(f workflow.Future) {
+		log.Warn("deadline exceeded")
 		timedOut = true
 	})
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
@@ -58,7 +71,7 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 		return ctx.Err()
 	}
 	if timedOut {
-		return workflow.NewContinueAsNewError(ctx, MyWorkflowV2, deadline)
+		return workflow.NewContinueAsNewError(ctx, MyWorkflowV2)
 	}
 	return childFuture.Get(ctx, nil)
 }
@@ -70,30 +83,17 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 [assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go)
 ```go
 
-func TestV2_CompletesWhenChildFinishes(t *testing.T) {
-	env := testsuite.NewTestWorkflowEnvironment(t)
-	env.RegisterWorkflow(LongRunningWorkflow)
-
-	// Signal the child workflow to complete before the deadline.
-	env.RegisterDelayedCallback(func() {
-		env.SignalWorkflowByID("long-running", "done", nil)
-	}, time.Second)
-
-	env.ExecuteWorkflow(MyWorkflowV2, 30*time.Minute)
-	require.True(t, env.IsWorkflowCompleted())
-	require.NoError(t, env.GetWorkflowError())
-}
-
 func TestV2_ContinuesAsNewOnDeadline(t *testing.T) {
 	env := testsuite.NewTestWorkflowEnvironment(t)
 	env.RegisterWorkflow(LongRunningWorkflow)
 
-	// Don't signal the child -- let the deadline fire first.
-	env.ExecuteWorkflow(MyWorkflowV2, 30*time.Minute)
+	// The child workflow sleeps for 24h, but the internal deadline
+	// is 30 minutes, so the deadline fires first and the workflow
+	// gracefully continues as new instead of being terminated.
+	env.ExecuteWorkflow(MyWorkflowV2)
 	require.True(t, env.IsWorkflowCompleted())
-	err := env.GetWorkflowError()
 	var continueAsNewErr *workflow.ContinueAsNewError
-	require.ErrorAs(t, err, &continueAsNewErr)
+	require.ErrorAs(t, env.GetWorkflowError(), &continueAsNewErr)
 }
 
 ```
