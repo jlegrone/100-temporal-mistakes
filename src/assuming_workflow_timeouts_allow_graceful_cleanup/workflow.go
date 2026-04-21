@@ -59,7 +59,7 @@ func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration,
 		return timeout - padding, nil
 	}
 	return 0, temporal.NewNonRetryableApplicationError(
-		"Workflow timeout is too small",
+		"workflow timeout is too small",
 		"wf_timeout_too_small",
 		nil,
 		map[string]string{
