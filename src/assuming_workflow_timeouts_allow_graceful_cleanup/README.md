@@ -3,7 +3,7 @@
 > [!TIP]
 > When a [workflow execution timeout](../terms/workflow-execution-timeout.md) fires, Temporal [terminates](../terms/terminate.md) the workflow -- it does not [cancel](../terms/cancelation.md) it. No cleanup code runs.
 
-A common assumption is that a timed-out workflow receives a cancelation signal and gets a chance to run compensation logic, release resources, or send notifications. This is wrong. Timeout-triggered termination is the equivalent of `kill -9`: no deferred functions execute, no cancelation handlers fire. If your workflow holds external state (a distributed lock, a lease), it will be left dangling.
+A common assumption is that a timed-out workflow receives a cancelation signal and gets a chance to run compensation logic, release resources, or send notifications. This is wrong. For workflows, there is no difference in behavior between an execution timeout and a termination: no deferred functions execute, no cancelation handlers fire.
 
 A workflow that relies on the execution timeout as its business deadline will be terminated without any opportunity to react:
 
@@ -19,8 +19,9 @@ func MyWorkflowV1(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
 	if err := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil); err != nil {
-		// This code is unreachable on timeout: the workflow is terminated,
-		// not canceled, so none of this executes.
+		// This code is unreachable if LongRunningWorkflow takes longer to return a result than
+		// the execution timeout of MyWorkflowV1. The workflow is effectively terminated, not
+		// canceled, so no compensation logic executes.
 		log.Warn("compensating", "error", err)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()

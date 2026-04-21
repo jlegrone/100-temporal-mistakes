@@ -28,8 +28,9 @@ func MyWorkflowV1(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
 	if err := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil); err != nil {
-		// This code is unreachable on timeout: the workflow is terminated,
-		// not canceled, so none of this executes.
+		// This code is unreachable if LongRunningWorkflow takes longer to return a result than
+		// the execution timeout of MyWorkflowV1. The workflow is effectively terminated, not
+		// canceled, so no compensation logic executes.
 		log.Warn("compensating", "error", err)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
