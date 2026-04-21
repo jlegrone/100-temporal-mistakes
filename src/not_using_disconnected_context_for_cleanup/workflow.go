@@ -1,33 +1,57 @@
 package not_using_disconnected_context_for_cleanup
 
 import (
+	"context"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 )
 
-// Input represents the workflow input.
-type Input struct{}
+// ProcessOrder is a long-running activity.
+func ProcessOrder(_ context.Context) error { return nil }
 
-// @@@SNIPSTART not-using-disconnected-context-for-cleanup-workflow
+// CancelOrder is a cleanup activity.
+func CancelOrder(_ context.Context) error { return nil }
 
-func MyWorkflow(ctx workflow.Context, input Input) error {
-	err := workflow.ExecuteActivity(ctx, ProcessOrder, input).Get(ctx, nil)
+// @@@SNIPSTART not-using-disconnected-context-bad
+
+// MyWorkflowV1 tries to run a cleanup activity after cancelation,
+// but uses the original (already-canceled) context. The cleanup
+// activity is never dispatched.
+func MyWorkflowV1(ctx workflow.Context) error {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Minute,
+	})
+
+	err := workflow.ExecuteActivity(ctx, ProcessOrder).Get(ctx, nil)
 	if err != nil && ctx.Err() == workflow.ErrCanceled {
-		cleanupCtx, cancel := workflow.NewDisconnectedContext(ctx)
-		defer cancel()
-		cleanupCtx = workflow.WithActivityOptions(cleanupCtx, workflow.ActivityOptions{
-			StartToCloseTimeout: 30 * time.Second,
-		})
-		_ = workflow.ExecuteActivity(cleanupCtx, CancelOrder, input).Get(cleanupCtx, nil)
+		// BUG: ctx is already canceled -- CancelOrder is never dispatched
+		_ = workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil)
 	}
 	return err
 }
 
 // @@@SNIPEND
 
-// ProcessOrder is a stub activity.
-func ProcessOrder(_ Input) error { return nil }
+// @@@SNIPSTART not-using-disconnected-context-good
 
-// CancelOrder is a stub activity.
-func CancelOrder(_ Input) error { return nil }
+// MyWorkflowV2 uses a disconnected context for cleanup, so the
+// activity runs even after the workflow is canceled.
+func MyWorkflowV2(ctx workflow.Context) error {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Minute,
+	})
+
+	err := workflow.ExecuteActivity(ctx, ProcessOrder).Get(ctx, nil)
+	if err != nil && ctx.Err() == workflow.ErrCanceled {
+		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
+		defer cancel()
+		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
+			StartToCloseTimeout: 30 * time.Second,
+		})
+		_ = workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil)
+	}
+	return err
+}
+
+// @@@SNIPEND
