@@ -79,36 +79,38 @@ func MyWorkflowV2(ctx workflow.Context) error {
 	var (
 		childFuture = workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
 		selector    = workflow.NewSelector(ctx)
-		selectError error
+		selectErr   error
 	)
 
 	// Wait for child workflow
 	selector.AddFuture(childFuture, func(f workflow.Future) {
 		log.Info("child workflow completed")
-		selectError = childFuture.Get(ctx, nil)
+		selectErr = childFuture.Get(ctx, nil)
 	})
 	// Wait for workflow cancelation
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
 		log.Warn("workflow canceled")
-		selectError = ctx.Err()
+		selectErr = ctx.Err()
 	})
 	// Wait for soft timeout
 	selector.AddFuture(workflow.NewTimer(ctx, softTimeout), func(f workflow.Future) {
 		log.Warn("deadline exceeded")
-		selectError = workflow.ErrDeadlineExceeded
+		selectErr = workflow.ErrDeadlineExceeded
 	})
 
+	// Select once; this sets up a race between the child workflow, context
+	// cancellation, and our soft timeout.
 	selector.Select(ctx)
-
-	if selectError != nil {
-		log.Warn("compensating", "error", selectError)
+	// Run compensating activity if any branch of the selector generated an error.
+	if selectErr != nil {
+		log.Warn("compensating", "error", selectErr)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
 			StartToCloseTimeout: 30 * time.Second,
 		})
 		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
-		return selectError
+		return selectErr
 	}
 
 	return nil
@@ -169,10 +171,9 @@ func TestMyWorkflowV2(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env := internaltestsuite.NewTestWorkflowEnvironment(t)
 			env.RegisterWorkflow(LongRunningWorkflow)
-			env.SetWorkflowRunTimeout(tc.runTimeout)
-
 			env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
 
+			env.SetWorkflowRunTimeout(tc.runTimeout)
 			if tc.setup != nil {
 				tc.setup(env)
 			}

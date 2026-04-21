@@ -24,6 +24,9 @@ func TestV1_CompensationNeverRuns(t *testing.T) {
 	env.ExecuteWorkflow(MyWorkflowV1)
 	require.True(t, env.IsWorkflowCompleted())
 	require.ErrorContains(t, env.GetWorkflowError(), "deadline exceeded")
+
+	// This assertion demonstrates the incorrect behavior; we WANT to run
+	// the compensating activity before the workflow times out.
 	env.AssertActivityNotCalled(t, "CompensateActivity", mock.Anything)
 }
 
@@ -77,10 +80,9 @@ func TestMyWorkflowV2(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env := internaltestsuite.NewTestWorkflowEnvironment(t)
 			env.RegisterWorkflow(LongRunningWorkflow)
-			env.SetWorkflowRunTimeout(tc.runTimeout)
-
 			env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
 
+			env.SetWorkflowRunTimeout(tc.runTimeout)
 			if tc.setup != nil {
 				tc.setup(env)
 			}
