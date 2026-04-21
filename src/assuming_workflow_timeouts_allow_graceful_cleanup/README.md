@@ -22,7 +22,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 	if err != nil {
 		// This code is unreachable on timeout: the workflow is terminated,
 		// not canceled, so none of this executes.
-		log.Warn("compensating")
+		log.Warn("compensating", "error", err)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
@@ -44,10 +44,14 @@ If you need graceful behavior on timeout, implement the deadline yourself with a
 ```go
 
 func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration, error) {
-	if timeout := workflow.GetInfo(ctx).WorkflowRunTimeout; timeout > padding {
-		return timeout - padding, nil
+	info := workflow.GetInfo(ctx)
+	// Prefer the run timeout if set; only fall back to execution timeout
+	// if no run timeout is configured.
+	timeout := info.WorkflowRunTimeout
+	if timeout == 0 {
+		timeout = info.WorkflowExecutionTimeout
 	}
-	if timeout := workflow.GetInfo(ctx).WorkflowExecutionTimeout; timeout > padding {
+	if timeout > padding {
 		return timeout - padding, nil
 	}
 	return 0, temporal.NewNonRetryableApplicationError(
@@ -65,46 +69,43 @@ func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration,
 func MyWorkflowV2(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
-	softTimeout, err := getSoftTimeout(ctx, 24*time.Hour)
+	softTimeout, err := getSoftTimeout(ctx, time.Minute)
 	if err != nil {
 		return err
 	}
 
-	ctx, cancel := workflow.WithCancel(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		workflow.Sleep(ctx, softTimeout)
-		cancel()
-	})
+	var (
+		childFuture = workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
+		selector    = workflow.NewSelector(ctx)
+		selectError error
+	)
 
-	childFuture := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
-
-	selector := workflow.NewSelector(ctx)
-
+	// Wait for child workflow
 	selector.AddFuture(childFuture, func(f workflow.Future) {
 		log.Info("child workflow completed")
 	})
+	// Wait for workflow cancelation
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
 		log.Warn("workflow canceled")
+		selectError = ctx.Err()
 	})
-	var timedOut bool
+	// Wait for soft timeout
 	selector.AddFuture(workflow.NewTimer(ctx, softTimeout), func(f workflow.Future) {
 		log.Warn("deadline exceeded")
-		timedOut = true
+		selectError = workflow.ErrDeadlineExceeded
 	})
+
 	selector.Select(ctx)
 
-	if timedOut || ctx.Err() != nil {
-		log.Warn("compensating")
+	if selectError != nil {
+		log.Warn("compensating", "error", selectError)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
 			StartToCloseTimeout: time.Minute,
 		})
 		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return workflow.ErrDeadlineExceeded
+		return selectError
 	}
 
 	return childFuture.Get(ctx, nil)
@@ -117,26 +118,70 @@ func MyWorkflowV2(ctx workflow.Context) error {
 [assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go)
 ```go
 
-func TestV2_CompensatesOnDeadline(t *testing.T) {
-	env := testsuite.NewTestWorkflowEnvironment(t)
-	env.RegisterWorkflow(LongRunningWorkflow)
+func TestMyWorkflowV2(t *testing.T) {
+	type testCase struct {
+		runTimeout    time.Duration
+		setup         func(env *testsuite.TestWorkflowEnvironment)
+		expectedError error
+	}
 
-	// Track whether CompensateActivity was called.
-	compensated := false
-	env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) { compensated = true },
-	)
+	tests := map[string]testCase{
+		"completes when child finishes": {
+			// Timeout longer than the child's 1h sleep, so the child completes first.
+			runTimeout: 2 * time.Hour,
+		},
+		"compensates on deadline": {
+			// Timeout shorter than the child's 1h sleep, so the soft deadline fires first.
+			runTimeout:    10 * time.Minute,
+			expectedError: workflow.ErrDeadlineExceeded,
+		},
+		"compensates on cancelation": {
+			runTimeout: 10 * time.Minute,
+			setup: func(env *testsuite.TestWorkflowEnvironment) {
+				env.RegisterDelayedCallback(func() {
+					env.CancelWorkflow()
+				}, time.Second)
+			},
+			expectedError: &temporal.CanceledError{},
+		},
+		"fails on too-short timeout": {
+			// Run timeout shorter than the padding (1m), so getSoftTimeout
+			// returns an error before any work starts.
+			runTimeout:    30 * time.Second,
+			expectedError: &temporal.ApplicationError{},
+		},
+	}
 
-	// Set a run timeout so getSoftTimeout can derive the internal deadline.
-	// The child sleeps for 1h; with a 24h10m run timeout and 24h padding,
-	// the soft timeout is 10m -- shorter than the child, so the deadline
-	// fires first.
-	env.SetWorkflowRunTimeout(24*time.Hour + 10*time.Minute)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			env := internaltestsuite.NewTestWorkflowEnvironment(t)
+			env.RegisterWorkflow(LongRunningWorkflow)
+			env.SetWorkflowRunTimeout(tc.runTimeout)
 
-	env.ExecuteWorkflow(MyWorkflowV2)
-	require.True(t, env.IsWorkflowCompleted())
-	require.Error(t, env.GetWorkflowError())
-	require.True(t, compensated, "CompensateActivity should have been called")
+			compensated := false
+			env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe().Run(
+				func(args mock.Arguments) { compensated = true },
+			)
+
+			if tc.setup != nil {
+				tc.setup(env)
+			}
+
+			env.ExecuteWorkflow(MyWorkflowV2)
+			require.True(t, env.IsWorkflowCompleted())
+
+			if tc.expectedError != nil {
+				require.ErrorAs(t, env.GetWorkflowError(), &tc.expectedError)
+			} else {
+				require.NoError(t, env.GetWorkflowError())
+			}
+			// Compensation runs for operational errors (deadline, cancelation)
+			// but not for configuration errors (too-short timeout).
+			var appErr *temporal.ApplicationError
+			wantCompensate := tc.expectedError != nil && !errors.As(tc.expectedError, &appErr)
+			require.Equal(t, wantCompensate, compensated, "CompensateActivity called")
+		})
+	}
 }
 
 ```

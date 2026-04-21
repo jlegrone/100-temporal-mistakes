@@ -20,8 +20,8 @@ temporal workflow show \
 
 func TestReplayWorkflow(t *testing.T) {
 	replayer := worker.NewWorkflowReplayer()
-	replayer.RegisterWorkflow(YourWorkflow)
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(nil, "history.json")
+	replayer.RegisterWorkflow(MyWorkflow)
+	err := replayer.ReplayWorkflowHistoryFromJSONFile(nil, "testdata/history.json")
 	require.NoError(t, err)
 }
 

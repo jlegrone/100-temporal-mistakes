@@ -31,7 +31,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 	if err != nil {
 		// This code is unreachable on timeout: the workflow is terminated,
 		// not canceled, so none of this executes.
-		log.Warn("compensating")
+		log.Warn("compensating", "error", err)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
@@ -48,10 +48,14 @@ func MyWorkflowV1(ctx workflow.Context) error {
 // @@@SNIPSTART assuming-workflow-timeouts-good
 
 func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration, error) {
-	if timeout := workflow.GetInfo(ctx).WorkflowRunTimeout; timeout > padding {
-		return timeout - padding, nil
+	info := workflow.GetInfo(ctx)
+	// Prefer the run timeout if set; only fall back to execution timeout
+	// if no run timeout is configured.
+	timeout := info.WorkflowRunTimeout
+	if timeout == 0 {
+		timeout = info.WorkflowExecutionTimeout
 	}
-	if timeout := workflow.GetInfo(ctx).WorkflowExecutionTimeout; timeout > padding {
+	if timeout > padding {
 		return timeout - padding, nil
 	}
 	return 0, temporal.NewNonRetryableApplicationError(
@@ -69,7 +73,9 @@ func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration,
 func MyWorkflowV2(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
-	softTimeout, err := getSoftTimeout(ctx, 24*time.Hour)
+	// Reserve at least 1 minute for the workflow to perform compensating actions
+	// before it is terminated due to workflow run timeout.
+	softTimeout, err := getSoftTimeout(ctx, time.Minute)
 	if err != nil {
 		return err
 	}
@@ -98,11 +104,11 @@ func MyWorkflowV2(ctx workflow.Context) error {
 	selector.Select(ctx)
 
 	if selectError != nil {
-		log.Warn("compensating")
+		log.Warn("compensating", "error", selectError)
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
-			StartToCloseTimeout: time.Minute,
+			StartToCloseTimeout: 30 * time.Second,
 		})
 		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
 		return selectError
