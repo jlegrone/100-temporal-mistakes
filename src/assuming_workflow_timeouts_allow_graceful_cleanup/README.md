@@ -15,13 +15,7 @@ A workflow that relies on the execution timeout as its business deadline will be
 // business deadline. When the timeout fires, the workflow is
 // terminated -- no cleanup runs.
 func MyWorkflowV1(ctx workflow.Context) error {
-	log := workflow.GetLogger(ctx)
-
-	ch := workflow.GetSignalChannel(ctx, "done")
-	ch.Receive(ctx, nil)
-
-	log.Info("done")
-	return nil
+	return workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil)
 }
 
 ```
@@ -34,19 +28,22 @@ If you need graceful behavior on timeout, implement the deadline yourself with a
 ```go
 
 // MyWorkflowV2 uses an internal timer as the business deadline.
-// If the timer fires before the signal arrives, the workflow
-// completes gracefully with an error instead of being terminated.
+// If the timer fires before the child workflow completes, the
+// workflow can react gracefully instead of being terminated.
 func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 	log := workflow.GetLogger(ctx)
 
-	ch := workflow.GetSignalChannel(ctx, "done")
+	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+		WorkflowID: "long-running",
+	})
+	childFuture := workflow.ExecuteChildWorkflow(childCtx, LongRunningWorkflow)
 	timer := workflow.NewTimer(ctx, deadline)
 
 	selector := workflow.NewSelector(ctx)
 
 	var timedOut bool
-	selector.AddReceive(ch, func(c workflow.ReceiveChannel, more bool) {
-		log.Info("done")
+	selector.AddFuture(childFuture, func(f workflow.Future) {
+		log.Info("child workflow completed")
 	})
 	selector.AddFuture(timer, func(f workflow.Future) {
 		log.Warn("deadline exceeded", "deadline", deadline)
@@ -63,7 +60,7 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 	if timedOut {
 		return workflow.NewContinueAsNewError(ctx, MyWorkflowV2, deadline)
 	}
-	return nil
+	return childFuture.Get(ctx, nil)
 }
 
 ```
@@ -73,11 +70,13 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 [assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go)
 ```go
 
-func TestV2_CompletesWhenSignaled(t *testing.T) {
+func TestV2_CompletesWhenChildFinishes(t *testing.T) {
 	env := testsuite.NewTestWorkflowEnvironment(t)
+	env.RegisterWorkflow(LongRunningWorkflow)
 
+	// Signal the child workflow to complete before the deadline.
 	env.RegisterDelayedCallback(func() {
-		env.SignalWorkflow("done", nil)
+		env.SignalWorkflowByID("long-running", "done", nil)
 	}, time.Second)
 
 	env.ExecuteWorkflow(MyWorkflowV2, 30*time.Minute)
@@ -87,12 +86,12 @@ func TestV2_CompletesWhenSignaled(t *testing.T) {
 
 func TestV2_ContinuesAsNewOnDeadline(t *testing.T) {
 	env := testsuite.NewTestWorkflowEnvironment(t)
+	env.RegisterWorkflow(LongRunningWorkflow)
 
-	// Don't send the signal -- let the deadline fire.
+	// Don't signal the child -- let the deadline fire first.
 	env.ExecuteWorkflow(MyWorkflowV2, 30*time.Minute)
 	require.True(t, env.IsWorkflowCompleted())
 	err := env.GetWorkflowError()
-	// The workflow calls ContinueAsNew when the deadline fires.
 	var continueAsNewErr *workflow.ContinueAsNewError
 	require.ErrorAs(t, err, &continueAsNewErr)
 }

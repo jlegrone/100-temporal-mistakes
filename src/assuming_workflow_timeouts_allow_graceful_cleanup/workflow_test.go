@@ -11,11 +11,13 @@ import (
 
 // @@@SNIPSTART assuming-workflow-timeouts-test
 
-func TestV2_CompletesWhenSignaled(t *testing.T) {
+func TestV2_CompletesWhenChildFinishes(t *testing.T) {
 	env := testsuite.NewTestWorkflowEnvironment(t)
+	env.RegisterWorkflow(LongRunningWorkflow)
 
+	// Signal the child workflow to complete before the deadline.
 	env.RegisterDelayedCallback(func() {
-		env.SignalWorkflow("done", nil)
+		env.SignalWorkflowByID("long-running", "done", nil)
 	}, time.Second)
 
 	env.ExecuteWorkflow(MyWorkflowV2, 30*time.Minute)
@@ -25,12 +27,12 @@ func TestV2_CompletesWhenSignaled(t *testing.T) {
 
 func TestV2_ContinuesAsNewOnDeadline(t *testing.T) {
 	env := testsuite.NewTestWorkflowEnvironment(t)
+	env.RegisterWorkflow(LongRunningWorkflow)
 
-	// Don't send the signal -- let the deadline fire.
+	// Don't signal the child -- let the deadline fire first.
 	env.ExecuteWorkflow(MyWorkflowV2, 30*time.Minute)
 	require.True(t, env.IsWorkflowCompleted())
 	err := env.GetWorkflowError()
-	// The workflow calls ContinueAsNew when the deadline fires.
 	var continueAsNewErr *workflow.ContinueAsNewError
 	require.ErrorAs(t, err, &continueAsNewErr)
 }
