@@ -44,8 +44,14 @@ func MyWorkflowV2(ctx workflow.Context, deadline time.Duration) error {
 		log.Warn("deadline exceeded", "deadline", deadline)
 		timedOut = true
 	})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
+		log.Warn("workflow canceled")
+	})
 	selector.Select(ctx)
 
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if timedOut {
 		return workflow.NewContinueAsNewError(ctx, MyWorkflowV2, deadline)
 	}
