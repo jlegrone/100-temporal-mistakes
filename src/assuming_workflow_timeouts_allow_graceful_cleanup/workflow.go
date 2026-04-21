@@ -2,6 +2,7 @@ package assuming_workflow_timeouts_allow_graceful_cleanup
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -48,7 +49,12 @@ func MyWorkflowV1(ctx workflow.Context) error {
 
 // @@@SNIPSTART assuming-workflow-timeouts-good
 
-func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration, error) {
+// getSoftTimeout returns a timer that fires before the workflow's hard timeout,
+// leaving at least padding duration for the workflow to perform cleanup (e.g.
+// compensation activities) before it is terminated. It uses the run timeout if
+// set, otherwise the execution timeout. Returns an error if neither timeout is
+// large enough to accommodate the padding.
+func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
 	info := workflow.GetInfo(ctx)
 	// Prefer the run timeout if set; only fall back to execution timeout
 	// if no run timeout is configured.
@@ -57,9 +63,11 @@ func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration,
 		timeout = info.WorkflowExecutionTimeout
 	}
 	if timeout > padding {
-		return timeout - padding, nil
+		return workflow.NewTimerWithOptions(ctx, timeout-padding, workflow.TimerOptions{
+			Summary: fmt.Sprintf("soft_timeout_%s", padding),
+		}), nil
 	}
-	return 0, temporal.NewNonRetryableApplicationError(
+	return nil, temporal.NewNonRetryableApplicationError(
 		"workflow timeout is too small",
 		"wf_timeout_too_small",
 		nil,
@@ -98,7 +106,7 @@ func MyWorkflowV2(ctx workflow.Context) error {
 		selectErr = ctx.Err()
 	})
 	// Wait for soft timeout
-	selector.AddFuture(workflow.NewTimer(ctx, softTimeout), func(f workflow.Future) {
+	selector.AddFuture(softTimeout, func(f workflow.Future) {
 		log.Warn("deadline exceeded")
 		selectErr = workflow.ErrDeadlineExceeded
 	})

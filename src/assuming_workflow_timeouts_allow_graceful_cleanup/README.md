@@ -38,13 +38,18 @@ func MyWorkflowV1(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-If you need graceful behavior on timeout, implement the deadline yourself with a timer. If the timer fires before the workflow completes, the workflow can take action -- log, run compensation, or continue as new. Keep the workflow-level execution timeout as a safety net set to something longer (e.g., internal timer at 30 minutes, execution timeout at 1 hour).
+If you need graceful behavior on timeout, implement the deadline yourself with a timer. If the timer fires before the workflow completes, the workflow can still take action. Keep the workflow-level execution timeout as a safety net set to something longer (e.g., internal timer at 30 minutes, execution timeout at 1 hour).
 
 <!--SNIPSTART assuming-workflow-timeouts-good-->
 [assuming_workflow_timeouts_allow_graceful_cleanup/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow.go)
 ```go
 
-func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration, error) {
+// getSoftTimeout returns a timer that fires before the workflow's hard timeout,
+// leaving at least padding duration for the workflow to perform cleanup (e.g.
+// compensation activities) before it is terminated. It uses the run timeout if
+// set, otherwise the execution timeout. Returns an error if neither timeout is
+// large enough to accommodate the padding.
+func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
 	info := workflow.GetInfo(ctx)
 	// Prefer the run timeout if set; only fall back to execution timeout
 	// if no run timeout is configured.
@@ -53,9 +58,11 @@ func getSoftTimeout(ctx workflow.Context, padding time.Duration) (time.Duration,
 		timeout = info.WorkflowExecutionTimeout
 	}
 	if timeout > padding {
-		return timeout - padding, nil
+		return workflow.NewTimerWithOptions(ctx, timeout-padding, workflow.TimerOptions{
+			Summary: fmt.Sprintf("soft_timeout_%s", padding),
+		}), nil
 	}
-	return 0, temporal.NewNonRetryableApplicationError(
+	return nil, temporal.NewNonRetryableApplicationError(
 		"workflow timeout is too small",
 		"wf_timeout_too_small",
 		nil,
@@ -94,7 +101,7 @@ func MyWorkflowV2(ctx workflow.Context) error {
 		selectErr = ctx.Err()
 	})
 	// Wait for soft timeout
-	selector.AddFuture(workflow.NewTimer(ctx, softTimeout), func(f workflow.Future) {
+	selector.AddFuture(softTimeout, func(f workflow.Future) {
 		log.Warn("deadline exceeded")
 		selectErr = workflow.ErrDeadlineExceeded
 	})
@@ -115,85 +122,6 @@ func MyWorkflowV2(ctx workflow.Context) error {
 	}
 
 	return nil
-}
-
-```
-<!--SNIPEND-->
-
-<!--SNIPSTART assuming-workflow-timeouts-test-->
-[assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow_test.go)
-```go
-
-func TestMyWorkflowV2(t *testing.T) {
-	type testCase struct {
-		runTimeout     time.Duration
-		setup          func(env *testsuite.TestWorkflowEnvironment)
-		expectedError  string
-		wantCompensate bool
-	}
-
-	tests := map[string]testCase{
-		"completes when child finishes": {
-			runTimeout: 2 * time.Hour,
-		},
-		"compensates on deadline": {
-			runTimeout:     10 * time.Minute,
-			expectedError:  "deadline exceeded",
-			wantCompensate: true,
-		},
-		"compensates on cancelation": {
-			runTimeout: 10 * time.Minute,
-			setup: func(env *testsuite.TestWorkflowEnvironment) {
-				env.RegisterDelayedCallback(func() {
-					env.CancelWorkflow()
-				}, time.Second)
-			},
-			expectedError:  "canceled",
-			wantCompensate: true,
-		},
-		"compensates on child error": {
-			runTimeout: 2 * time.Hour,
-			setup: func(env *testsuite.TestWorkflowEnvironment) {
-				env.OnWorkflow(LongRunningWorkflow, mock.Anything).Return(
-					fmt.Errorf("child failed"),
-				)
-			},
-			expectedError:  "child failed",
-			wantCompensate: true,
-		},
-		"fails on too-short timeout": {
-			runTimeout:     30 * time.Second,
-			expectedError:  "workflow timeout is too small",
-			wantCompensate: false,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			env := internaltestsuite.NewTestWorkflowEnvironment(t)
-			env.RegisterWorkflow(LongRunningWorkflow)
-			env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
-
-			env.SetWorkflowRunTimeout(tc.runTimeout)
-			if tc.setup != nil {
-				tc.setup(env)
-			}
-
-			env.ExecuteWorkflow(MyWorkflowV2)
-			require.True(t, env.IsWorkflowCompleted())
-
-			if tc.expectedError != "" {
-				require.ErrorContains(t, env.GetWorkflowError(), tc.expectedError)
-			} else {
-				require.NoError(t, env.GetWorkflowError())
-			}
-			if tc.wantCompensate {
-				env.AssertActivityCalled(t, "CompensateActivity", mock.Anything)
-			} else {
-				env.AssertActivityNotCalled(t, "CompensateActivity", mock.Anything)
-			}
-		})
-	}
 }
 
 ```

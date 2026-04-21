@@ -30,8 +30,6 @@ func TestV1_CompensationNeverRuns(t *testing.T) {
 	env.AssertActivityNotCalled(t, "CompensateActivity", mock.Anything)
 }
 
-// @@@SNIPSTART assuming-workflow-timeouts-test
-
 func TestMyWorkflowV2(t *testing.T) {
 	type testCase struct {
 		runTimeout     time.Duration
@@ -103,5 +101,3 @@ func TestMyWorkflowV2(t *testing.T) {
 		})
 	}
 }
-
-// @@@SNIPEND
