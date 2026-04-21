@@ -69,4 +69,4 @@ func MyWorkflowV2(ctx workflow.Context, data Data) error {
 ```
 <!--SNIPEND-->
 
-If you must do work before starting a workflow, make both the external work and the workflow start [idempotent](../terms/idempotency.md) so you can safely retry the entire operation.
+If you must do work before starting a workflow, make both the external work and the workflow start [idempotent](../terms/idempotency.md) so you can safely retry the entire operation. In special cases, you may also consider using [eager workflow start](https://temporal.io/blog/reduce-latency-and-speed-up-your-temporal-workflows) to reduce latency.
