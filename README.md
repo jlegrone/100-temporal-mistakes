@@ -45,7 +45,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 ## Cancellation
 - [Assuming activity cancellation means workflow cancellation](src/assuming_activity_cancelation_means_workflow_cancelation/)
 - [Not using ParentClosePolicy when graceful cleanup on cancellation is needed in child workflows](src/not_using_parent_close_policy/)
-- [Deadlocking when workflow canceled (handle cancel signal)](src/deadlocking_when_workflow_cancelled/)
+- [Deadlocking when workflow canceled (handle cancel signal)](src/deadlocking_when_workflow_canceled/)
 - [Not using a disconnected context to perform cleanup or other deferred child workflows/activities after workflow canceled](src/not_using_disconnected_context_for_cleanup/)
 - [Not sending heartbeats from activities you want to handle cancellation](src/not_sending_heartbeats_for_cancellation/)
 

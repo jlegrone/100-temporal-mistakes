@@ -1,4 +1,4 @@
-package deadlocking_when_workflow_cancelled
+package deadlocking_when_workflow_canceled
 
 import (
 	"fmt"
@@ -58,7 +58,7 @@ func TestV2_CompletesWhenSignaled(t *testing.T) {
 	require.NoError(t, env.GetWorkflowError())
 }
 
-// @@@SNIPSTART deadlocking-cancelled-test
+// @@@SNIPSTART deadlocking-canceled-test
 
 func TestV2_HandlesGracefulCancelation(t *testing.T) {
 	env := testsuite.NewTestWorkflowEnvironment(t)

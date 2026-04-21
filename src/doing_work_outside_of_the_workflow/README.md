@@ -8,39 +8,62 @@ A common pattern when first adopting Temporal is performing meaningful work in t
 <!--SNIPSTART doing-work-outside-bad-->
 [doing_work_outside_of_the_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/workflow.go)
 ```go
-// Dangerous: work done outside the workflow
-func ExampleV1(ctx context.Context, temporalClient client.Client, db Database, data Data, options client.StartWorkflowOptions) error {
-	record, err := db.Insert(ctx, data)
+
+// HandleRequest performs a database insert before starting the workflow.
+// If the process crashes between the insert and the workflow start, the
+// record exists but no workflow is running to process it.
+func (s *MyService) HandleRequest(ctx context.Context, data Data) error {
+	record, err := s.DB.Insert(ctx, data)
 	if err != nil {
 		return err
 	}
-	// If the process crashes HERE, the record exists but no workflow was started
-	_, err = temporalClient.ExecuteWorkflow(ctx, options, MyWorkflow, record.ID)
-	return err
+	// If the process crashes HERE, the record exists but no workflow was started.
+	if _, err := s.Temporal.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+		TaskQueue: "my-task-queue",
+	}, MyWorkflowV1, record.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MyWorkflowV1 receives the already-inserted record ID.
+func MyWorkflowV1(ctx workflow.Context, id string) error {
+	// ... process the record
+
+	return nil
 }
 
 ```
 <!--SNIPEND-->
 
-Temporal's durability only applies to code running inside a workflow or activity. The gap between completing external work and starting/signaling a workflow is a vulnerability window. This works 99.9% of the time -- the failures are rare but happen exactly when things are already going wrong (under load, during deployments).
+Temporal's durability only applies to code running inside a workflow or activity. The gap between completing external work and starting/signaling a workflow is a vulnerability window, where a system failure can leave behind dangling state.
 
 Move the work inside the workflow instead:
 
 <!--SNIPSTART doing-work-outside-good-->
 [doing_work_outside_of_the_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/doing_work_outside_of_the_workflow/workflow.go)
 ```go
-// Better: start the workflow first, let it do the work durably
-func ExampleV2(ctx context.Context, temporalClient client.Client, data Data, options client.StartWorkflowOptions) error {
-	_, err := temporalClient.ExecuteWorkflow(ctx, options, MyWorkflow, data)
-	return err
+
+// HandleRequestV2 starts the workflow first and lets it perform the
+// database insert as an activity, so both operations are durable.
+func (s *MyService) HandleRequestV2(ctx context.Context, data Data) error {
+	if _, err := s.Temporal.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+		TaskQueue: "my-task-queue",
+	}, MyWorkflowV2, data); err != nil {
+		return err
+	}
+	return nil
 }
 
-func MyWorkflow(ctx workflow.Context, data Data) error {
+func MyWorkflowV2(ctx workflow.Context, data Data) error {
 	var record Record
-	err := workflow.ExecuteActivity(ctx, InsertRecord, data).Get(ctx, &record)
-	// If the worker crashes after insert, replay skips the completed activity
-	_ = record
-	return err
+	if err := workflow.ExecuteActivity(ctx, InsertRecord, data).Get(ctx, &record); err != nil {
+		return err
+	}
+
+	// ... continue processing with record.ID
+
+	return nil
 }
 
 ```

@@ -13,10 +13,12 @@ When a workflow is canceled, the root context and all descendants are canceled. 
 // but uses the original (already-canceled) context. The cleanup
 // activity is never dispatched.
 func MyWorkflowV1(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Minute,
 	})
 
+	log.Info("Processing order")
 	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
 
 	selector := workflow.NewSelector(ctx)
@@ -24,9 +26,15 @@ func MyWorkflowV1(ctx workflow.Context) error {
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
 	selector.Select(ctx)
 
-	if ctx.Err() == workflow.ErrCanceled {
-		// BUG: ctx is already canceled -- CancelOrder is never dispatched
-		_ = workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil)
+	if ctx.Err() != nil {
+		log.Warn("Canceling order", "error", ctx.Err())
+		// BUG: ctx is already canceled -- CancelOrder returns CanceledError
+		// immediately without ever being executed.
+		if err := workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil); err != nil {
+			log.Error("Failed to cancel order", "error", err)
+		} else {
+			log.Info("Order canceled")
+		}
 	}
 	return activityFuture.Get(ctx, nil)
 }
@@ -43,10 +51,12 @@ Use a disconnected context for cleanup, so the activity runs even after the work
 // MyWorkflowV2 uses a disconnected context for cleanup, so the
 // activity runs even after the workflow is canceled.
 func MyWorkflowV2(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Minute,
 	})
 
+	log.Info("Processing order")
 	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
 
 	selector := workflow.NewSelector(ctx)
@@ -54,13 +64,18 @@ func MyWorkflowV2(ctx workflow.Context) error {
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
 	selector.Select(ctx)
 
-	if ctx.Err() == workflow.ErrCanceled {
+	if ctx.Err() != nil {
+		log.Warn("Canceling order", "error", ctx.Err())
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
 			StartToCloseTimeout: 30 * time.Second,
 		})
-		_ = workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil)
+		if err := workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil); err != nil {
+			log.Error("Failed to cancel order", "error", err)
+		} else {
+			log.Info("Order canceled")
+		}
 	}
 	return activityFuture.Get(ctx, nil)
 }
@@ -68,4 +83,4 @@ func MyWorkflowV2(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-See also: [Deadlocking When a Workflow Is Canceled](../deadlocking_when_workflow_cancelled/).
+See also: [Deadlocking When a Workflow Is Canceled](../deadlocking_when_workflow_canceled/).

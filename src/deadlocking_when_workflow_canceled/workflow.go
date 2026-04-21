@@ -1,10 +1,10 @@
-package deadlocking_when_workflow_cancelled
+package deadlocking_when_workflow_canceled
 
 import (
 	"go.temporal.io/sdk/workflow"
 )
 
-// @@@SNIPSTART deadlocking-cancelled-bad
+// @@@SNIPSTART deadlocking-canceled-bad
 
 // MyWorkflowV1 blocks forever if canceled. The Receive call blocks
 // until a signal arrives, but once the workflow is canceled, no signal
@@ -23,7 +23,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 
 // @@@SNIPEND
 
-// @@@SNIPSTART deadlocking-cancelled-good
+// @@@SNIPSTART deadlocking-canceled-good
 
 // MyWorkflowV2 uses a selector to unblock on either the signal
 // or cancellation.

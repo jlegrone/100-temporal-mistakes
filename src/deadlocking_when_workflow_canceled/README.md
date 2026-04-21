@@ -5,8 +5,8 @@
 
 Temporal [cancelation](../terms/cancelation.md) is cooperative. The SDK signals that cancelation was requested, but it's up to the workflow code to notice and respond. If a workflow is blocked waiting for a [signal](../terms/signals.md), a timer, or any other event without also checking for cancelation, it will never unblock -- the event it's waiting for will never arrive. The workflow is stuck: it can't complete, can't run cleanup, and will sit there until it hits a workflow timeout or is manually [terminated](../terms/terminate.md).
 
-<!--SNIPSTART deadlocking-cancelled-bad-->
-[deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
+<!--SNIPSTART deadlocking-canceled-bad-->
+[deadlocking_when_workflow_canceled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_canceled/workflow.go)
 ```go
 
 // MyWorkflowV1 blocks forever if canceled. The Receive call blocks
@@ -29,8 +29,8 @@ func MyWorkflowV1(ctx workflow.Context) error {
 
 The fix: wait for either the expected event or cancelation, so the workflow unblocks in both cases:
 
-<!--SNIPSTART deadlocking-cancelled-good-->
-[deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)
+<!--SNIPSTART deadlocking-canceled-good-->
+[deadlocking_when_workflow_canceled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_canceled/workflow.go)
 ```go
 
 // MyWorkflowV2 uses a selector to unblock on either the signal
@@ -57,8 +57,8 @@ func MyWorkflowV2(ctx workflow.Context) error {
 
 It's also a good idea to write tests that ensure your workflow handles cancellation:
 
-<!--SNIPSTART deadlocking-cancelled-test-->
-[deadlocking_when_workflow_cancelled/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow_test.go)
+<!--SNIPSTART deadlocking-canceled-test-->
+[deadlocking_when_workflow_canceled/workflow_test.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_canceled/workflow_test.go)
 ```go
 
 func TestV2_HandlesGracefulCancelation(t *testing.T) {

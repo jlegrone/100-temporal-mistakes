@@ -127,4 +127,4 @@ func MyWorkflowV2(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-See also: [Deadlocking When a Workflow Is Canceled](../deadlocking_when_workflow_cancelled/) for more on handling cancelation in blocking workflows.
+See also: [Deadlocking When a Workflow Is Canceled](../deadlocking_when_workflow_canceled/) for more on handling cancelation in blocking workflows.

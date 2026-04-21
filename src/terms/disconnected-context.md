@@ -7,7 +7,7 @@ When a workflow is canceled, its main context is canceled, which means any new a
 ## Related
 
 - [Not Using Disconnected Context for Cleanup](../not_using_disconnected_context_for_cleanup/README.md)
-- [Deadlocking When Workflow Canceled](../deadlocking_when_workflow_cancelled/)
+- [Deadlocking When Workflow Canceled](../deadlocking_when_workflow_canceled/)
 - [Not Waiting for Child Workflows to Start](../not_waiting_for_child_workflows_to_start/README.md)
 - [Cancellation](cancellation.md)
 - [Child Workflow](child-workflow.md)
