@@ -27,8 +27,7 @@ func CompensateActivity(_ context.Context) error {
 func MyWorkflowV1(ctx workflow.Context) error {
 	log := workflow.GetLogger(ctx)
 
-	err := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil)
-	if err != nil {
+	if err := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow).Get(ctx, nil); err != nil {
 		// This code is unreachable on timeout: the workflow is terminated,
 		// not canceled, so none of this executes.
 		log.Warn("compensating", "error", err)
@@ -40,6 +39,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
 		return err
 	}
+
 	return nil
 }
 
@@ -89,6 +89,7 @@ func MyWorkflowV2(ctx workflow.Context) error {
 	// Wait for child workflow
 	selector.AddFuture(childFuture, func(f workflow.Future) {
 		log.Info("child workflow completed")
+		selectError = childFuture.Get(ctx, nil)
 	})
 	// Wait for workflow cancelation
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
@@ -114,7 +115,7 @@ func MyWorkflowV2(ctx workflow.Context) error {
 		return selectError
 	}
 
-	return childFuture.Get(ctx, nil)
+	return nil
 }
 
 // @@@SNIPEND
