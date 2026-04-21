@@ -74,39 +74,40 @@ func MyWorkflowV2(ctx workflow.Context) error {
 		return err
 	}
 
-	ctx, cancel := workflow.WithCancel(ctx)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		workflow.Sleep(ctx, softTimeout)
-		cancel()
-	})
+	var (
+		childFuture = workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
+		selector    = workflow.NewSelector(ctx)
+		selectError error
+	)
 
-	childFuture := workflow.ExecuteChildWorkflow(ctx, LongRunningWorkflow)
-
-	selector := workflow.NewSelector(ctx)
-
+	// Wait for child workflow
 	selector.AddFuture(childFuture, func(f workflow.Future) {
 		log.Info("child workflow completed")
 	})
+	// Wait for workflow cancelation
 	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
 		log.Warn("workflow canceled")
+		selectError = ctx.Err()
 	})
-	var timedOut bool
+	// Wait for soft timeout
 	selector.AddFuture(workflow.NewTimer(ctx, softTimeout), func(f workflow.Future) {
 		log.Warn("deadline exceeded")
-		timedOut = true
+		selectError = workflow.ErrDeadlineExceeded
 	})
+
 	selector.Select(ctx)
 
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if timedOut {
+	if selectError != nil {
 		log.Warn("compensating")
-		_ = workflow.ExecuteActivity(workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
+		defer cancel()
+		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
 			StartToCloseTimeout: time.Minute,
-		}), CompensateActivity).Get(ctx, nil)
-		return err
+		})
+		_ = workflow.ExecuteActivity(newCtx, CompensateActivity).Get(newCtx, nil)
+		return selectError
 	}
+
 	return childFuture.Get(ctx, nil)
 }
 
