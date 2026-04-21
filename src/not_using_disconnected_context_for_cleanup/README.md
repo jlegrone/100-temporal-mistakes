@@ -17,12 +17,18 @@ func MyWorkflowV1(ctx workflow.Context) error {
 		StartToCloseTimeout: time.Minute,
 	})
 
-	err := workflow.ExecuteActivity(ctx, ProcessOrder).Get(ctx, nil)
-	if err != nil && ctx.Err() == workflow.ErrCanceled {
+	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
+
+	selector := workflow.NewSelector(ctx)
+	selector.AddFuture(activityFuture, func(f workflow.Future) {})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
+	selector.Select(ctx)
+
+	if ctx.Err() == workflow.ErrCanceled {
 		// BUG: ctx is already canceled -- CancelOrder is never dispatched
 		_ = workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil)
 	}
-	return err
+	return activityFuture.Get(ctx, nil)
 }
 
 ```
@@ -41,8 +47,14 @@ func MyWorkflowV2(ctx workflow.Context) error {
 		StartToCloseTimeout: time.Minute,
 	})
 
-	err := workflow.ExecuteActivity(ctx, ProcessOrder).Get(ctx, nil)
-	if err != nil && ctx.Err() == workflow.ErrCanceled {
+	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
+
+	selector := workflow.NewSelector(ctx)
+	selector.AddFuture(activityFuture, func(f workflow.Future) {})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
+	selector.Select(ctx)
+
+	if ctx.Err() == workflow.ErrCanceled {
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
@@ -50,12 +62,10 @@ func MyWorkflowV2(ctx workflow.Context) error {
 		})
 		_ = workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil)
 	}
-	return err
+	return activityFuture.Get(ctx, nil)
 }
 
 ```
 <!--SNIPEND-->
-
-Always set a timeout on cleanup activities -- without one, a stuck cleanup runs until its [start-to-close timeout](../terms/start-to-close-timeout.md) expires.
 
 See also: [Deadlocking When a Workflow Is Canceled](../deadlocking_when_workflow_cancelled/).

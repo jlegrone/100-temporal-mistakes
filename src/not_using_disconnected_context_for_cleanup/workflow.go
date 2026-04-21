@@ -19,16 +19,30 @@ func CancelOrder(_ context.Context) error { return nil }
 // but uses the original (already-canceled) context. The cleanup
 // activity is never dispatched.
 func MyWorkflowV1(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Minute,
 	})
 
-	err := workflow.ExecuteActivity(ctx, ProcessOrder).Get(ctx, nil)
-	if err != nil && ctx.Err() == workflow.ErrCanceled {
-		// BUG: ctx is already canceled -- CancelOrder is never dispatched
-		_ = workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil)
+	log.Info("Processing order")
+	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
+
+	selector := workflow.NewSelector(ctx)
+	selector.AddFuture(activityFuture, func(f workflow.Future) {})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
+	selector.Select(ctx)
+
+	if ctx.Err() != nil {
+		log.Warn("Canceling order", "error", ctx.Err())
+		// BUG: ctx is already canceled -- CancelOrder returns CanceledError
+		// immediately without ever being executed.
+		if err := workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil); err != nil {
+			log.Error("Failed to cancel order", "error", err)
+		} else {
+			log.Info("Order canceled")
+		}
 	}
-	return err
+	return activityFuture.Get(ctx, nil)
 }
 
 // @@@SNIPEND
@@ -38,20 +52,33 @@ func MyWorkflowV1(ctx workflow.Context) error {
 // MyWorkflowV2 uses a disconnected context for cleanup, so the
 // activity runs even after the workflow is canceled.
 func MyWorkflowV2(ctx workflow.Context) error {
+	log := workflow.GetLogger(ctx)
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Minute,
 	})
 
-	err := workflow.ExecuteActivity(ctx, ProcessOrder).Get(ctx, nil)
-	if err != nil && ctx.Err() == workflow.ErrCanceled {
+	log.Info("Processing order")
+	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
+
+	selector := workflow.NewSelector(ctx)
+	selector.AddFuture(activityFuture, func(f workflow.Future) {})
+	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
+	selector.Select(ctx)
+
+	if ctx.Err() != nil {
+		log.Warn("Canceling order", "error", ctx.Err())
 		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
 		defer cancel()
 		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
 			StartToCloseTimeout: 30 * time.Second,
 		})
-		_ = workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil)
+		if err := workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil); err != nil {
+			log.Error("Failed to cancel order", "error", err)
+		} else {
+			log.Info("Order canceled")
+		}
 	}
-	return err
+	return activityFuture.Get(ctx, nil)
 }
 
 // @@@SNIPEND
