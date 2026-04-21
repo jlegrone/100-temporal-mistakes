@@ -33,7 +33,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Modifying workflow history in interceptors or shared libraries](src/modifying-workflow-history-in-interceptors.md)
 
 ## Timeouts and Retries
-- [Assuming workflow timeouts allow graceful cleanup (treated like termination, not cancellation)](src/assuming-workflow-timeouts-allow-graceful-cleanup.md)
+- [Assuming workflow timeouts allow graceful cleanup (treated like termination, not cancellation)](src/assuming_workflow_timeouts_allow_graceful_cleanup/)
 - [Preventing activity retries](src/preventing-activity-retries.md)
 	- Not setting activity heartbeat timeout
 	- Not setting start to close activity timeout

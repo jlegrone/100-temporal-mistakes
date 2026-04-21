@@ -27,7 +27,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-The fix: wait for both the expected event and cancelation simultaneously, so the workflow unblocks either way:
+The fix: wait for either the expected event or cancelation, so the workflow unblocks in both cases:
 
 <!--SNIPSTART deadlocking-cancelled-good-->
 [deadlocking_when_workflow_cancelled/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/deadlocking_when_workflow_cancelled/workflow.go)

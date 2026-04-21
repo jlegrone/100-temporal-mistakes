@@ -7,7 +7,7 @@ If both a workflow run timeout and workflow execution timeout are set, the run t
 ## Related
 
 - [Not Setting a Workflow Timeout](../not-setting-a-workflow-timeout.md)
-- [Assuming Workflow Timeouts Allow Graceful Cleanup](../assuming-workflow-timeouts-allow-graceful-cleanup.md)
+- [Assuming Workflow Timeouts Allow Graceful Cleanup](../assuming_workflow_timeouts_allow_graceful_cleanup/)
 - [Not Using ContinueAsNew](../not_using_continue_as_new/README.md)
 - [Workflow Execution Timeout](workflow-execution-timeout.md)
 - [Terminate](terminate.md)

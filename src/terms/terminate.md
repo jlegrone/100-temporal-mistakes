@@ -6,7 +6,7 @@ Unlike cancellation, which is cooperative and gives the workflow a chance to run
 ## Related
 
 - [Terminating rather than canceling](../terminating-rather-than-canceling.md)
-- [Assuming workflow timeouts allow graceful cleanup](../assuming-workflow-timeouts-allow-graceful-cleanup.md)
+- [Assuming workflow timeouts allow graceful cleanup](../assuming_workflow_timeouts_allow_graceful_cleanup/)
 - [Not setting a workflow timeout](../not-setting-a-workflow-timeout.md)
 - [Cancellation](cancellation.md)
 - [Event History](event-history.md)

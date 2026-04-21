@@ -7,7 +7,7 @@ This timeout acts as a safety net to prevent workflows from running indefinitely
 ## Related
 
 - [Not Setting a Workflow Timeout](../not-setting-a-workflow-timeout.md)
-- [Assuming Workflow Timeouts Allow Graceful Cleanup](../assuming-workflow-timeouts-allow-graceful-cleanup.md)
+- [Assuming Workflow Timeouts Allow Graceful Cleanup](../assuming_workflow_timeouts_allow_graceful_cleanup/)
 - [Workflow Run Timeout](workflow-run-timeout.md)
 - [Terminate](terminate.md)
 - [ContinueAsNew](continue-as-new.md)
