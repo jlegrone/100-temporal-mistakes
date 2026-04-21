@@ -11,6 +11,22 @@ import (
 	"go.temporal.io/sdk/testsuite"
 )
 
+func TestV1_CompensationNeverRuns(t *testing.T) {
+	env := internaltestsuite.NewTestWorkflowEnvironment(t)
+	env.RegisterWorkflow(LongRunningWorkflow)
+	env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
+
+	// The child sleeps for 1h. With a 10m run timeout, the workflow
+	// is terminated when the timeout fires -- not canceled.
+	// V1's compensation code is unreachable.
+	env.SetWorkflowRunTimeout(10 * time.Minute)
+
+	env.ExecuteWorkflow(MyWorkflowV1)
+	require.True(t, env.IsWorkflowCompleted())
+	require.ErrorContains(t, env.GetWorkflowError(), "deadline exceeded")
+	env.AssertActivityNotCalled(t, "CompensateActivity", mock.Anything)
+}
+
 // @@@SNIPSTART assuming-workflow-timeouts-test
 
 func TestMyWorkflowV2(t *testing.T) {
