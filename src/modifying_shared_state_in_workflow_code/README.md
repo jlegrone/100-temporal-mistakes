@@ -1,6 +1,7 @@
 # Modifying Shared State in Workflow Code
 
 <!-- Workflow code must not access or modify variables outside of its direct control flow. In go, an example would be reading the value of a package level variable (which could change between deployments). Or defining a workflow as a method on a struct, and writing/reading fields on that struct in the workflow code. In cases where you need shared state, use an external database or cache and read/write values via activities. -->
+<!-- TODO: Also note that side effects can be used to safely read external state like environment variables. -->
 
 > [!TIP]
 > Workflow code runs in a shared [worker](terms/worker.md) process -- modifying global variables, singletons, or shared maps creates race conditions and breaks determinism on [replay](terms/replay.md).

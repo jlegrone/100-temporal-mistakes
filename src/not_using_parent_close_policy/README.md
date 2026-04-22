@@ -1,5 +1,8 @@
 # Not Using ParentClosePolicy
 
+<!-- TODO: Consider suggesting a linter setting that makes parent close policy required, or an interceptor that changes the default to REQUEST_CANCEL. Cross-link to the cancelation deadlock mistake, which can cause dangling workflow executions after cancelation is requested. If the interceptor approach seems too heavy handed, it could also enforce that SOME policy is set (you would just discover this at runtime (ideally in tests). Add an example go interceptor and a unit test that confirms that a child workflow is rejected with an error by the interceptor if policy is not specified. The interceptor should have a toggleable "enforce only" and "apply default" mode. -->
+<!-- TODO: Provide additional guidance around the usage of the "abandon" policy -- it may be useful if the child workflow is meant to run to perform some state reconciliation that must complete without interference from the parent workflow. But this is a special case and abandon workflows should be thoroughly tested to ensure they eventually run to completion (or, set a timeout). -->
+
 > [!TIP]
 > By default, [child workflows](terms/child-workflow.md) are [terminated](terms/terminate.md) (hard-killed) when their parent completes, fails, or is [canceled](terms/cancelation.md). Set `ParentClosePolicy` to `REQUEST_CANCEL` or `ABANDON` if children need cleanup.
 

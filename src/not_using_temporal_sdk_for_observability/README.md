@@ -1,5 +1,7 @@
 # Not Using the Temporal SDK for Observability
 
+<!-- TODO: include metrics & logs in the example code. Add a v1 (bad) and v2 version, and include an Example unit test for the go worker that performs an assertion on the log output of the worker. Also note which log fields and metric tags are missing if you don't use the SDK logger and metrics interfaces. Also note that you have the ability to customize the logger and metrics adapters in the client or worker options. -->
+
 > [!TIP]
 > Standard logging, metrics, and tracing libraries run on every [replay](../terms/replay.md), producing duplicate and misleading output. Use the SDK's replay-aware alternatives in workflow code instead.
 

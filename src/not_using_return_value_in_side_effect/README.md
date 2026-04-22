@@ -1,5 +1,9 @@
 # Not Using the Return Value of SideEffect
 
+<!-- TODO: Include the sideeffect workflow helper function here to demonstrate how to use the type system to make this mistake more preventable in go (though it's still possible to modify variables inside the side effect callback). -->
+<!-- TODO: Consider renaming this mistake to something along the lines of modifying variables that exist in the parent scope of the side effect function. -->
+<!-- TODO: Double check if there is already support for generic side effect functions in the Go SDK now, or at least an open issue. -->
+
 > [!TIP]
 > `SideEffect` records its result in [history](terms/event-history.md) on first execution and returns the recorded value on [replay](terms/replay.md) -- if you ignore the return value and rely on the function's side effects, that logic won't re-execute on replay.
 
