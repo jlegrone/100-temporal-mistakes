@@ -79,4 +79,34 @@ func TestLocalActivityTooSlow(t *testing.T) {
 	require.ErrorContains(t, run.Get(t.Context(), nil), "deadline exceeded")
 }
 
+func TestLocalActivityGrowsHistory(t *testing.T) {
+	c, taskQueue := testsuite.StartDevServerWorker(t, func(r worker.Registry) {
+		r.RegisterWorkflow(failingLocalActivityWorkflow)
+		r.RegisterActivity(alwaysFails)
+	})
+
+	run, err := c.ExecuteWorkflow(t.Context(), client.StartWorkflowOptions{
+		TaskQueue:           taskQueue,
+		WorkflowRunTimeout:  time.Minute,
+		WorkflowTaskTimeout: 200 * time.Millisecond,
+	}, failingLocalActivityWorkflow, "request")
+	require.NoError(t, err)
+
+	// Wait for the workflow to complete (retries exhaust after 5 attempts).
+	require.Error(t, run.Get(t.Context(), nil))
+
+	// Count history events to prove local activity retries added events.
+	iter := c.GetWorkflowHistory(t.Context(), run.GetID(), run.GetRunID(), false, 0)
+	var eventCount int
+	for iter.HasNext() {
+		_, err := iter.Next()
+		require.NoError(t, err)
+		eventCount++
+	}
+	t.Logf("history event count: %d", eventCount)
+	// A simple workflow with no retries would have ~5 events.
+	// With server-deferred local activity retries, we expect significantly more.
+	require.Greater(t, eventCount, 20, "local activity retries should grow the history")
+}
+
 // @@@SNIPEND

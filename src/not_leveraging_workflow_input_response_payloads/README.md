@@ -1,5 +1,7 @@
 # Not Leveraging Workflow Input/Response Payloads
 
+<!-- TODO: delete this entry -->
+
 > [!TIP]
 > Temporal supports typed inputs and outputs on workflow executions. Pass data as workflow arguments rather than feeding it via [signals](terms/signals.md) after the workflow starts.
 
