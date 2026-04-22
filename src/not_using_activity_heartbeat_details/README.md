@@ -1,5 +1,7 @@
 # Not Using Activity Heartbeat Details
 
+<!-- TODO: also check if heartbeat details show up in the web UI (useful for debugging). Included a screenshot if so (you can start the dev server with the UI enabled and then use the chrome mcp server to take a screenshot). And note that heartbeat details are often simpler to use than writing to an external database and dealing with scoping/cleanup of records after the activity completes. -->
+
 > [!TIP]
 > Activity [heartbeats](terms/heartbeat.md) can carry progress information, not just keep-alive signals. When a long-running activity is retried, the new attempt can retrieve the last heartbeat details and resume from where it left off.
 

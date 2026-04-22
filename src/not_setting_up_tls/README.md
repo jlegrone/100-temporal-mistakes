@@ -1,5 +1,7 @@
 # Not Setting Up TLS
 
+<!-- TODO: delete this entry -->
+
 > [!TIP]
 > By default, all Temporal SDK-to-server communication is unencrypted. In any production environment, TLS must be configured for [worker](../terms/worker.md)-to-server and client-to-server connections.
 

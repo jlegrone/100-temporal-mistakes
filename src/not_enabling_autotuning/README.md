@@ -1,5 +1,7 @@
 # Not Enabling Worker Autotuning
 
+<!-- Autotuning is great! Start with that, and only explore more explicit tuning settings if you have identified bottlenecks specific to your workload. With autotuning, in theory it is also possible to simplify horizontal autoscaling by scaling in and out based on resource usage on the worker process. -->
+
 > [!TIP]
 > Temporal SDKs offer autotuning that automatically adjusts [worker](../terms/worker.md) concurrency settings based on system resource utilization, replacing error-prone manual tuning of values like `MaxConcurrentActivities`.
 

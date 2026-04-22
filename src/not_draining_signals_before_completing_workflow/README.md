@@ -1,6 +1,6 @@
 # Not Draining Signals Before Completing a Workflow
 
-<!-- If your workflow accepts multiple signals, you it is possible not to observe some of them if your workflow completes or continues as new without reading all signals from the channel first. -->
+<!-- TODO: If your workflow accepts multiple signals, it is possible not to observe some of them if your workflow completes or continues as new without reading all signals from the channel first. -->
 
 > [!TIP]
 > If a workflow completes or calls [ContinueAsNew](../terms/continue-as-new.md) while [signals](../terms/signals.md) are buffered in the channel, those signals are silently lost. Drain the channel before completing.
@@ -9,7 +9,7 @@ Signals are recorded in [history](../terms/event-history.md) and the API call su
 
 Before completing or calling ContinueAsNew, use non-blocking receive to drain pending signals:
 
-<!-- TODO: the code example here should have a before and after example. Also be sure to mention the https://pkg.go.dev/go.temporal.io/sdk@v1.42.0/workflow#GetUnhandledSignalNames function (could be used in an interceptor to automatically monitor workflows for this problem). -->
+<!-- TODO: the code example here should have a before and after example. Also be sure to mention the https://pkg.go.dev/go.temporal.io/sdk@v1.42.0/workflow#GetUnhandledSignalNames function (could be used in an interceptor to automatically monitor workflows for this problem). It also ought to be possible to look at old workflow histories to check if there were unhandled signals (by replaying the workflow with the interceptor turned on and inspecting the logs) -->
 <!--SNIPSTART not-draining-signals-drain-example-->
 [not_draining_signals_before_completing_workflow/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_draining_signals_before_completing_workflow/workflow.go)
 ```go
