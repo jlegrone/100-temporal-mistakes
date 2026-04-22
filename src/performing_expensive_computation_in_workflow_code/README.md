@@ -1,5 +1,7 @@
 # Performing Expensive Computation in Workflow Code
 
+<!-- TODO: add a go benchmark test for replaying a v1 workflow history 100 times that does a computation in the workflow code, and a v2 workflow that does the same computation but via an activity. Put the benchmark outputs in the readme. -->
+
 > [!TIP]
 > [Workflow tasks](../terms/workflow-task.md) have a default 10-second timeout. Expensive computation blocks the task, causing timeouts and livelocks where the workflow perpetually retries but never makes progress.
 

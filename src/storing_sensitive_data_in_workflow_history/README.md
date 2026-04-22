@@ -1,5 +1,7 @@
 # Storing Sensitive Data in Workflow History
 
+<!-- TODO: Note Temporal payload encryption and/or external storage as potential workarounds for this problem. Find an official temporal doc link for both approaches (https://github.com/temporalio/features/issues/765 is the issue for external payload storage, but there's probably a better doc link). -->
+
 > [!TIP]
 > [Workflow history](../terms/event-history.md) is persisted in the [Temporal server backend](../terms/temporal-server-backend.md) and visible through the UI and API. Sensitive data (PII, credentials, financial data) in history creates security and compliance risks.
 

@@ -1,5 +1,7 @@
 # Returning Both a Payload and an Error
 
+<!-- TODO: Add a unit test demonstrating this issue (payload being silently dropped when an error value is also returned). Also provide an example showing how to include and extract error details in a temporal application error. Putting structured details in the error itself is also more flexible than putting error details in the result because it allows the activity to choose whether the error is retryable or nonretryable depending on the temporal error type. But it's still valid to not return an error value at all if the intent is for the activity not to be retried. -->
+
 > [!TIP]
 > In Go, the Temporal SDK discards the [payload](../terms/payload.md) when an error is returned alongside it from an activity or workflow, leading to silent data loss.
 
@@ -23,6 +25,7 @@ func MyActivity(ctx context.Context, input Input) (Result, error) {
 ```
 <!--SNIPEND-->
 
+<!-- TODO: consider removing this in favor of using error details. Make sure there is a unit test for the error details approach. -->
 If you need to communicate partial results alongside a failure, encode the partial result into the result struct itself:
 
 <!--SNIPSTART returning-both-payload-and-error-partial-->

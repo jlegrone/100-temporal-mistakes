@@ -1,5 +1,7 @@
 # Passing Too Much Information from Activities
 
+<!-- TODO: Switch to v1/v2 naming for the activity -->
+
 > [!TIP]
 > Activity results are persisted in [workflow history](../terms/event-history.md) -- every byte counts toward history size limits and [replay](../terms/replay.md) performance. Return only what the workflow actually needs, and store large data externally.
 

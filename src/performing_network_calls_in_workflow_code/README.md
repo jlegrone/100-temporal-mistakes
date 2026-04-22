@@ -1,5 +1,7 @@
 # Performing Network Calls in Workflow Code
 
+<!-- TODO: Recommend enabling the sandbox for python, typescript etc. And the Go https://github.com/temporalio/sdk-go/tree/master/contrib/tools/workflowcheck analyzer (if possible demonstrate that the workflowcheck analyzer breaks the build in a unit test). -->
+
 > [!TIP]
 > Network calls (HTTP requests, database queries, gRPC calls) in workflow code are re-executed on every [replay](terms/replay.md), producing potentially different results each time and breaking determinism. Move all network I/O into activities.
 

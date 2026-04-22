@@ -1,5 +1,8 @@
 # Starting Workflows from Activities
 
+<!-- TODO: Use the dev server to demonstrate top level workflow cancelation not propagating to a workflow started by an activity. -->
+<!-- TODO: Note that in situations where you are starting workflows from an activity, it might be better to use a child workflow with parent workflow close policy of ABANDON instead (that way you still see the parent-child relationship in the temporal workflow history/temporal UI for debugging). -->
+
 > [!TIP]
 > Starting a workflow from an activity hides the relationship from [history](../terms/event-history.md), breaks [cancellation](../terms/cancelation.md) propagation, and risks duplicate workflows on retry. Use [child workflows](../terms/child-workflow.md) from workflow code instead.
 
