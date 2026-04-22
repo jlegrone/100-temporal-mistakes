@@ -2,7 +2,7 @@ package testsuite
 
 import (
 	"go.temporal.io/sdk/log"
-	"go.temporal.io/sdk/testsuite"
+	sdktestsuite "go.temporal.io/sdk/testsuite"
 )
 
 // TB is the subset of testing.TB that both *testing.T and *rapid.T satisfy.
@@ -13,9 +13,9 @@ type TB interface {
 
 // NewTestWorkflowEnvironment creates a test workflow environment with
 // logs directed to t.Log so they appear in go test -v output.
-func NewTestWorkflowEnvironment(t TB) *testsuite.TestWorkflowEnvironment {
+func NewTestWorkflowEnvironment(t TB) *sdktestsuite.TestWorkflowEnvironment {
 	t.Helper()
-	suite := &testsuite.WorkflowTestSuite{}
+	suite := &sdktestsuite.WorkflowTestSuite{}
 	suite.SetLogger(&tLogger{t: t})
 	return suite.NewTestWorkflowEnvironment()
 }

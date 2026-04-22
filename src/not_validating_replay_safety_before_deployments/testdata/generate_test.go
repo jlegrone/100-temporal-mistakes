@@ -1,17 +1,16 @@
 package testdata
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"testing"
 
 	parent "github.com/jlegrone/100-temporal-mistakes/src/not_validating_replay_safety_before_deployments"
 
+	internaltestsuite "github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -21,28 +20,17 @@ import (
 //
 //	go test ./src/not_validating_replay_safety_before_deployments/testdata/ -run TestGenerateHistory -count=1
 func TestGenerateHistory(t *testing.T) {
-	ctx := context.Background()
+	c, taskQueue := internaltestsuite.StartDevServerWorker(t, func(r worker.Registry) {
+		r.RegisterWorkflow(parent.MyWorkflow)
+	})
 
-	server, err := testsuite.StartDevServer(ctx, testsuite.DevServerOptions{})
-	require.NoError(t, err)
-	defer server.Stop()
-
-	c := server.Client()
-	defer c.Close()
-
-	taskQueue := "replay-validation-example"
-	w := worker.New(c, taskQueue, worker.Options{})
-	w.RegisterWorkflow(parent.MyWorkflow)
-	require.NoError(t, w.Start())
-	defer w.Stop()
-
-	run, err := c.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+	run, err := c.ExecuteWorkflow(t.Context(), client.StartWorkflowOptions{
 		TaskQueue: taskQueue,
 	}, parent.MyWorkflow)
 	require.NoError(t, err)
-	require.NoError(t, run.Get(ctx, nil))
+	require.NoError(t, run.Get(t.Context(), nil))
 
-	iter := c.GetWorkflowHistory(ctx, run.GetID(), run.GetRunID(), false, enums.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT)
+	iter := c.GetWorkflowHistory(t.Context(), run.GetID(), run.GetRunID(), false, enums.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT)
 	var events []json.RawMessage
 	for iter.HasNext() {
 		event, err := iter.Next()
