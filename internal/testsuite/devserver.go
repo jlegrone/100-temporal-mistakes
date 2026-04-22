@@ -16,6 +16,7 @@ func StartDevServerWorker(t testing.TB, register func(r worker.Registry), extraA
 	t.Helper()
 
 	server, err := sdktestsuite.StartDevServer(t.Context(), sdktestsuite.DevServerOptions{
+		LogLevel:  "error",
 		ExtraArgs: extraArgs,
 	})
 	if err != nil {
