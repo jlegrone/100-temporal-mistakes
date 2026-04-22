@@ -1,5 +1,13 @@
 # Not Sending Heartbeats for Cancellation
 
+<!-- TODO: Activities that don't heartbeat will never observe cancelation when their parent workflow cancels them or the workflow itself is closed (canceled, terminated, or completed). The only way to detect cancelation is by sending heartbeats. Note that cancelation CAN still be observed when a worker is shutting down, even without heartbeats. -->
+
+<!-- TODO: Add a test demonstrating that an activity never runs its cleanup logic if it doesn't heartbeat. Hopefully we can do that with the regular unit test environment instead of a full dev server. Use the normal MyActivityV1 and MyActivityV2 style to show and verify the two different behaviors. -->
+
+<!-- TODO: write a test (using dev server) to confirm whether an auto-heartbeating interceptor that doesn't set heartbeat details overrides heartbeat details added by the activity implementation itself. It would be nice if an interceptor could automatically implement heartbeating (eg. if the activity timeout is > 30s). The interceptor would need to be paired with a workflow side interceptor that sets a heartbeat timeout. -->
+
+<!-- TODO: is there an entry for not setting heartbeat timeouts? There should be. -->
+
 > [!TIP]
 > Activity [cancellation](terms/cancelation.md) is cooperative -- the server notifies the [worker](terms/worker.md) during the next [heartbeat](terms/heartbeat.md) response. If an activity doesn't heartbeat, it won't learn about cancellation until it completes naturally.
 

@@ -1,6 +1,6 @@
 # Not Leveraging Workflow Input/Response Payloads
 
-<!-- TODO: delete this entry -->
+<!-- TODO: Reframe this around other workflow engines like airflow or dbt or databricks, because people coming from those may not be used to the pattern of request/response style control flow as opposed to storing intermediate artifacts in shared storage between tasks. -->
 
 > [!TIP]
 > Temporal supports typed inputs and outputs on workflow executions. Pass data as workflow arguments rather than feeding it via [signals](terms/signals.md) after the workflow starts.
