@@ -7,6 +7,7 @@ Temporal workers have several concurrency knobs: maximum concurrent [workflow ta
 
 Worker autotuning (currently in preview) replaces this static guess with a dynamic feedback loop. It adjusts concurrency at runtime based on actual CPU and memory usage, ramping up when resources are available and backing off under pressure:
 
+<!-- TODO: make sure this is up to date, and hardcode an infosupplier instead of leaving that up to the imagination. -->
 <!--SNIPSTART not-enabling-autotuning-good-->
 [not_enabling_autotuning/worker.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_enabling_autotuning/worker.go)
 ```go

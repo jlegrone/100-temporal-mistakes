@@ -12,10 +12,12 @@ import (
 // StartDevServerWorker starts a DevServer, creates a worker with a unique task queue,
 // calls register to let the caller register workflows and activities, starts the worker,
 // and registers cleanup for all resources via t.Cleanup.
-func StartDevServerWorker(t testing.TB, register func(r worker.Registry)) (c client.Client, taskQueue string) {
+func StartDevServerWorker(t testing.TB, register func(r worker.Registry), extraArgs ...string) (c client.Client, taskQueue string) {
 	t.Helper()
 
-	server, err := sdktestsuite.StartDevServer(t.Context(), sdktestsuite.DevServerOptions{})
+	server, err := sdktestsuite.StartDevServer(t.Context(), sdktestsuite.DevServerOptions{
+		ExtraArgs: extraArgs,
+	})
 	if err != nil {
 		t.Fatalf("StartDevServer: %v", err)
 	}
