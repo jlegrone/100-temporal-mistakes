@@ -1,5 +1,8 @@
 # Not Waiting for Child Workflows to Start
 
+<!-- TODO: Add a unit test demonstrating the issue (with a V1 workflow version) and a fix (with V2). -->
+<!-- TODO: Add a "sync" ExecuteChildWorkflow helper to the workflowhelpers package that demonstrates how to avoid this issue in Go. Maybe it could also be an interceptor? Add a "v3" version that is exactly the same as the v1 version of the workflow but with this helper/interceptor enabled and demonstrate that the behavior is fixed in a unit test. -->
+
 > [!TIP]
 > `ExecuteChildWorkflow()` doesn't immediately schedule the [child workflow](terms/child-workflow.md). If the parent completes before the server processes the creation, the child may never start.
 

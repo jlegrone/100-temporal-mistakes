@@ -1,5 +1,9 @@
 # Not Using Workflow Versioning
 
+<!-- TODO: rename this to "patching" since that's what it's called in most SDKs. -->
+<!-- TODO: revise this now that worker versioning is an option (but note that version is still necessary when using "unpinned" workflows). -->
+<!-- TODO: add a note on how to safely remove handlers for old version numbers (leveraging search attributes). -- actually this should just go in the incorrect workflow patching entry, but link to it. -->
+
 > [!TIP]
 > Deploying changes to workflow code without versioning causes non-determinism errors for in-flight workflows. Use the SDK's patching/versioning APIs to safely evolve workflow definitions while existing executions are still running.
 
@@ -9,6 +13,7 @@ Without [versioning](terms/versioning.md), you cannot safely evolve workflow log
 
 Use the SDK's versioning APIs to introduce changes safely. In Go, use `workflow.GetVersion`; in TypeScript, use `patched()`. These APIs branch your workflow code so existing executions follow the old path while new executions take the new path:
 
+<!-- TODO: update this example to use a switch statement instead of if/else. -->
 <!--SNIPSTART not-using-workflow-versioning-workflow-->
 [not_using_workflow_versioning/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_using_workflow_versioning/workflow.go)
 ```go

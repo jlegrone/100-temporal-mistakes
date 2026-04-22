@@ -1,5 +1,9 @@
 # Not Validating Replay Safety Before Deployments
 
+<!-- TODO: Note that leveraging worker versioning https://docs.temporal.io/worker-versioning and exclusively using pinned workflows is an alternative strategy that avoids the need for constant checks. -->
+<!-- TODO: Give advice on how to monitor for workflows that failed workflow tasks due to replay safety issues. -->
+<!-- TODO: Nit: non-replay safe changes can themselves be deterministic. Nondeterminism is a different class of mistake than just making an unpatched/unversioned code change (which itself is determinsitically going down a different code path than the previous version of the workflow code). These two concepts are getting confused with each other in the text below. -->
+
 > [!TIP]
 > Replay tests against production [workflow histories](terms/event-history.md) should be part of your CI/CD pipeline to catch non-deterministic changes before they reach production.
 

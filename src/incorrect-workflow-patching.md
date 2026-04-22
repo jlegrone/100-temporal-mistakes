@@ -1,5 +1,7 @@
 # Incorrect Workflow Patching
 
+<!-- TODO: Detail how to check if any workflows are still active on a specific version (show the full temporal command to query open workflows with the search attribute) and include a test case for this (using the dev server). -->
+
 > [!TIP]
 > Even when you know to use patching, doing it wrong causes the same non-determinism errors you were trying to avoid. Never remove the old code branch until every running workflow has advanced past the patched point.
 
