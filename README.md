@@ -14,9 +14,17 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 	- [Naive batch processing implementations](src/naive-batch-processing-implementation.md)
 - [Exceeding 10s task timeout](src/exceeding-10s-task-timeout.md)
 
+### Solutions
+- External payloads
+- ContinueAsNew
+- Fan Out pattern
+- Monitor history length, payload size, etc (customer interceptor and codec for metrics?)
+
 ## Workflow Replay
 - [Not using workflow versioning/patching](src/not_using_workflow_versioning/)
 - [Incorrect workflow patching (wrong version numbers, removing branch before it's safe)](src/incorrect-workflow-patching.md)
+	- Removing a version branch before it's safe
+	- Using the wrong version numbers
 - [Thinking that replay means re-running activities](src/thinking-replay-means-rerunning-activities.md)
 - [Performing network calls in workflow code](src/performing_network_calls_in_workflow_code/)
 - [Using system time instead of workflow time](src/using_system_time_instead_of_workflow_time/)
@@ -32,6 +40,13 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Not using static analysis / sandboxed SDK](src/not-using-static-analysis-sandboxed-sdk.md)
 - [Modifying workflow history in interceptors or shared libraries](src/modifying-workflow-history-in-interceptors.md)
 
+### Solutions
+- Worker versioning + pinned workflows
+- Static analysis
+- SDK sandboxes
+- Replay testing
+- Run with very small sticky cache size in dev?
+
 ## Timeouts and Retries
 - [Assuming workflow timeouts allow graceful cleanup (treated like termination, not cancellation)](src/assuming_workflow_timeouts_allow_graceful_cleanup/)
 - [Preventing activity retries](src/preventing-activity-retries.md)
@@ -41,6 +56,15 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Using workflow retries](src/using-workflow-retries.md)
 - [Setting too-short workflow or activity timeouts (keep long enough to survive downstream failures)](src/setting-too-short-timeouts.md)
 - [Not setting a workflow timeout (they'll run for 10 years!)](src/not-setting-a-workflow-timeout.md)
+- Retrying after receiving a downstream error that should not be retried (add interceptor example)
+- Retrying too quickly/frequently in the event of downstream resource overload errors (also include interceptor example)
+- Too short StartToClose timeout (never allows longer tasks to complete even though they are actively running)
+
+### Solutions
+- Timeout and retry policy lint/simulator
+- Enforcement via interceptor (hard error in dev, warn in prod)
+  - Also prevent max_attempts=1
+- Decide retryability from the activity!
 
 ## Cancellation
 - [Assuming activity cancellation means workflow cancellation](src/assuming_activity_cancelation_means_workflow_cancelation/)
@@ -49,12 +73,17 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Not using a disconnected context to perform cleanup or other deferred child workflows/activities after workflow canceled](src/not_using_disconnected_context_for_cleanup/)
 - [Not sending heartbeats from activities you want to handle cancellation](src/not_sending_heartbeats_for_cancellation/)
 
+### Solutions
+- Heartbeat from (almost) all activities
+- Let workflows orchestrate cleanup/compensation on cancel
+- Test workflow cancelation based on timing of the cancel signal
+
 ## Software Design
 - [Not making activities idempotent (at least once execution semantic, even with max attempts == 1)](src/not-making-activities-idempotent.md)
 - [Not leveraging workflow input/response payloads (not all workflow engines support these!)](src/not_leveraging_workflow_input_response_payloads/)
 - [Using more than one input/response payload (only supported in Go, Java SDKs?)](src/using_more_than_one_input_response_payload/)
 - [Doing too many things in one workflow (scale out rather than scale up) (shard contention)](src/doing-too-many-things-in-one-workflow.md)
-- [Over-using activities (do more in one activity without checkpointing)](src/over-using-activities.md)
+- [Over-using activities (do more in one activity without checkpointing)](src/over-using-activities.md) <!-- TODO: consider the wording for this title, it's ok if the activity is idempotent and not expensive to retry. There's another entry about combining multiple activities into one that should be crosslinked or combined with this one. -->
 - [Unnecessary usage of workflows (maybe you don't need the durability for a CRUD API)?](src/unnecessary-usage-of-workflows.md)
 - [Not using activity heartbeat details](src/not_using_activity_heartbeat_details/)
 - [Not using ContinueAsNew (limit your maximum code age!)](src/not_using_continue_as_new/)
@@ -79,6 +108,7 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Storing sensitive data in workflow history](src/storing_sensitive_data_in_workflow_history/)
 - [Fallible local activities](src/fallible_local_activities/)
     - https://youtu.be/b2AnXkqCwgw?feature=shared&t=429
+- Using a primitive type rather than an object for workflow/activity/signal/update payloads
 
 ## Testing
 
@@ -87,12 +117,14 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 - [Not monitoring STSL](src/not-monitoring-stsl.md)
 - [Not monitoring sync match rate](src/not-monitoring-sync-match-rate.md)
 - [Not enabling autotuning (still preview feature though)](src/not_enabling_autotuning/)
+<!-- TODO: The "not knowing" phrasing is awkward -->
 - [Not knowing about `workflow reset`](src/not-knowing-about-workflow-reset.md)
 - [Not knowing about batch operations API](src/not-knowing-about-batch-operations-api.md)
 - [Underutilizing namespaces](src/underutilizing-namespaces.md)
 - [Not draining activity tasks before graceful worker shutdown](src/not_draining_activity_tasks_before_shutdown/)
 - [Downloading workflow history from UI with "DecodePayloads" option enabled](src/downloading-history-with-decode-payloads.md)
 - [Not validating replay safety before worker deployments](src/not_validating_replay_safety_before_deployments/)
+<!-- TODO: Delete the entries relating to self-hosting Temporal server -->
 - [Not setting up TLS](src/not_setting_up_tls/)
 - [Not enabling ringpop TLS](src/not-enabling-ringpop-tls.md)
 - [Not setting up persistence rate limits](src/not-setting-up-persistence-rate-limits.md)
