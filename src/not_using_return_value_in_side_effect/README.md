@@ -3,6 +3,7 @@
 <!-- TODO: Include the sideeffect workflow helper function here to demonstrate how to use the type system to make this mistake more preventable in go (though it's still possible to modify variables inside the side effect callback). -->
 <!-- TODO: Consider renaming this mistake to something along the lines of modifying variables that exist in the parent scope of the side effect function. -->
 <!-- TODO: Double check if there is already support for generic side effect functions in the Go SDK now, or at least an open issue. -->
+<!-- TODO: Could we make a linter that requires the value returned by side effect function to be read? -->
 
 > [!TIP]
 > `SideEffect` records its result in [history](terms/event-history.md) on first execution and returns the recorded value on [replay](terms/replay.md) -- if you ignore the return value and rely on the function's side effects, that logic won't re-execute on replay.
@@ -13,6 +14,8 @@
 [not_using_return_value_in_side_effect/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_using_return_value_in_side_effect/workflow.go)
 ```go
 
+// TODO: Add a unit test demonstrating that there are different results during replay of a real workflow history vs. the original (uninterrupted) execution. You'll need to use the dev server and structure the test so that it executes the workflow, waits for it to complete, grabs the history, and then replays the history. The replay should fail. You don't need to include the test as a snippet though.
+
 // WRONG: ignoring the return value
 func MyWorkflowV1(ctx workflow.Context) error {
 	var myUUID string
@@ -20,6 +23,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 		myUUID = uuid.New().String() // Sets variable as a side effect
 		return nil
 	})
+	// TODO: Search across ALL example code and remove any "_ = ..." assignment patterns like on the following line. You can log the variable instead if you need to use it or show that it has a certain value.
 	// During replay, the function doesn't run -- myUUID stays empty!
 	_ = myUUID
 	return nil

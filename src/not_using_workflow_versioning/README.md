@@ -3,13 +3,16 @@
 <!-- TODO: rename this to "patching" since that's what it's called in most SDKs. -->
 <!-- TODO: revise this now that worker versioning is an option (but note that version is still necessary when using "unpinned" workflows). -->
 <!-- TODO: add a note on how to safely remove handlers for old version numbers (leveraging search attributes). -- actually this should just go in the incorrect workflow patching entry, but link to it. -->
+<!-- TODO: Copy framing text from my Replay 2022 presentation -->
 
 > [!TIP]
-> Deploying changes to workflow code without versioning causes non-determinism errors for in-flight workflows. Use the SDK's patching/versioning APIs to safely evolve workflow definitions while existing executions are still running.
+> Deploying changes to workflow code without versioning causes replay errors for in-flight workflows. Use patching/versioning to safely evolve and maintain backwards compatibility of workflow code.
+
+<!-- TODO: Fact check that changing timer durations is actually a non-replay-safe change. -->
 
 When you deploy a new version of your workflow code, all currently running workflows will [replay](terms/replay.md) using that new code. If the updated code produces different commands than what was originally recorded in the workflow's [history](terms/event-history.md), Temporal detects the mismatch and raises a [non-determinism](terms/non-determinism.md) error, and the workflow gets stuck. Common changes that trigger this include adding, removing, or reordering activity calls, changing timer durations, modifying [child workflow](terms/child-workflow.md) executions, or changing activity arguments.
 
-Without [versioning](terms/versioning.md), you cannot safely evolve workflow logic while workflows are running. You would have to drain all running workflows before every deployment, which is impractical for long-running workflows that may execute for days or months. Non-determinism errors are particularly painful because they silently break workflows that were previously healthy -- you deploy what looks like a harmless change, and suddenly hundreds of in-flight workflows start failing.
+Non-determinism errors are particularly painful because they silently break workflows that were previously healthy -- you deploy what looks like a harmless change, and suddenly hundreds of in-flight workflows start failing.
 
 Use the SDK's versioning APIs to introduce changes safely. In Go, use `workflow.GetVersion`; in TypeScript, use `patched()`. These APIs branch your workflow code so existing executions follow the old path while new executions take the new path:
 

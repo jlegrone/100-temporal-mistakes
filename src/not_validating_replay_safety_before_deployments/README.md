@@ -5,7 +5,7 @@
 <!-- TODO: Nit: non-replay safe changes can themselves be deterministic. Nondeterminism is a different class of mistake than just making an unpatched/unversioned code change (which itself is determinsitically going down a different code path than the previous version of the workflow code). These two concepts are getting confused with each other in the text below. -->
 
 > [!TIP]
-> Replay tests against production [workflow histories](terms/event-history.md) should be part of your CI/CD pipeline to catch non-deterministic changes before they reach production.
+> Replay tests against existing [workflow histories](terms/event-history.md) should be part of your CI/CD pipeline to catch non-replay safe changes before they reach production.
 
 When you deploy new [worker](terms/worker.md) code, any running workflows will eventually [replay](terms/replay.md) using it. If the new code changes the workflow's deterministic sequence of commands -- adding, removing, or reordering activities without proper [versioning](terms/versioning.md) -- replay detects a mismatch and the workflow gets stuck with a [non-determinism](terms/non-determinism.md) error. Without automated replay validation in your deployment pipeline, you only discover these breaking changes after workflows start failing in production.
 

@@ -2,8 +2,10 @@
 
 <!-- TODO: include metrics & logs in the example code. Add a v1 (bad) and v2 version, and include an Example unit test for the go worker that performs an assertion on the log output of the worker. Also note which log fields and metric tags are missing if you don't use the SDK logger and metrics interfaces. Also note that you have the ability to customize the logger and metrics adapters in the client or worker options. -->
 
+<!-- TODO: Add a note on how to use replay-aware helpers from the SDK when necessary. -->
+
 > [!TIP]
-> Standard logging, metrics, and tracing libraries run on every [replay](../terms/replay.md), producing duplicate and misleading output. Use the SDK's replay-aware alternatives in workflow code instead.
+> Standard logging, metrics, and tracing libraries run on every [replay](../terms/replay.md), producing duplicate logs and over-counting metrics. Use the SDK's replay-aware alternatives in workflow code instead.
 
 Developers often reach for familiar observability tools inside workflow code -- `log.Info()`, a Prometheus counter, a Datadog span. These work fine during initial execution, but workflow code also runs during [replay](../terms/replay.md). When a [worker](../terms/worker.md) restarts or a workflow is evicted from cache, the SDK replays the [workflow history](../terms/event-history.md) to reconstruct state, and every log statement, metric increment, and trace span fires again. The result is duplicated logs that make debugging harder, inflated metrics that misrepresent actual activity, and noisy traces that obscure real issues.
 

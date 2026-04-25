@@ -1,5 +1,8 @@
 # Not Using Workflow Replay for Debugging
 
+<!-- TODO: Include log-based debugging technique explanation (copy from internal blog post) -->
+<!-- TODO: Add example test demonstrating replay log output -->
+
 > [!TIP]
 > The Temporal SDK can replay a single workflow's [history](../terms/event-history.md) locally, letting you step through the exact execution in a debugger. This is often the fastest way to reproduce and diagnose workflow bugs.
 
