@@ -19,6 +19,8 @@ func CompensateActivity(_ context.Context) error {
 	return nil
 }
 
+// TODO: Make sure there's a test demonstrating that the compensation never runs (don't include it in the readme though).
+
 // @@@SNIPSTART assuming-workflow-timeouts-bad
 
 // MyWorkflowV1 relies on the workflow execution timeout as its

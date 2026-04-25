@@ -38,7 +38,7 @@ func MyWorkflowV1(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-If you need graceful behavior on timeout, implement the deadline yourself with a timer. If the timer fires before the workflow completes, the workflow can still take action. Keep the workflow-level execution timeout as a safety net set to something longer (e.g., internal timer at 30 minutes, execution timeout at 1 hour).
+If you need graceful behavior on timeout, implement the deadline yourself with a timer. If the timer fires before the workflow completes, the workflow can still take action. A workflow-level execution timeout should only be used as a guarantee that the workflow is closed by a certain time, regardless of whether it had an implementation bug that caused it to become deadlocked.
 
 <!--SNIPSTART assuming-workflow-timeouts-good-->
 [assuming_workflow_timeouts_allow_graceful_cleanup/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/assuming_workflow_timeouts_allow_graceful_cleanup/workflow.go)

@@ -5,9 +5,9 @@
 > [!TIP]
 > Temporal SDKs offer autotuning that automatically adjusts [worker](../terms/worker.md) concurrency settings based on system resource utilization, replacing error-prone manual tuning of values like `MaxConcurrentActivities`.
 
-Temporal workers have several concurrency knobs: maximum concurrent [workflow tasks](../terms/workflow-task.md), maximum concurrent activities, number of pollers, and more. By default, these are set to fixed values that represent conservative guesses. Most teams either leave the defaults untouched or manually set them based on load testing, then never revisit them. Manual tuning is problematic: conservative settings leave capacity on the table, aggressive settings risk overwhelming the host with missed [heartbeats](../terms/heartbeat.md) and cascading failures, and load characteristics change over time as new activity types, input sizes, and traffic patterns evolve.
+Temporal workers have several concurrency knobs: maximum concurrent [workflow tasks](../terms/workflow-task.md), maximum concurrent activities, number of pollers, and more. By default, these are set to fixed values that represent conservative guesses. Most teams either leave the defaults untouched or manually set them based on load testing, then never revisit them. Manual tuning is problematic: conservative settings leave capacity on the table, while aggressive settings risk overwhelming the worker. Load characteristics also change over time as worker code is modified and traffic patterns evolve.
 
-Worker autotuning (currently in preview) replaces this static guess with a dynamic feedback loop. It adjusts concurrency at runtime based on actual CPU and memory usage, ramping up when resources are available and backing off under pressure:
+Worker autotuning replaces this static configuration with a dynamic feedback loop. It adjusts concurrency at runtime based on actual CPU and memory usage, ramping up when resources are available and backing off under pressure:
 
 <!-- TODO: make sure this is up to date, and hardcode an infosupplier instead of leaving that up to the imagination. -->
 <!--SNIPSTART not-enabling-autotuning-good-->
@@ -32,4 +32,5 @@ func NewWorkerOptions(infoSupplier worker.SysInfoProvider) (worker.Options, erro
 ```
 <!--SNIPEND-->
 
-Set target resource utilization thresholds that make sense for your environment, and monitor the actual concurrency after enabling autotuning via SDK metrics showing current concurrent activities and workflow tasks. Be aware of the preview status -- test thoroughly in non-production environments before rolling out widely, and watch SDK release notes for changes to the API or behavior.
+<!-- TODO: Describe which specific worker/SDK metrics to monitor and what their target values should look like. For one thing, you probably want to see that autotuning is getting you close to your utilization targets configured in worker options. -->
+Set target resource utilization thresholds that make sense for your environment, and monitor after enabling autotuning via SDK metrics.

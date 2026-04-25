@@ -19,7 +19,7 @@ func TestWorkflowOrderInvariance(t *testing.T) {
 		for range rapid.IntRange(0, 19).Draw(t, "n") {
 			changes = append(changes, Change{
 				ID:   ulid.Make().String(),
-				Data: rapid.String().Draw(t, "data"),
+				Data: rapid.String().Draw(t, "data"), // TODO: No need for random data here, just Sprintf "data_" plus the index
 			})
 		}
 		// The last change has known data we can assert on.
