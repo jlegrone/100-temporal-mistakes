@@ -1,7 +1,7 @@
 # Not Making Activities Idempotent
 
 > [!TIP]
-> Temporal provides at-least-once execution semantics for activities -- even with max attempts set to 1, infrastructure failures can cause an activity to execute more than once. Design activities to produce the same result when run multiple times with the same input.
+> Temporal provides at-least-once execution semantics for activities -- even with max attempts set to 1, Temporal multi-cluster failover can allow an activity to execute more than once. Design activities to produce the same result when run multiple times with the same input.
 
 Setting `MaximumAttempts` to 1 on a [retry policy](terms/retry-policy.md) does not guarantee an activity runs only once. A [worker](terms/worker.md) can complete an activity (e.g. charge a credit card) then crash before reporting the result. The server, unaware of success, schedules the activity again on another worker. This also happens during network partitions and deployments.
 
@@ -13,3 +13,6 @@ Several strategies help:
 - **Natural idempotency**: Setting a value to a specific state (vs. incrementing) or upserting with a fixed ID is inherently idempotent.
 
 Always assume your activity can run more than once, and design accordingly.
+
+<!-- TODO: Provide a v1 and v2 example of a "CreateFooRecord" activity that uses upsert to write to a postgres db. -->
+<!-- TODO: Consider an idempotency test interceptor? -->

@@ -1,5 +1,7 @@
 # Not Knowing About the Batch Operations API
 
+<!-- TODO: Can be a powerful tool to rescue stuck or terminated or timed out workflows -->
+
 > [!TIP]
 > Temporal's batch operations API can terminate, [cancel](terms/cancelation.md), [signal](terms/signals.md), or reset many workflows matching a [visibility](terms/visibility.md) query in a single request. Use it instead of writing scripts that iterate over workflows one by one.
 
@@ -23,3 +25,6 @@ temporal batch signal \
 The power of batch operations depends on the quality of your visibility query. Use [search attributes](terms/search-attributes.md) to tag workflows with metadata (team, environment, version) so you can target exactly the right set. Always test your query first to verify it matches only the expected workflows -- a too-broad query on a destructive operation like terminate causes significant damage.
 
 See also: [Not Knowing About Workflow Reset](not-knowing-about-workflow-reset.md).
+
+<!-- TODO: Add a batch reset example with a build id last event -->
+<!-- TODO: Add a protip to test your workflow filter in the UI or CLI first using the List API (give example CLI command) -->

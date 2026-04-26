@@ -1,5 +1,7 @@
 # Not Enabling Ringpop TLS
 
+<!-- TODO: Delete this mistake from the repo. -->
+
 > [!TIP]
 > Even if you have configured TLS for client-to-server and inter-service gRPC communication, Ringpop cluster membership traffic may still be unencrypted. Enable Ringpop TLS separately to fully secure all inter-node communication.
 

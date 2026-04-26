@@ -1,4 +1,5 @@
 # Not Investing in a Temporal Platform Team
+<!-- TODO: Delete this mistake from the repo. -->
 
 > [!TIP]
 > As Temporal adoption grows across an organization, a dedicated platform team prevents fragmentation, duplicated effort, and operational drift. Without one, every team reinvents the wheel and operational quality varies wildly.
