@@ -5,7 +5,7 @@
 > [!TIP]
 > Network calls (HTTP requests, database queries, gRPC calls) in workflow code are re-executed on every [replay](terms/replay.md), producing potentially different results each time and breaking determinism. Move all network I/O into activities.
 
-Workflow code must be deterministic because it re-executes during replay to reconstruct state. A network call is inherently [non-deterministic](terms/non-determinism.md): it might return different data, fail differently, or time out depending on when it runs. Unlike activity calls whose results come from [history](terms/event-history.md), network calls made directly in workflow code execute again on every replay. The different result causes the workflow to take a different code path, produce different commands, or fail outright with a non-determinism error.
+Workflow code must be deterministic because it re-executes during replay to reconstruct state. A network call is inherently [non-deterministic](terms/non-determinism.md): it might return different data, fail differently, or time out depending on when it runs. Unlike activity calls whose results come from [history](terms/event-history.md), network calls made directly in workflow code execute again on every replay. A different result causes the workflow to take a different code path, produce different commands, and fail with a non-determinism error.
 
 <!--SNIPSTART performing-network-calls-bad-->
 [performing_network_calls_in_workflow_code/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/performing_network_calls_in_workflow_code/workflow.go)
@@ -53,5 +53,3 @@ func MyWorkflowV2(ctx workflow.Context) error {
 
 ```
 <!--SNIPEND-->
-
-If you need a small piece of non-deterministic data (like a UUID) without the overhead of a full activity, use `workflow.SideEffect` -- but for anything involving network I/O, prefer activities because they come with retries, timeouts, and [heartbeating](terms/heartbeat.md).

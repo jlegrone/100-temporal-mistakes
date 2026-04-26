@@ -1,11 +1,12 @@
 # Passing Too Much Information from Activities
 
 <!-- TODO: Switch to v1/v2 naming for the activity -->
+<!-- TODO: Link to Temporal external payload storage docs -->
 
 > [!TIP]
-> Activity results are persisted in [workflow history](../terms/event-history.md) -- every byte counts toward history size limits and [replay](../terms/replay.md) performance. Return only what the workflow actually needs, and store large data externally.
+> Activity results are persisted in [workflow history](../terms/event-history.md) -- every byte counts toward history size limits and [replay](../terms/replay.md) performance. Return only what the workflow actually needs, and store large payloads externally.
 
-Activities often fetch or produce data -- database records, API responses, file contents -- and a common mistake is returning all of it when the workflow only needs a small subset. Every activity result is serialized and stored as an event in the workflow history, then replayed in full when a workflow resumes. Oversized results push the workflow closer to the [history length limit](../overflowing-workflow-history-length.md), slow down replay, risk hitting the [individual payload size limit](../overflowing-maximum-individual-payload-size.md), and increase storage costs across millions of executions.
+Activities often fetch or produce data -- database records, API responses, file contents -- and a common mistake is returning all of it when the workflow only needs a small subset. Large activity return values push the workflow closer to the [history size limit](../overflowing-workflow-history-size.md), slow down replay, risk hitting the [individual payload size limit](../overflowing-maximum-individual-payload-size.md), and increase storage costs.
 
 Design activity return types the same way you'd design an API response -- include only the fields the caller needs:
 

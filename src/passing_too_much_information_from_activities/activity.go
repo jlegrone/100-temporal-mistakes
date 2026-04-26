@@ -17,6 +17,7 @@ var db interface {
 
 // @@@SNIPSTART passing-too-much-information-from-activities-bad
 
+// TODO: Make it more obvious this is an activity
 // Bad: returning the full record
 func LookupCustomerBad(ctx context.Context, customerID string) (*Customer, error) {
 	return db.GetCustomer(ctx, customerID)

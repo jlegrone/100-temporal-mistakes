@@ -1,7 +1,8 @@
 # Not Waiting for Child Workflows to Start
 
 <!-- TODO: Add a unit test demonstrating the issue (with a V1 workflow version) and a fix (with V2). -->
-<!-- TODO: Add a "sync" ExecuteChildWorkflow helper to the workflowhelpers package that demonstrates how to avoid this issue in Go. Maybe it could also be an interceptor? Add a "v3" version that is exactly the same as the v1 version of the workflow but with this helper/interceptor enabled and demonstrate that the behavior is fixed in a unit test. -->
+<!-- TODO: Add a ExecuteDisconnectedChildWorkflow helper to the workflowhelpers package that demonstrates how to avoid this issue in Go. Maybe it could also be an interceptor? Add a "v3" version that is exactly the same as the v1 version of the workflow but with this helper/interceptor enabled and demonstrate that the behavior is fixed in a unit test. -->
+<!-- TODO: Find out if this bug / surprising behavior also exists in TypeScript & Python SDKs. -->
 
 > [!TIP]
 > `ExecuteChildWorkflow()` doesn't immediately schedule the [child workflow](terms/child-workflow.md). If the parent completes before the server processes the creation, the child may never start.
@@ -28,5 +29,3 @@ func MyWorkflow(disconnectedCtx workflow.Context, input Input) error {
 
 ```
 <!--SNIPEND-->
-
-The key distinction: `childFuture.Get()` waits for the child to **complete**; `childFuture.GetChildWorkflowExecution().Get()` waits only for the child to **start**. For fire-and-forget semantics, waiting for the start is the minimum.
