@@ -3,9 +3,9 @@
 > [!TIP]
 > Polling loops with `workflow.Sleep()` add timer events to [history](terms/event-history.md) on every iteration, bloating it over time. Use [signals](terms/signals.md) to push state changes, or offload polling to an activity.
 
-A loop that periodically checks a condition via `workflow.Sleep()` generates roughly 2,880 timer event pairs per day, plus activity events for each check. A workflow polling for a week can easily exceed the 50,000 event [history limit](overflowing-workflow-history-length.md).
+If the condition change comes from an external system or workflow that you control, have it send a signal -- this consumes no additional resources while waiting and allows your workflow to be woken up in real time.
 
-If the condition change comes from an external system, have it send a signal -- this adds zero events while waiting:
+<!-- TODO: Just delete the signal code example. This is pretty self-evident. -->
 
 <!--SNIPSTART writing-polling-loops-in-workflow-code-signal-->
 [writing_polling_loops_in_workflow_code/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/writing_polling_loops_in_workflow_code/workflow.go)
@@ -23,7 +23,7 @@ func WaitForStatusUpdate(ctx workflow.Context) (Status, error) {
 ```
 <!--SNIPEND-->
 
-If you need a timeout alongside a signal, use `workflow.NewSelector` to combine a signal channel with a timer. If you genuinely need to poll an external system, poll inside an activity with [heartbeats](terms/heartbeat.md) -- the activity can poll as frequently as needed without adding events to workflow history:
+If it is an external system that you do not control, then you can poll from an activity:
 
 <!--SNIPSTART writing-polling-loops-in-workflow-code-activity-->
 [writing_polling_loops_in_workflow_code/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/writing_polling_loops_in_workflow_code/workflow.go)
@@ -41,7 +41,7 @@ func PollUntilReady(ctx context.Context) (Result, error) {
 		if result.Ready {
 			return result, nil
 		}
-		activity.RecordHeartbeat(ctx, result.Status)
+		activity.RecordHeartbeat(ctx, result)
 		time.Sleep(30 * time.Second) // Regular time.Sleep, not workflow.Sleep
 	}
 }
@@ -49,4 +49,5 @@ func PollUntilReady(ctx context.Context) (Result, error) {
 ```
 <!--SNIPEND-->
 
-For very long polling durations, combine the activity approach with [ContinueAsNew](terms/continue-as-new.md).
+For a very long polling back off durations, you can use activity retries as you're pulling mechanism instead in order to free of resources on your worker between polling attempts.
+<!-- TODO: Add activity retry based polling example. The temporal application error returned by the activity should include structured result instead of putting that in the heartbeat details. -->

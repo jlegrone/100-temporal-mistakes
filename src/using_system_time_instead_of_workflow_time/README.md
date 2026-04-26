@@ -1,10 +1,12 @@
 # Using System Time Instead of Workflow Time
 
+<!-- TODO: Update the wording to not be Go SDK specific. -->
 > [!TIP]
 > `time.Now()` returns different values on [replay](terms/replay.md), breaking determinism. Use `workflow.Now()` for the current time and `workflow.Sleep()` for delays -- both are deterministic and durable.
 
 Using the system clock directly in workflow code is a common determinism violation. `time.Now()` in Go (or `Date.now()` in TypeScript, `datetime.now()` in Python) returns the current wall-clock time, which differs every time the code executes. Since workflow code re-executes during replay, this causes the workflow to potentially make different decisions.
 
+<!-- TODO: Update example to a time based ContinueAsNew loop (if >24h since wf started, continue as new). -->
 <!--SNIPSTART using-system-time-bad-->
 [using_system_time_instead_of_workflow_time/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_system_time_instead_of_workflow_time/workflow.go)
 ```go
@@ -65,6 +67,6 @@ func MyWorkflowV2Sleep(ctx workflow.Context) error {
 ```
 <!--SNIPEND-->
 
-System time violations are especially tricky because they often work fine in development -- replay happens so quickly that `time.Now()` returns a nearly identical value. The bug only surfaces when a workflow replays hours or days later after a long [worker](terms/worker.md) outage or redeployment.
+Temporal timers (`workflow.Sleep`, `workflow.NewTimer`) are both deterministic and durable: they survive worker restarts and produce the same behavior on replay. In the TypeScript SDK, `Date.now()` and `setTimeout` are automatically patched inside workflow code.
 
-Temporal timers (`workflow.Sleep`, `workflow.NewTimer`) are both deterministic and durable: they survive worker restarts and produce the same behavior on replay. In the TypeScript SDK, `Date.now()` and `setTimeout` are automatically patched inside workflow code, but importing external libraries that use raw system time internally can still break determinism.
+<!-- TODO: Are sandboxes opt-in for any SDKs? Is it possible to misconfigure/disable them? Document/warn if so. -->

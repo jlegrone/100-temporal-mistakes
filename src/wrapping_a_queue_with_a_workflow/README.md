@@ -1,7 +1,8 @@
-# Wrapping a Queue with a Workflow
+# Implementing a Queue with a Workflow
+<!-- TODO: Rename this file to match the new title. -->
 
 > [!TIP]
-> Using a single workflow as a message queue (receiving [signals](terms/signals.md) as "messages") creates a scalability bottleneck. Temporal scales horizontally across many workflows, not vertically within one.
+> Using a single workflow as a message queue (receiving [signals](terms/signals.md) as "messages") may create a scalability bottleneck. Temporal scales horizontally across many workflows, not vertically within one.
 
 A tempting pattern is using a long-running workflow as a message queue: external systems send signals and the workflow processes them one by one. On the surface this gives you durability and retries for free, but it breaks down under real load.
 
@@ -24,3 +25,5 @@ func StartTask(ctx context.Context, temporalClient client.Client, taskID string,
 <!--SNIPEND-->
 
 If you need some workflow-level state, partition across multiple workflows (e.g., by tenant ID or hash of message key). If you genuinely need message queue semantics (ordering, consumer groups, backpressure), use a purpose-built system (Kafka, SQS, RabbitMQ) and have workflows consume from it via activities.
+
+<!-- TODO: add another entry for wrapping queues/jobs with workflows add to queue (eg. activity 1, result activity two). Exceptions to this would be external systems that enforce fairness, resource based scheduling, etc. But temporal is making progress here too! -->

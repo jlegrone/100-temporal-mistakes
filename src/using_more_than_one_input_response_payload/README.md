@@ -1,5 +1,7 @@
 # Using More Than One Input/Response Payload
 
+<!-- TODO: Mention the backwards compatibility aspects of not using multiple request or response values, even within the context of a single language. -->
+
 > [!TIP]
 > Some SDKs (Go, Java) allow multiple positional arguments for workflow and activity inputs, but this breaks cross-SDK interoperability and makes schema evolution harder. Stick to a single struct/object for both input and output.
 
@@ -37,6 +39,8 @@ func MyWorkflowV2(ctx workflow.Context, input MyWorkflowInput) error {
 ```
 <!--SNIPEND-->
 
+<!-- TODO: Delete the activity example code. For the workflow example, maybe show a cross-language call if it's not too much boilerplate? -->
+
 <!--SNIPSTART using-more-than-one-input-response-payload-activity-->
 [using_more_than_one_input_response_payload/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_more_than_one_input_response_payload/workflow.go)
 ```go
@@ -60,7 +64,5 @@ func MyActivityV2(ctx context.Context, input MyActivityInput) (MyActivityOutput,
 
 ```
 <!--SNIPEND-->
-
-This convention is a small upfront cost that pays for itself every time you evolve workflow contracts, interoperate across SDKs, or debug production issues.
 
 See also: [Breaking changes to payloads](../breaking-changes-to-payloads.md).
