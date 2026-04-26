@@ -1,10 +1,9 @@
 # Terminating Rather Than Canceling
 
+<!-- TODO: Share temporal cli examples for cancel and batch cancel. -->
+
 > [!TIP]
-> [Termination](terms/terminate.md) is `kill -9` -- no cleanup runs. [Cancellation](terms/cancelation.md) is cooperative -- the workflow can run compensation logic before completing. Default to cancellation.
-
-When operators need to stop a workflow, many default to termination because it feels decisive. But termination denies the workflow any opportunity to clean up: resources held (database locks, cloud infrastructure) aren't released, multi-step processes are left partially completed, and the workflow's final state tells you nothing about what was happening.
-
-Cancellation is cooperative: the workflow receives a cancellation request, catches it, runs compensation logic, and completes gracefully. Default to `tctl workflow cancel` or the "Cancel" action in the UI. Reserve termination for true emergencies where the workflow is stuck in a tight loop or causing active harm. Consider restricting terminate permissions via [namespace](terms/namespace.md)-level access controls.
+> Terminating workflows should only be done as a last resort. When you wish to stop a workflow execution, try cancelation instead. This allows the workflow to perform graceful cleanup and run compensating actions if it needs to.
 
 See also: [Not Using a Disconnected Context for Cleanup](not_using_disconnected_context_for_cleanup/README.md).
+<!-- TODO: Also link to deadlock on cancelation entry and resetting a stuck or terminated workflow entry. -->

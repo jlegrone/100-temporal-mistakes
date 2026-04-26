@@ -1,4 +1,5 @@
 # Underutilizing Namespaces
+<!-- TODO: Delete this mistake from the repo. -->
 
 > [!TIP]
 > [Namespaces](terms/namespace.md) provide isolation boundaries for rate limits, [visibility](terms/visibility.md), and access controls. Many teams put everything in the "default" namespace, losing all the benefits of isolation.
