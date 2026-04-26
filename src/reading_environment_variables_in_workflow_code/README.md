@@ -45,5 +45,3 @@ func MyWorkflowV2(ctx workflow.Context, input WorkflowInput) error {
 
 ```
 <!--SNIPEND-->
-
-For values that must be read at runtime, use `workflow.SideEffect` to capture and record them in [history](terms/event-history.md). Environment variables are fine to read in activity code, worker initialization, or any code that runs outside the workflow function.

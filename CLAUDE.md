@@ -38,3 +38,7 @@ Make sure that all "good" activity code examples follow the recommended timeout 
 ----
 
 Where it makes sense, reuse the same code examples. Eg. when you want to show a workflow fanout pattern from multiple mistake entries, you can embed the same snip id from a single code sample in both.
+
+----
+
+Use "Request"/"Response" (eg. MyWorkflowRequest) instead of "Input"/"Output" (MyWorkflowInput) in code examples.

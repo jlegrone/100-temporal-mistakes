@@ -3,10 +3,12 @@
 > [!TIP]
 > Some SDKs (Go, Java) allow multiple positional arguments for workflow and activity inputs, but this breaks cross-SDK interoperability and makes schema evolution harder. Stick to a single struct/object for both input and output.
 
-Some Temporal SDKs allow defining workflow and activity functions with multiple positional parameters, where each argument is serialized as a separate [payload](../terms/payload.md) in the [event history](../terms/event-history.md). This creates problems: the TypeScript and Python SDKs only support a single input argument, making cross-SDK calls painful; adding, removing, or reordering positional arguments is a breaking change; and call sites like `StartWorkflow("MyWorkflow", "user-123", 500, "USD")` are opaque without reading the function signature.
+Some Temporal SDKs allow defining workflow and activity functions with multiple positional parameters, where each argument is serialized as a separate [payload](../terms/payload.md) in the [event history](../terms/event-history.md). This creates problems: the TypeScript and Python SDKs only support a single input argument, making cross-worker calls impossible. Adding, removing, or reordering positional arguments is also a breaking change; and call sites like `StartWorkflow("MyWorkflow", "user-123", 500, "USD")` make argument names opaque without reading the function signature.
 
-Always wrap inputs into a single struct, and return a single result struct rather than multiple return values (beyond the error):
+Always wrap inputs into a single request object, and return a single result object rather than multiple values (beyond the error):
 
+<!-- TODO: Add multiple (unnamed) return values (in addition to the error) in the v1 example as well. -->
+<!-- TODO: Use "Request"/"Response" instead of "Input"/"Output" in code examples. -->
 <!--SNIPSTART using-more-than-one-input-response-payload-workflow-->
 [using_more_than_one_input_response_payload/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_more_than_one_input_response_payload/workflow.go)
 ```go
