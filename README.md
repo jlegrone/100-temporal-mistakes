@@ -120,21 +120,12 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
 <!-- TODO: The "not knowing" phrasing is awkward -->
 - [Not knowing about `workflow reset`](src/not-knowing-about-workflow-reset.md)
 - [Not knowing about batch operations API](src/not-knowing-about-batch-operations-api.md)
-- [Underutilizing namespaces](src/underutilizing-namespaces.md)
 - [Not draining activity tasks before graceful worker shutdown](src/not_draining_activity_tasks_before_shutdown/)
 - [Downloading workflow history from UI with "DecodePayloads" option enabled](src/downloading-history-with-decode-payloads.md)
 - [Not validating replay safety before worker deployments](src/not_validating_replay_safety_before_deployments/)
-<!-- TODO: Delete the entries relating to self-hosting Temporal server -->
-- [Not setting up TLS](src/not_setting_up_tls/)
-- [Not enabling ringpop TLS](src/not-enabling-ringpop-tls.md)
-- [Not setting up persistence rate limits](src/not-setting-up-persistence-rate-limits.md)
-- [Not setting up namespaces rate limits](src/not-setting-up-namespaces-rate-limits.md)
 
 ## Other
 - [Starting workflows on the wrong task queue](src/starting-workflows-on-wrong-task-queue.md)
-- [Not understanding why you're using Temporal](src/not-understanding-why-youre-using-temporal.md)
-- [Not investing in a Temporal platform team (?)](src/not-investing-in-temporal-platform-team.md)
-- [Using the Temporal UI use cases other than debugging (eg. as the main interface for end users)](src/using-temporal-ui-for-non-debugging.md)
 
 ---
 

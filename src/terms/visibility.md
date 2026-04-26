@@ -8,7 +8,6 @@ Standard visibility (backed by the same database as persistence) provides basic 
 
 - [Depending on List Workflow API](../depending-on-list-workflow-api.md)
 - [Querying Closed Workflows](../querying-closed-workflows.md)
-- [Underutilizing Namespaces](../underutilizing-namespaces.md)
 - [Search Attributes](search-attributes.md)
 - [Namespace](namespace.md)
 - [Temporal Server Backend](temporal-server-backend.md)

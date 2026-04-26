@@ -6,8 +6,6 @@ Namespaces enable multi-tenancy, environment separation (dev/staging/prod), and 
 
 ## Related
 
-- [Underutilizing Namespaces](../underutilizing-namespaces.md)
-- [Not Setting Up Namespaces Rate Limits](../not-setting-up-namespaces-rate-limits.md)
 - [Not Properly Scoping Semantic Workflow IDs](../not-properly-scoping-semantic-workflow-ids.md)
 - [Dynamic Config](dynamic-config.md)
 - [Visibility](visibility.md)
