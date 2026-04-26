@@ -1,4 +1,5 @@
 # Not Setting Up Namespace Rate Limits
+<!-- TODO: Delete this mistake from the repo. -->
 
 > [!TIP]
 > Without per-namespace rate limits, one [namespace](terms/namespace.md)'s traffic can starve all others. Configure namespace-level rate limits via [dynamic configuration](terms/dynamic-config.md) to ensure fair resource allocation, especially in multi-tenant setups.

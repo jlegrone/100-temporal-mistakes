@@ -1,4 +1,5 @@
 # Not Setting Up Persistence Rate Limits
+<!-- TODO: Delete this mistake from the repo. -->
 
 > [!TIP]
 > Without persistence rate limits, a burst of workflow traffic can overwhelm your database, causing cascading failures across all [namespaces](terms/namespace.md). Configure persistence rate limits via [dynamic configuration](terms/dynamic-config.md) to protect your [Temporal server backend](terms/temporal-server-backend.md).
