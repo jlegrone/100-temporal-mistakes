@@ -3,7 +3,7 @@
 <!-- TODO: Detail how to check if any workflows are still active on a specific version (show the full temporal command to query open workflows with the search attribute) and include a test case for this (using the dev server). -->
 
 > [!TIP]
-> Even when you know to use patching, doing it wrong causes the same non-determinism errors you were trying to avoid. Never remove the old code branch until every running workflow has advanced past the patched point.
+> Even when you know to use patching, doing it wrong causes the same replay errors you were trying to avoid. Never remove the old code branch until every running workflow has advanced past the patched point.
 
 [Versioning](terms/versioning.md) APIs like `workflow.GetVersion` and `patched()` are the right tool for evolving workflow code, but they have a lifecycle that must be respected. Removing the old branch too early, using incorrect version numbers, or nesting patches improperly leads to the same [non-determinism](terms/non-determinism.md) errors that patching was supposed to prevent. A particularly common mistake is removing the old code path prematurely: you deploy version 2, see it working, and clean up the old branch, but some long-running workflow started weeks ago that hasn't reached the patched code yet. When it does, it replays with the new code, finds no matching old branch, and fails. The patching lifecycle also has a deprecation step that people skip -- jumping straight from "both branches present" to "old branch removed" risks breaking workflows that already have the patch marker in their [history](terms/event-history.md).
 
@@ -12,3 +12,15 @@ These mistakes are insidious because they pass all your regular tests. The new c
 The correct lifecycle is: (1) introduce the patch with both old and new branches, (2) wait for all workflows started before step 1 to complete or advance past the patched point, (3) deprecate the patch by removing the old branch but keeping the version/patch marker, (4) wait for all workflows from steps 1-2 to complete, (5) remove the patch entirely. Use replay tests with real [workflow histories](terms/event-history.md) in CI to catch non-determinism errors before production. If you are unsure whether all affected workflows have completed, keep the old branch -- the cost of dead code is low compared to breaking running workflows. If a section of code needs frequent changes, restructure it so the changing logic lives in an activity rather than in workflow code, since activity code can change freely without versioning concerns.
 
 See also: [Not Using Workflow Versioning](not_using_workflow_versioning/README.md), [Not Validating Replay Safety Before Deployments](not_validating_replay_safety_before_deployments/README.md).
+
+<!-- 
+TODO: Recommendations:
+- Use case statements/matching rather than if/else (easier to extend with new revisions of code). Maybe there's also a subtle bug with forward compatibility of if/else where the "else" condition will get hit if an old version of the worker replays a history from a newer version if the newer version had a higher max patch version? Need to explore this more.
+- Never use same patch ID more than once in the same workflow
+- Always increment max version by exactly 1
+- Be vigilant when deleting min version handler -> maybe there could be a CLI tool for this? (check our internal tooling). Must also check for unset SA since old executions may not have been replayed yet after the latest deployment. Wait before removal entirely, so you can distinguish between old and new versions.
+- Bump the min compatible version
+- Consider worker versioning + pinned workflows
+- Put version checks at the top of the workflow or you won't get search attributes until the check is evaluated (could be a long time).
+- Limit maximum code age with time-based continue as new.
+ -->

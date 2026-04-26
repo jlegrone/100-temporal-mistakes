@@ -42,3 +42,9 @@ Where it makes sense, reuse the same code examples. Eg. when you want to show a 
 ----
 
 Use "Request"/"Response" (eg. MyWorkflowRequest) instead of "Input"/"Output" (MyWorkflowInput) in code examples.
+
+----
+
+Look for and point out ways to avoid any sentences with a tone that sounds judgemental.
+
+----
