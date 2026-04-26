@@ -283,4 +283,54 @@ How to come across:
 
 ##### Outline
 
-* \<move things from "potential", but *leave some behind\!*\>
+Total: ~32 min talk + Q&A. Four mental-model sections, each with 2–3 mistakes that fall out of the same misunderstanding, ending with the design pattern that prevents them. Closing distills the patterns into a small toolkit. No live demos — code on slides.
+
+**Open (~3 min)**
+* Why this talk: collected mistakes from years of Datadog Temporal use; speaking as a practitioner, not a vendor.
+* Frame: Temporal *is* complicated. The complications exist for good reasons (durability, replay, at-least-once). The way through is a handful of mental models, not a checklist.
+* Roadmap: 4 mental models → 4 patterns at the end.
+
+**Part 1 — Replay is not what you think (~7 min)**
+* Mental model: workflow code re-executes; activities don't.
+* Mistake: Thinking replay means re-running activities. *(sets up the model)*
+* Mistake: Performing network calls / using system time in workflow code. *(non-determinism error shown via slide screenshot)*
+* Mistake: Not using the return value in a side effect. *(the trap that looks correct)*
+* Pattern: keep workflow code deterministic; activities are the boundary. SDK sandboxes / static analysis catch the rest.
+
+**Part 2 — Activities are at-least-once, always (~7 min)**
+* Mental model: an activity can run more than once, even with `MaxAttempts=1`.
+* Mistake: Not making activities idempotent.
+* Mistake: Preventing activity retries — the three timeout misconfigurations. *(`#presentation-include` from the repo)*
+* Mistake: Setting too-short timeouts (base on outage tolerance, not happy path).
+* Pattern: idempotent by construction; heartbeat + start-to-close + schedule-to-close on every activity.
+
+**Part 3 — Cancellation is cooperative, not a kill (~7 min)**
+* Mental model: cancellation is a request the workflow has to handle. Termination and execution-timeout are `kill -9`.
+* Mistake: Deadlocking when workflow canceled. *(before/after code on slide — selector fix)*
+* Mistake: Not using a disconnected context for cleanup.
+* Mistake: Assuming workflow timeouts allow graceful cleanup. *(the surprise that lands well)*
+* Pattern: workflows orchestrate cleanup via selector + disconnected context + soft (internal) timeout.
+
+**Part 4 — Scale out, not up (~5 min)**
+* Mental model: Temporal scales across many workflows, not within one.
+* Mistake: Doing too many things in one workflow / wrapping a queue with a workflow. *(combine into one beat)*
+* Mistake: Not using ContinueAsNew (history limits + code age).
+* Pattern: fan-out via dedicated child workflows + ContinueAsNew for long-lived state.
+* Brief Datadog-scale anecdote here if appropriate (with permission).
+
+**Close — the toolkit (~3 min)**
+* Distill the four patterns into a one-slide checklist:
+  1. Determinism: keep non-deterministic work in activities; lean on the SDK sandbox/static analysis.
+  2. Idempotency + complete activity timeout configuration on every activity.
+  3. Cancellation-aware workflows with selector + disconnected context.
+  4. Fan out across many small workflows + ContinueAsNew.
+* Bonus tools to know about (one slide, no deep dive): replay tests in CI, batch operations API, workflow reset.
+* Pointer to the repo for the ~50 mistakes the talk didn't cover.
+* Q&A.
+
+**Things explicitly left in Potential (not in talk)**
+* Versioning / patching lifecycle (too deep for 30-40 min; mention briefly under "replay tests in CI").
+* Most observability mistakes (STSL, sync match rate, autotuning) — operational, niche; cut.
+* Most payload mistakes (lossy serialization, multiple inputs, sensitive data) — important but not foundational; cut.
+* All "not knowing about X" operational tools beyond the 3 in the bonus slide.
+* Custom orchestration frameworks, polling loops, signal-order, semantic IDs, child-workflow start race — defer to repo.
