@@ -9,13 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/temporal"
 )
-
-// rateLimitBackoffMultiplier scales the next retry delay when the upstream
-// returns 429 Too Many Requests, so callers slow down without exhausting the
-// activity's ScheduleToClose budget too quickly.
-const rateLimitBackoffMultiplier = 1.5
 
 // HTTPResponseError translates an HTTP response into a [temporal.ApplicationError]
 // suitable for returning from an activity. It returns nil for 2xx and 3xx
@@ -47,7 +43,13 @@ func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 
 	switch resp.StatusCode {
 	case http.StatusTooManyRequests:
-		nextDelay := time.Duration(float64(GetNextRetryDelay(ctx)) * rateLimitBackoffMultiplier)
+		var nextDelay time.Duration
+		if activity.IsActivity(ctx) {
+			if info := activity.GetInfo(ctx); info.RetryPolicy != nil {
+				// Back off more aggressively
+				nextDelay = calculateNewRetryDelay(info.RetryPolicy, info.Attempt, 3)
+			}
+		}
 		return temporal.NewApplicationErrorWithOptions(msg, errType, temporal.ApplicationErrorOptions{
 			NextRetryDelay: nextDelay,
 		})

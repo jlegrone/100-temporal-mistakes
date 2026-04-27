@@ -118,7 +118,7 @@ func TestGetNextRetryDelay(t *testing.T) {
 			},
 			wantDelay: time.Second,
 		},
-		"zero backoff coefficient defaults to two": {
+		"zero backoff coefficient is replaced with the temporal default of 2": {
 			info: activity.Info{
 				Attempt: 3,
 				RetryPolicy: &temporal.RetryPolicy{
@@ -127,15 +127,15 @@ func TestGetNextRetryDelay(t *testing.T) {
 			},
 			wantDelay: 4 * time.Second,
 		},
-		"zero maximum interval defaults to one hundred times initial": {
+		"zero maximum interval applies no cap": {
 			info: activity.Info{
-				Attempt: 20,
+				Attempt: 5,
 				RetryPolicy: &temporal.RetryPolicy{
 					InitialInterval:    time.Second,
 					BackoffCoefficient: 2.0,
 				},
 			},
-			wantDelay: 100 * time.Second,
+			wantDelay: 16 * time.Second,
 		},
 		"large attempt does not overflow": {
 			info: activity.Info{
@@ -164,4 +164,21 @@ func TestGetNextRetryDelay_NonActivityContext(t *testing.T) {
 	assert.NotPanics(t, func() {
 		assert.Equal(t, time.Duration(0), GetNextRetryDelay(t.Context()))
 	})
+}
+
+// TestGetNextRetryDelay_OverflowingAttemptStaysPositive verifies that an
+// attempt large enough to overflow the exponential never produces a
+// non-positive duration, regardless of how the host platform converts +Inf
+// to int64. The exact fallback value differs by architecture (e.g.,
+// math.MaxInt64 on arm64, time.Hour on amd64), so we only assert the
+// platform-independent guarantee.
+func TestGetNextRetryDelay_OverflowingAttemptStaysPositive(t *testing.T) {
+	delay := getNextRetryDelay(activity.Info{
+		Attempt: 1000,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:    time.Second,
+			BackoffCoefficient: 2.0,
+		},
+	})
+	assert.Positive(t, delay)
 }
