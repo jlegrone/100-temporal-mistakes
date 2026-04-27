@@ -43,11 +43,36 @@ Should also:
 
 ---
 
-## Activities: Configuring Timeouts
+## Activities: Handling Downstream Service Outages
 
-<!-- New code example, this time showing the workflow code that invokes the payment activity. -->
+<!-- New code example, this time showing the workflow code that invokes the payment activity. Set a 30s start to close timeout and a 1m schedule to close timeout. -->
 ```go
 ```
+
+<!-- Update the schedule to close timeout to 1h in the code example. Speaker notes: Avoid setting schedule to close too short. Pick a value based on how long you want to retry in the face of a serious system outage. -->
+
+---
+
+## Activities: Handling Worker Disruptions
+
+Choosing between StartToClose and Heartbeat timeouts
+
+<!-- New workflow code example, this time invoking a (longer running) AwaitPaymentReconciliation activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
+```go
+```
+
+<!-- Updated code example: Change the start to close timeout to 5m.
+
+Speaker notes:
+- A 30s start to close timeout made sense for the previous use case, but what about for an activity that could run for much longer? Setting too short a value could mean that some requests never complete, no matter how many retry attempts are made.
+- But increasing the start to close timeout now also means that if the worker crashes or becomes unresponsive, we'd have to wait much longer before Temporal retries the activity.
+-->
+
+<!-- Updated code example: Replace the start to close timeout with a 30s heartbeat timeout.
+
+Speaker notes:
+- Replacing a start to close timeout with heartbeat timeout avoids the tradeoff between retrying quickly when the worker fails, and allowing your longest-running tasks to complete. Now the activity can run as long as it needs to, up to the schedule to close timeout, but is retried quickly if the worker becomes unresponsive.
+ -->
 
 ---
 
