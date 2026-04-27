@@ -114,9 +114,8 @@ Choosing between StartToClose and Heartbeat timeouts
 
 <!-- Updated code example: Change the start to close timeout to 5m.
 
-Speaker notes:
-- A 30s start to close timeout made sense for the previous use case, but what about for an activity that could run for much longer? Setting too short a value could mean that some requests never complete, no matter how many retry attempts are made.
-- But increasing the start to close timeout now also means that if the worker crashes or becomes unresponsive, we'd have to wait much longer before Temporal retries the activity.
+Speaker note:
+So we can try increasing the start to close timeout, but now this also means that if the worker crashes or becomes unresponsive, we'd have to wait much longer before Temporal retries the activity.
 -->
 
 <!-- Updated code example: Replace the start to close timeout with a 30s heartbeat timeout.
