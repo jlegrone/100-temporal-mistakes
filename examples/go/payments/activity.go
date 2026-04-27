@@ -51,12 +51,13 @@ func NewWorker(endpoint string) *Worker {
 // The Idempotency-Key header is derived from the workflow + activity identity
 // so retries are coalesced by the upstream service.
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
-	httpReq, err := w.buildChargeRequest(ctx, req, activityhelpers.GetIdempotencyToken(ctx))
+	httpReq, err := w.buildChargeRequest(ctx, req)
 	if err != nil {
 		return nil, temporal.NewApplicationErrorWithCause(
 			err.Error(), "BuildRequest", err,
 		)
 	}
+	httpReq.Header.Set("Idempotency-Key", activityhelpers.GetIdempotencyToken(ctx))
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -80,10 +81,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 }
 
 // buildChargeRequest serializes a ChargePaymentRequest as JSON and builds the
-// upstream HTTP request, including the Content-Type and Idempotency-Key
-// headers. Errors here represent programmer bugs (bad endpoint URL, request
-// fields that fail to marshal) so callers should treat them as non-retryable.
-func (w *Worker) buildChargeRequest(ctx context.Context, req ChargePaymentRequest, idempotencyKey string) (*http.Request, error) {
+// HTTP request.
+func (w *Worker) buildChargeRequest(ctx context.Context, req ChargePaymentRequest) (*http.Request, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -93,6 +92,5 @@ func (w *Worker) buildChargeRequest(ctx context.Context, req ChargePaymentReques
 		return nil, fmt.Errorf("build http request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Idempotency-Key", idempotencyKey)
 	return httpReq, nil
 }
