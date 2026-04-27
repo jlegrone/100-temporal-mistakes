@@ -85,7 +85,7 @@ func TestChargePayment_RateLimitedReturnsApplicationError(t *testing.T) {
 	var appErr *temporal.ApplicationError
 	require.True(t, errors.As(err, &appErr), "expected ApplicationError, got %T: %v", err, err)
 	require.False(t, appErr.NonRetryable())
-	require.Equal(t, "RateLimited", appErr.Type())
+	require.Equal(t, "TooManyRequests", appErr.Type())
 }
 
 func TestChargePayment_GenericServerErrorIsRetryable(t *testing.T) {

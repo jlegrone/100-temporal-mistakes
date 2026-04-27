@@ -9,9 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"time"
 
 	"go.temporal.io/sdk/temporal"
 
@@ -68,38 +66,17 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 	}
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusAccepted, http.StatusOK:
-		var out ChargePaymentResponse
-		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-			return nil, temporal.NewApplicationErrorWithCause(
-				fmt.Sprintf("decode response: %v", err), "DecodeResponse", err,
-			)
-		}
-		return &out, nil
-	case http.StatusBadRequest:
-		return nil, temporal.NewNonRetryableApplicationError(
-			fmt.Sprintf("payment rejected: %s", readSnippet(resp.Body)),
-			"BadRequest",
-			nil,
-		)
+	if err := activityhelpers.HTTPResponseError(ctx, resp); err != nil {
+		return nil, err
+	}
 
-	case http.StatusTooManyRequests:
-		// Multiply the server-computed retry delay by 1.5 to slow down callers
-		// when the upstream is overloaded.
-		nextDelay := time.Duration(float64(activityhelpers.GetNextRetryDelay(ctx)) * 1.5)
-		return nil, temporal.NewApplicationErrorWithOptions(
-			fmt.Sprintf("rate limited: %s", readSnippet(resp.Body)),
-			"RateLimited",
-			temporal.ApplicationErrorOptions{NextRetryDelay: nextDelay},
-		)
-
-	default:
-		return nil, temporal.NewApplicationError(
-			fmt.Sprintf("payment service error %d: %s", resp.StatusCode, readSnippet(resp.Body)),
-			"ServiceError",
+	var out ChargePaymentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, temporal.NewApplicationErrorWithCause(
+			fmt.Sprintf("decode response: %v", err), "DecodeResponse", err,
 		)
 	}
+	return &out, nil
 }
 
 // buildChargeRequest serializes a ChargePaymentRequest as JSON and builds the
@@ -118,11 +95,4 @@ func (w *Worker) buildChargeRequest(ctx context.Context, req ChargePaymentReques
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Idempotency-Key", idempotencyKey)
 	return httpReq, nil
-}
-
-// readSnippet returns at most 256 bytes of an error response body for inclusion
-// in error messages.
-func readSnippet(r io.Reader) string {
-	b, _ := io.ReadAll(io.LimitReader(r, 256))
-	return string(bytes.TrimSpace(b))
 }
