@@ -11,20 +11,74 @@ Should also:
 
 ---
 
-Activities: Handling Downstream Service Errors
+## Activities: Handling Downstream Service Errors
 
-<!-- Screenshot of simple example activity that calls an generic payments API and returns the result (modeled after Stripe) -->
+<!-- Code for simple example activity that calls an generic payments API and returns the result (modeled after Stripe) -->
+```go
+```
 
+---
 
+## Activities: Avoid Amplifying Invalid Requests
+
+<!-- Updated code example that inspects http status code and returns non-retryable TemporalApplicationError for bad requests (HTTP 400) (use switch statement for HTTP status so more cases can easily be added in the future) -->
+```go
+```
+
+---
+
+## Activities: Avoid Overloading Services With Retries
+
+<!-- Updated code example that also increases the next retry backoff time when external service returns a resource overloaded error (HTTP 429) using the activityhelpers.GetNextRetryDelay function and multiplying its return value by 1.5. -->
+```go
+```
+
+---
+
+## Activities: Implementing Idempotency
+
+<!-- Update code example to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and adding it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
+```go
+```
+
+---
+
+## Activities: Configuring Timeouts
+
+<!-- New code example, this time showing the workflow code that invokes the payment activity. -->
+```go
+```
 
 ---
 
 ## Overview of Activity Timeouts & Retry Policy
 
-<!-- 1. Screenshot of StartActivityOptions from the Go SDK -->
-<!-- 2. Highlight the options in the screenshot that we'll talk about -->
+<!-- 1. Screenshot of StartActivityOptions (every timeout & retry policy field) from the Go SDK -->
+```go
+```
+
+<!-- 2. Highlight the options in the screenshot that we'll talk about in subsequent slides -->
 
 ---
+
+## Activities: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
