@@ -281,7 +281,7 @@ How to come across:
 * Timeout and retry policy lint/simulator.
 * CLI tool to check whether any workflows are still active on a given patch version (so the old branch is safe to remove).
 
-##### Outline
+##### Draft Outline
 
 Total: ~32 min talk + Q&A. Four mental-model sections, each with 2–3 mistakes that fall out of the same misunderstanding, ending with the design pattern that prevents them. Closing distills the patterns into a small toolkit. No live demos — code on slides.
 
@@ -334,3 +334,67 @@ Total: ~32 min talk + Q&A. Four mental-model sections, each with 2–3 mistakes 
 * Most payload mistakes (lossy serialization, multiple inputs, sensitive data) — important but not foundational; cut.
 * All "not knowing about X" operational tools beyond the 3 in the bonus slide.
 * Custom orchestration frameworks, polling loops, signal-order, semantic IDs, child-workflow start race — defer to repo.
+
+##### Final Outline
+
+**Introduction**
+
+* TBD
+
+**Part One: Activities (~11 min)**
+
+* Mental model: an activity gives the workflow access to the outside world. The Temporal server owns its lifecycle — it can run more than once, it can be canceled, and its timeouts decide how long Temporal keeps trying.
+* Mistake — [Not making activities idempotent](src/not-making-activities-idempotent.md).
+  * Pattern: idempotency key from workflow ID + input; DB constraints; naturally idempotent ops.
+* Mistake — [Preventing activity retries](src/preventing-activity-retries.md) (3 timeout misconfigurations: no heartbeat timeout; no start-to-close; start-to-close == schedule-to-close).
+  * Pattern: set heartbeat + start-to-close + schedule-to-close on every activity.
+* Mistake — [Setting too-short timeouts](src/setting-too-short-timeouts.md).
+  * Pattern: base schedule-to-close on outage tolerance, not happy-path latency.
+* Mistake — Activity can't be canceled because it doesn't [heartbeat](src/not_sending_heartbeats_for_cancellation/README.md). Cancellation is delivered through heartbeat responses; without heartbeats it sits on the server until the activity completes on its own.
+  * Pattern: set a heartbeat timeout and heartbeat from any cancelable activity; carry progress in [heartbeat details](src/not_using_activity_heartbeat_details/README.md) so a retry resumes instead of restarting.
+* Mistake — Calling external services without controlling retry behavior. *(README-only — no entries yet)*
+  * Retrying non-retryable errors (auth, validation, "not found").
+    * Pattern: decide retryability *from the activity* — return a non-retryable application error.
+  * Hammering a struggling downstream during an outage.
+    * Pattern: real backoff config; honor downstream backpressure; centralize via interceptor.
+* Closing beat: the "well-formed activity" template — carry into Part Two.
+
+**Part Two: Workflows (~10 min)**
+
+* Mental model: workflow code re-executes on [replay](src/thinking-replay-means-rerunning-activities.md), scales across many small workflows rather than within one, and orchestrates cleanup when needed.
+
+* **Avoiding workflow limits**
+  * Mistake — [Doing too many things in one workflow](src/doing-too-many-things-in-one-workflow.md) / [wrapping a queue with a workflow](src/wrapping_a_queue_with_a_workflow/README.md). Lock contention, history bloat, replay cost.
+    * Pattern: fan out to many small workflows, one per business entity or batch.
+  * Mistake — [Not using ContinueAsNew](src/not_using_continue_as_new/README.md). Long-running workflows hit [history-length](src/overflowing-workflow-history-length.md) and [history-size](src/overflowing-workflow-history-bytes.md) limits and accumulate code-version baggage.
+    * Pattern: ContinueAsNew on event count, elapsed time, or explicit signal; carry a compact checkpoint as input.
+  * Mistake — [Not draining signals before completing the workflow](src/not_draining_signals_before_completing_workflow/README.md). Buffered signals are silently lost on completion or ContinueAsNew.
+    * Pattern: drain pending signals before returning; apply them, don't discard.
+
+* **Setting and using timeouts**
+  * Mistake — [Not setting a workflow timeout](src/not-setting-a-workflow-timeout.md). Default is 10 years.
+    * Pattern: set a generous execution timeout as a backstop; set a run timeout for ContinueAsNew chains.
+  * Mistake — [Assuming workflow timeouts allow graceful cleanup](src/assuming_workflow_timeouts_allow_graceful_cleanup/README.md). Execution-timeout terminates; no defers, no handlers.
+    * Pattern: implement business deadlines yourself with an internal soft-timeout timer; reserve execution-timeout as a backstop.
+
+* **Handling cancellation and compensating actions**
+  * Mistake — [Deadlocking when a workflow is canceled](src/deadlocking_when_workflow_canceled/README.md). Blocking on a signal/timer with no escape.
+    * Pattern: selector that waits for the expected event OR `ctx.Done()`.
+  * Mistake — [Not using a disconnected context for cleanup](src/not_using_disconnected_context_for_cleanup/README.md). Cleanup activities on a canceled context never dispatch.
+    * Pattern: `workflow.NewDisconnectedContext()` for compensation; [wait for child workflows to start](src/not_waiting_for_child_workflows_to_start/README.md) before exiting.
+  * Mistake — [Not using ParentClosePolicy](src/not_using_parent_close_policy/README.md). Default `TERMINATE` kills children with no cleanup.
+    * Pattern: `REQUEST_CANCEL` when children need cleanup; `ABANDON` when their lifecycle is independent.
+
+* **Dealing with determinism**
+  * Mistake — Performing [network calls](src/performing_network_calls_in_workflow_code/README.md) or [using system time](src/using_system_time_instead_of_workflow_time/README.md) in workflow code (also: [env vars](src/reading_environment_variables_in_workflow_code/README.md), [shared state](src/modifying_shared_state_in_workflow_code/README.md)).
+    * Pattern: keep all non-determinism in activities; `workflow.Now()` / `workflow.Sleep()` for time.
+  * Side effects — [Not using the return value in a `SideEffect`](src/not_using_return_value_in_side_effect/README.md). The function doesn't run on replay; the recorded value does.
+    * Pattern: always use the returned value; never rely on closure mutation.
+  * Patching / version checks — [Not using workflow versioning](src/not_using_workflow_versioning/README.md) and [incorrect patching](src/incorrect-workflow-patching.md). Replay errors strike running workflows after deploy.
+    * Pattern: patch lifecycle (introduce → wait → deprecate → wait → remove); restructure changing logic into activities.
+
+* Closing beat: workflows are deterministic, cooperative, and small — durable orchestration on top of well-formed activities.
+
+**Part Three: Tools & Techniques**
+
+* TBD
