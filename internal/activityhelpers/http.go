@@ -7,9 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
-	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/temporal"
 )
 
@@ -43,15 +41,9 @@ func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 
 	switch resp.StatusCode {
 	case http.StatusTooManyRequests:
-		var nextDelay time.Duration
-		if activity.IsActivity(ctx) {
-			if info := activity.GetInfo(ctx); info.RetryPolicy != nil {
-				// Back off more aggressively
-				nextDelay = calculateNewRetryDelay(info.RetryPolicy, info.Attempt, 3)
-			}
-		}
+		// Back off more aggressively than the typical 2x backoff coefficient.
 		return temporal.NewApplicationErrorWithOptions(msg, errType, temporal.ApplicationErrorOptions{
-			NextRetryDelay: nextDelay,
+			NextRetryDelay: GetNextRetryDelay(ctx, 3),
 		})
 
 	case http.StatusRequestTimeout, http.StatusTooEarly:

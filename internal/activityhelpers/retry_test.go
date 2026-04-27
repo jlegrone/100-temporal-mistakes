@@ -152,7 +152,7 @@ func TestGetNextRetryDelay(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.wantDelay, getNextRetryDelay(tc.info))
+			assert.Equal(t, tc.wantDelay, getNextRetryDelay(tc.info, 0))
 		})
 	}
 }
@@ -162,7 +162,7 @@ func TestGetNextRetryDelay(t *testing.T) {
 // does not panic when invoked outside of a Temporal activity.
 func TestGetNextRetryDelay_NonActivityContext(t *testing.T) {
 	assert.NotPanics(t, func() {
-		assert.Equal(t, time.Duration(0), GetNextRetryDelay(t.Context()))
+		assert.Equal(t, time.Duration(0), GetNextRetryDelay(t.Context(), 0))
 	})
 }
 
@@ -179,6 +179,6 @@ func TestGetNextRetryDelay_OverflowingAttemptStaysPositive(t *testing.T) {
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 2.0,
 		},
-	})
+	}, 0)
 	assert.Positive(t, delay)
 }
