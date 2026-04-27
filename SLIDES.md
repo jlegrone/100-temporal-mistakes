@@ -72,13 +72,33 @@ Three techniques to achieve idempotency:
 
 ---
 
-## Activities: Handling Downstream Service Outages
+## Activities: Weathering System Outages
 
 <!-- New code example, this time showing the workflow code that invokes the payment activity. Set a 30s start to close timeout and a 1m schedule to close timeout. -->
 ```go
 ```
 
-<!-- Update the schedule to close timeout to 1h in the code example. Speaker notes: Avoid setting schedule to close too short. Pick a value based on how long you want to retry in the face of a serious system outage. -->
+<!-- Speaker note: Temporal is great at retrying activities, but it's still important to think carefully about how we configure timeouts and retry policies in order to survive worst case system outages. For example here I'm invoking my activity with a schedule to close timeout that doesn't give much room for the activity to be retried if the worker or downstream API are temporarily unavailble. -->
+
+<!-- Update the schedule to close timeout to 1h in the code example. Include code comment saying "allow retrying for up to 1 hour".
+
+Speaker note: So the first timeout mistake to avoid is a schedule to close timeout that's too short. Pick a value based on how long you want to retry in the face of a serious system outage.
+-->
+
+---
+
+## Activities: Weathering System Outages
+
+<!-- Update code example, now adding a retry policy with MaxAttempts set to 3, initial backoff to 1s, backoff coefficient to 2, and max backoff to 30s. -->
+```go
+```
+
+<!-- Speaker note: Another way an activity's retry behavior can be unexpectedly limited is by setting MaxAttempts. For example now if this activity quickly returns an error, we would exhaust all of our retries in less than 10 seconds, even though our intent was to survive outages of up to 1 hour. -->
+
+<!-- Comment out the MaxAttempts field in the code example. Include code comment saying "allow unlimited attempts until the ScheduleToClose timeout is reached".
+
+Speaker note: I think a much simpler mental model is to allow unlimited attempts, and only use retry policy to tune the backoff behavior like initial interval and maximum backoff duration as needed.
+-->
 
 ---
 
@@ -89,6 +109,8 @@ Choosing between StartToClose and Heartbeat timeouts
 <!-- New workflow code example, this time invoking our (longer running) AwaitKubernetesJob activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
 ```go
 ```
+
+<!-- Speaker note: Our previous activity example was expected to always complete in under 30s. But that's not the case for all activities. A short start to close timeout made sense for the previous use case, but what about for an activity that could run for much longer? Setting too short a value could mean that some requests never complete, no matter how many retry attempts are made. -->
 
 <!-- Updated code example: Change the start to close timeout to 5m.
 
