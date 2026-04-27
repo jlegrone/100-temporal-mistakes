@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,34 +12,33 @@ import (
 	"go.temporal.io/sdk/testsuite"
 )
 
-type fakeDoer struct {
-	resp *http.Response
-	err  error
-	got  *http.Request
-}
-
-func (f *fakeDoer) Do(req *http.Request) (*http.Response, error) {
-	f.got = req
-	return f.resp, f.err
-}
-
-func newResponse(status int, body string) *http.Response {
-	return &http.Response{
-		StatusCode: status,
-		Body:       io.NopCloser(strings.NewReader(body)),
-		Header:     make(http.Header),
-	}
-}
-
 func newActivityEnv() *testsuite.TestActivityEnvironment {
 	suite := &testsuite.WorkflowTestSuite{}
 	return suite.NewTestActivityEnvironment()
 }
 
-func TestChargePayment_Success(t *testing.T) {
-	doer := &fakeDoer{resp: newResponse(http.StatusOK, `{"id":"ch_123","status":"succeeded"}`)}
-	w := &Worker{Client: doer, Endpoint: "https://api.example/charges"}
+// fakeServer starts an httptest.Server that responds to every request with
+// the given status code and body.
+func fakeServer(t *testing.T, status int, body string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
 
+func TestChargePayment_Success(t *testing.T) {
+	var got *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Clone(r.Context())
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"id":"ch_123","status":"succeeded"}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	w := NewWorker(srv.URL)
 	env := newActivityEnv()
 	env.RegisterActivity(w.ChargePayment)
 	val, err := env.ExecuteActivity(w.ChargePayment, ChargePaymentRequest{
@@ -54,14 +53,14 @@ func TestChargePayment_Success(t *testing.T) {
 	require.Equal(t, "ch_123", resp.ChargeID)
 	require.Equal(t, "succeeded", resp.Status)
 
-	require.NotNil(t, doer.got)
-	require.NotEmpty(t, doer.got.Header.Get("Idempotency-Key"))
-	require.Equal(t, "application/json", doer.got.Header.Get("Content-Type"))
+	require.NotNil(t, got)
+	require.NotEmpty(t, got.Header.Get("Idempotency-Key"))
+	require.Equal(t, "application/json", got.Header.Get("Content-Type"))
 }
 
 func TestChargePayment_BadRequestIsNonRetryable(t *testing.T) {
-	doer := &fakeDoer{resp: newResponse(http.StatusBadRequest, "missing currency")}
-	w := &Worker{Client: doer, Endpoint: "https://api.example/charges"}
+	srv := fakeServer(t, http.StatusBadRequest, "missing currency")
+	w := NewWorker(srv.URL)
 
 	env := newActivityEnv()
 	env.RegisterActivity(w.ChargePayment)
@@ -75,8 +74,8 @@ func TestChargePayment_BadRequestIsNonRetryable(t *testing.T) {
 }
 
 func TestChargePayment_RateLimitedReturnsApplicationError(t *testing.T) {
-	doer := &fakeDoer{resp: newResponse(http.StatusTooManyRequests, "slow down")}
-	w := &Worker{Client: doer, Endpoint: "https://api.example/charges"}
+	srv := fakeServer(t, http.StatusTooManyRequests, "slow down")
+	w := NewWorker(srv.URL)
 
 	env := newActivityEnv()
 	env.RegisterActivity(w.ChargePayment)
@@ -90,8 +89,8 @@ func TestChargePayment_RateLimitedReturnsApplicationError(t *testing.T) {
 }
 
 func TestChargePayment_GenericServerErrorIsRetryable(t *testing.T) {
-	doer := &fakeDoer{resp: newResponse(http.StatusInternalServerError, "boom")}
-	w := &Worker{Client: doer, Endpoint: "https://api.example/charges"}
+	srv := fakeServer(t, http.StatusInternalServerError, "boom")
+	w := NewWorker(srv.URL)
 
 	env := newActivityEnv()
 	env.RegisterActivity(w.ChargePayment)

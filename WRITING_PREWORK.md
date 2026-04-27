@@ -398,3 +398,20 @@ Total: ~32 min talk + Q&A. Four mental-model sections, each with 2–3 mistakes 
 **Part Three: Tools & Techniques**
 
 * TBD
+
+
+
+
+
+
+
+# Part Two: Workflows
+
+Need to be robust to:
+- Downstream service errors
+- Worker crashes & hangs
+- Temporal server disruption
+
+Should also:
+- Not amplify bad requests
+- Gracefully handle cancelation

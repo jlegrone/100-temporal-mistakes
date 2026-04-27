@@ -1,7 +1,7 @@
 // Package payments contains the final-state code examples for the "Activities"
 // chapter of SLIDES.md. The ChargePayment activity demonstrates handling
 // downstream service errors, mapping HTTP status codes to retry behavior, and
-// passing a deterministic idempotency key to a Stripe-style payments API.
+// passing a deterministic idempotency key to the upstream payments API.
 package payments
 
 import (
@@ -18,13 +18,7 @@ import (
 	"github.com/jlegrone/100-temporal-mistakes/internal/activityhelpers"
 )
 
-// HTTPDoer is the subset of *http.Client the activity needs. Accepting an
-// interface keeps tests free of network calls.
-type HTTPDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-// ChargePaymentRequest models a charge in a Stripe-style payments API.
+// ChargePaymentRequest models a charge in the upstream payments API.
 type ChargePaymentRequest struct {
 	CustomerID  string `json:"customer_id"`
 	AmountCents int64  `json:"amount_cents"`
@@ -38,10 +32,14 @@ type ChargePaymentResponse struct {
 	Status   string `json:"status"`
 }
 
-// Worker groups payments activities so they can share a configured client.
+// Worker groups payments activities so they can share configuration.
 type Worker struct {
-	Client   HTTPDoer
-	Endpoint string // e.g., https://api.stripe.com/v1/charges
+	endpoint string
+}
+
+// NewWorker constructs a Worker that posts charges to endpoint.
+func NewWorker(endpoint string) *Worker {
+	return &Worker{endpoint: endpoint}
 }
 
 // ChargePayment posts a charge to the payments API. Status codes are mapped to
@@ -55,22 +53,14 @@ type Worker struct {
 // The Idempotency-Key header is derived from the workflow + activity identity
 // so retries are coalesced by the upstream service.
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
-	body, err := json.Marshal(req)
+	httpReq, err := w.buildChargeRequest(ctx, req, activityhelpers.GetIdempotencyToken(ctx))
 	if err != nil {
-		return nil, temporal.NewNonRetryableApplicationError(
-			fmt.Sprintf("marshal request: %v", err), "MarshalRequest", err,
+		return nil, temporal.NewApplicationErrorWithCause(
+			err.Error(), "BuildRequest", err,
 		)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, w.Endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, temporal.NewNonRetryableApplicationError(
-			fmt.Sprintf("build request: %v", err), "BuildRequest", err,
-		)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Idempotency-Key", activityhelpers.GetIdempotencyToken(ctx))
 
-	resp, err := w.Client.Do(httpReq)
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return nil, temporal.NewApplicationErrorWithCause(
 			fmt.Sprintf("call payment service: %v", err), "Network", err,
@@ -78,8 +68,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 	}
 	defer resp.Body.Close()
 
-	switch {
-	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+	switch resp.StatusCode {
+	case http.StatusAccepted, http.StatusOK:
 		var out ChargePaymentResponse
 		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 			return nil, temporal.NewApplicationErrorWithCause(
@@ -87,15 +77,14 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 			)
 		}
 		return &out, nil
-
-	case resp.StatusCode == http.StatusBadRequest:
+	case http.StatusBadRequest:
 		return nil, temporal.NewNonRetryableApplicationError(
 			fmt.Sprintf("payment rejected: %s", readSnippet(resp.Body)),
 			"BadRequest",
 			nil,
 		)
 
-	case resp.StatusCode == http.StatusTooManyRequests:
+	case http.StatusTooManyRequests:
 		// Multiply the server-computed retry delay by 1.5 to slow down callers
 		// when the upstream is overloaded.
 		nextDelay := time.Duration(float64(activityhelpers.GetNextRetryDelay(ctx)) * 1.5)
@@ -111,6 +100,24 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 			"ServiceError",
 		)
 	}
+}
+
+// buildChargeRequest serializes a ChargePaymentRequest as JSON and builds the
+// upstream HTTP request, including the Content-Type and Idempotency-Key
+// headers. Errors here represent programmer bugs (bad endpoint URL, request
+// fields that fail to marshal) so callers should treat them as non-retryable.
+func (w *Worker) buildChargeRequest(ctx context.Context, req ChargePaymentRequest, idempotencyKey string) (*http.Request, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, w.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build http request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Idempotency-Key", idempotencyKey)
+	return httpReq, nil
 }
 
 // readSnippet returns at most 256 bytes of an error response body for inclusion
