@@ -5,7 +5,7 @@
 > [!TIP]
 > Three common timeout misconfigurations can silently prevent activities from retrying: no [heartbeat timeout](terms/heartbeat-timeout.md), no [start-to-close timeout](terms/start-to-close-timeout.md), or start-to-close equal to [schedule-to-close](terms/schedule-to-close-timeout.md).
 
-**No start-to-close timeout AND no heartbeat timeout**: Without a heartbeat timeout, Temporal can't detect an unresponsive worker. Instead Temporal will wait the full start-to-close duration before a retry. But if no schedule to close timeout is set either, then an unresponsive worker will cause the entire schedule to close timeout to elapse without a single retry.
+**No start-to-close timeout AND no heartbeat timeout**: Without a heartbeat timeout, Temporal can't detect an unresponsive worker. Instead Temporal will wait the full start-to-close duration before a retry. But if no start to close timeout is set either, then an unresponsive worker will cause the entire schedule to close timeout to elapse without a single retry.
 
 Set a heartbeat timeout so that the activity can be retried more quickly if the worker dies or is redeployed while the activity is running.
 
