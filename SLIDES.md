@@ -37,9 +37,38 @@ Should also:
 
 ## Activities: Implementing Idempotency
 
-<!-- Update code example to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and adding it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
+Three techniques to achieve idempotency:
+- Passing idempotency key to external APIs
+    - Derive a key from the Workflow ID and activity ID. Pass this to downstream systems (like Stripe) to ignore duplicate requests.
+- Applying database constraints
+    - Use `INSERT ... ON CONFLICT` or conditional writes to ensure records aren't created twice.
+- Using naturally idempotent operations
+    - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
+    - May help to decompose into multiple activities.
+
+## Activities: Natural Idempotency
+
+<!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
 ```go
 ```
+
+<!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
+
+<!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
+```go
+```
+
+<!-- Speaker note: Now the workflow needs to call both activities, one after the other, but it doesn't matter how many times either of them is retried and we get more visibility into what's going on through the workflow history. -->
+
+---
+
+## Activities: Idempotency Keys
+
+<!-- Back to the previous payment code example. Update the code to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and add it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
+```go
+```
+
+<!-- Speaker note: if you are lucky enough to be using an API that directly supports idempotency keys, whether in the form of a header or a client side request identifier, then you can also compute one based on the workflow run id and activity id. -->
 
 ---
 
@@ -57,7 +86,7 @@ Should also:
 
 Choosing between StartToClose and Heartbeat timeouts
 
-<!-- New workflow code example, this time invoking a (longer running) AwaitPaymentReconciliation activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
+<!-- New workflow code example, this time invoking our (longer running) AwaitKubernetesJob activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
 ```go
 ```
 
