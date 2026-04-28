@@ -647,6 +647,8 @@ explicit error if a stale v0/v1 history ever shows up. -->
 <!-- Speaker notes: A Selector fans in shipping, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 
 But this naive version uses the parent's (possibly canceled) ctx, the default ParentClosePolicy, and doesn't wait for the child to be scheduled before returning. Each of those is a bug we'll fix on the next slide. -->
+
+<!-- TODO: Rework this example to wait for a signal that the shipment has completed instead of running an activity. That sets up the cancelation deadlock bug. -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... reserve inventory and charge payment
