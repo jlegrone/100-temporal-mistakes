@@ -13,7 +13,9 @@ Workflow code must be deterministic because it re-executes during replay to reco
 
 // BAD: network call in workflow code
 func MyWorkflowV1(ctx workflow.Context) error {
+	// TODO: Use httpbin
 	resp, err := http.Get("https://api.example.com/config")
+	// TODO: Don't use underscores in examples; this looks too contrived.
 	_ = resp
 	_ = err
 	// ...

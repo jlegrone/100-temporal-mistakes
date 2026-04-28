@@ -41,7 +41,7 @@ func PollUntilReady(ctx context.Context) (Result, error) {
 		if result.Ready {
 			return result, nil
 		}
-		activity.RecordHeartbeat(ctx, result)
+		activity.RecordHeartbeat(ctx, result.Status)
 		time.Sleep(30 * time.Second) // Regular time.Sleep, not workflow.Sleep
 	}
 }

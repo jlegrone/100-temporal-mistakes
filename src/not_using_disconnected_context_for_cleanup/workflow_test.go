@@ -12,39 +12,52 @@ import (
 
 // @@@SNIPSTART not-using-disconnected-context-test
 
-func TestV1_CleanupNeverRuns(t *testing.T) {
+func TestV1_NoCompensation(t *testing.T) {
 	env := internaltestsuite.NewTestWorkflowEnvironment(t)
-	// ProcessOrder blocks for 1h, so the cancel at 1s interrupts it.
-	env.OnActivity(ProcessOrder, mock.Anything).After(time.Hour).Return(nil)
-	env.OnActivity(CancelOrder, mock.Anything).Return(nil).Maybe()
+	// Shipping never completes within the test window so the cancel interrupts it.
+	env.OnActivity(ShipItem, mock.Anything, mock.Anything).After(time.Hour).Return(&ShipItemResponse{}, nil)
+	env.OnActivity(Refund, mock.Anything, mock.Anything).Return(&RefundResponse{}, nil).Maybe()
 
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Second)
 
-	env.ExecuteWorkflow(MyWorkflowV1)
+	env.ExecuteWorkflow(PurchaseItemV1, PurchaseItemRequest{OrderID: "o-1"})
 	require.True(t, env.IsWorkflowCompleted())
 	require.True(t, temporal.IsCanceledError(env.GetWorkflowError()))
 
-	// V1 uses the canceled context for cleanup, so CancelOrder never runs.
-	env.AssertActivityNotCalled(t, "CancelOrder", mock.Anything)
+	// V1 has no compensation -- the customer is left charged.
+	env.AssertActivityNotCalled(t, "Refund", mock.Anything, mock.Anything)
 }
 
-func TestV2_CleanupRuns(t *testing.T) {
+func TestV2_RefundsOnCancelation(t *testing.T) {
 	env := internaltestsuite.NewTestWorkflowEnvironment(t)
-	env.OnActivity(ProcessOrder, mock.Anything).After(time.Hour).Return(nil)
-	env.OnActivity(CancelOrder, mock.Anything).Return(nil)
+	env.RegisterWorkflow(RefundPayment)
+	env.OnActivity(ShipItem, mock.Anything, mock.Anything).After(time.Hour).Return(&ShipItemResponse{}, nil)
+	env.OnActivity(Refund, mock.Anything, mock.Anything).Return(&RefundResponse{}, nil)
 
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()
 	}, time.Second)
 
-	env.ExecuteWorkflow(MyWorkflowV2)
+	env.ExecuteWorkflow(PurchaseItemV2, PurchaseItemRequest{OrderID: "o-2"})
 	require.True(t, env.IsWorkflowCompleted())
-	require.True(t, temporal.IsCanceledError(env.GetWorkflowError()))
 
-	// V2 uses a disconnected context, so CancelOrder runs.
-	env.AssertActivityCalled(t, "CancelOrder", mock.Anything)
+	// V2 refunds the customer via the disconnected child workflow.
+	env.AssertActivityCalled(t, "Refund", mock.Anything, mock.Anything)
+}
+
+func TestV2_RefundsOnFulfilmentTimeout(t *testing.T) {
+	env := internaltestsuite.NewTestWorkflowEnvironment(t)
+	env.RegisterWorkflow(RefundPayment)
+	// Shipping outlasts the workflow's fulfilment deadline.
+	env.OnActivity(ShipItem, mock.Anything, mock.Anything).After(48*time.Hour).Return(&ShipItemResponse{}, nil)
+	env.OnActivity(Refund, mock.Anything, mock.Anything).Return(&RefundResponse{}, nil)
+
+	env.ExecuteWorkflow(PurchaseItemV2, PurchaseItemRequest{OrderID: "o-3"})
+	require.True(t, env.IsWorkflowCompleted())
+
+	env.AssertActivityCalled(t, "Refund", mock.Anything, mock.Anything)
 }
 
 // @@@SNIPEND

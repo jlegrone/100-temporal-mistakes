@@ -14,6 +14,7 @@ Design activity return types the same way you'd design an API response -- includ
 [passing_too_much_information_from_activities/activity.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/passing_too_much_information_from_activities/activity.go)
 ```go
 
+// TODO: Make it more obvious this is an activity
 // Bad: returning the full record
 func LookupCustomerBad(ctx context.Context, customerID string) (*Customer, error) {
 	return db.GetCustomer(ctx, customerID)

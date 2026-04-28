@@ -4,81 +4,132 @@ import (
 	"context"
 	"time"
 
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/workflow"
 )
 
-// ProcessOrder is a long-running activity.
-func ProcessOrder(_ context.Context) error { return nil }
+type PurchaseItemRequest struct {
+	OrderID    string
+	CustomerID string
+}
 
-// CancelOrder is a cleanup activity.
-func CancelOrder(_ context.Context) error { return nil }
+type PurchaseItemResponse struct {
+	TrackingID string
+}
+
+type ShipItemRequest struct {
+	OrderID string
+}
+
+type ShipItemResponse struct {
+	TrackingID string
+}
+
+type RefundPaymentRequest struct {
+	OrderID    string
+	CustomerID string
+}
+
+type RefundPaymentResponse struct{}
+
+type RefundRequest struct {
+	OrderID string
+}
+
+type RefundResponse struct{}
+
+// ShipItem dispatches the order to the shipping carrier.
+func ShipItem(ctx context.Context, req ShipItemRequest) (*ShipItemResponse, error) {
+	return &ShipItemResponse{}, nil
+}
+
+// Refund credits the customer's payment method.
+func Refund(ctx context.Context, req RefundRequest) (*RefundResponse, error) {
+	return &RefundResponse{}, nil
+}
+
+// RefundPayment is the compensating child workflow started when a purchase
+// fails to ship within the fulfilment window or is canceled.
+func RefundPayment(ctx workflow.Context, req RefundPaymentRequest) (*RefundPaymentResponse, error) {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout:    30 * time.Second,
+		ScheduleToCloseTimeout: time.Hour,
+	})
+	if err := workflow.ExecuteActivity(ctx, Refund, RefundRequest{OrderID: req.OrderID}).Get(ctx, nil); err != nil {
+		return nil, err
+	}
+	return &RefundPaymentResponse{}, nil
+}
 
 // @@@SNIPSTART not-using-disconnected-context-bad
 
-// MyWorkflowV1 tries to run a cleanup activity after cancelation,
-// but uses the original (already-canceled) context. The cleanup
-// activity is never dispatched.
-func MyWorkflowV1(ctx workflow.Context) error {
-	log := workflow.GetLogger(ctx)
+// PurchaseItemV1 blocks on shipping with no fulfilment deadline and no
+// compensating action. If the workflow is canceled or shipping hangs, the
+// customer is left charged for an item that never arrives.
+func PurchaseItemV1(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Minute,
+		StartToCloseTimeout:    30 * time.Second,
+		ScheduleToCloseTimeout: time.Hour,
 	})
 
-	log.Info("Processing order")
-	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
-
-	selector := workflow.NewSelector(ctx)
-	selector.AddFuture(activityFuture, func(f workflow.Future) {})
-	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
-	selector.Select(ctx)
-
-	if ctx.Err() != nil {
-		log.Warn("Canceling order", "error", ctx.Err())
-		// BUG: ctx is already canceled -- CancelOrder returns CanceledError
-		// immediately without ever being executed.
-		if err := workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil); err != nil {
-			log.Error("Failed to cancel order", "error", err)
-		} else {
-			log.Info("Order canceled")
-		}
+	var ship ShipItemResponse
+	if err := workflow.ExecuteActivity(ctx, ShipItem, ShipItemRequest{OrderID: req.OrderID}).Get(ctx, &ship); err != nil {
+		return nil, err
 	}
-	return activityFuture.Get(ctx, nil)
+	return &PurchaseItemResponse{TrackingID: ship.TrackingID}, nil
 }
 
 // @@@SNIPEND
 
 // @@@SNIPSTART not-using-disconnected-context-good
 
-// MyWorkflowV2 uses a disconnected context for cleanup, so the
-// activity runs even after the workflow is canceled.
-func MyWorkflowV2(ctx workflow.Context) error {
-	log := workflow.GetLogger(ctx)
+// PurchaseItemV2 fans in shipping completion, a 5-minute fulfilment deadline,
+// and workflow cancelation through a Selector. If shipping doesn't win, it
+// refunds via an abandoned child workflow started on a disconnected context,
+// so the cleanup survives the parent's cancelation.
+func PurchaseItemV2(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Minute,
+		StartToCloseTimeout:    30 * time.Second,
+		ScheduleToCloseTimeout: time.Hour,
 	})
 
-	log.Info("Processing order")
-	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
+	shipFuture := workflow.ExecuteActivity(ctx, ShipItem, ShipItemRequest{OrderID: req.OrderID})
 
-	selector := workflow.NewSelector(ctx)
-	selector.AddFuture(activityFuture, func(f workflow.Future) {})
-	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
-	selector.Select(ctx)
+	var (
+		shipResp ShipItemResponse
+		err      error
+		sel      = workflow.NewNamedSelector(ctx, "shipment")
+	)
+	sel.AddFuture(shipFuture, func(f workflow.Future) {
+		err = f.Get(ctx, &shipResp)
+	})
+	sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+		err = workflow.ErrDeadlineExceeded
+	})
+	sel.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
+		err = ctx.Err()
+	})
+	sel.Select(ctx) // fires when the item is shipped, the timer fires, or ctx is canceled
 
-	if ctx.Err() != nil {
-		log.Warn("Canceling order", "error", ctx.Err())
-		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
-		defer cancel()
-		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
-			StartToCloseTimeout: 30 * time.Second,
+	if err != nil {
+		// Start the refund as an abandoned child workflow on a disconnected
+		// context so the cleanup survives the parent's cancelation.
+		cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
+		cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
+			WorkflowID:        "refund-" + req.OrderID,
+			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
 		})
-		if err := workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil); err != nil {
-			log.Error("Failed to cancel order", "error", err)
-		} else {
-			log.Info("Order canceled")
+		refund := workflow.ExecuteChildWorkflow(cleanupCtx, RefundPayment, RefundPaymentRequest{
+			OrderID:    req.OrderID,
+			CustomerID: req.CustomerID,
+		})
+		// Get the child workflow future to ensure that it has been started.
+		if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
+			return nil, startErr
 		}
 	}
-	return activityFuture.Get(ctx, nil)
+
+	return &PurchaseItemResponse{TrackingID: shipResp.TrackingID}, err
 }
 
 // @@@SNIPEND

@@ -577,26 +577,34 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
     shipFuture := workflow.ExecuteActivity(ctx, w.ShipItem, shipRequest)
 
-    var shipped bool
+    var (
+        resp PurchaseItemResponse
+        err error
+    )
     sel := workflow.NewSelector(ctx)
-    sel.AddFuture(shipFuture, func(workflow.Future) { shipped = true })
-    sel.AddFuture(workflow.NewTimer(ctx, 5*time.Minute), func(workflow.Future) {})
-    sel.Select(ctx) // returns when shipping completes, the timer fires, or ctx is canceled
+    sel.AddFuture(shipFuture, func(f workflow.Future) {
+        err = f.Get(ctx, &resp)
+    })
+    sel.AddFuture(workflow.NewTimer(ctx, 5*time.Minute), func(f workflow.Future) {
+        err = errors.New("fulfilment deadline exceeded")
+    })
+    sel.Select(ctx) // fires when shipping completes, the timer fires, or ctx is canceled
 
-    if !shipped {
-        // Refund as a child workflow on a disconnected context so cancelation
-        // can't kill the cleanup.
-        cleanupCtx, cancel := workflow.NewDisconnectedContext(ctx)
-        defer cancel()
+    if err != nil {
+        // Start the refund as an abandoned child workflow on a disconnected
+        // context so the cleanup survives the parent's cancelation.
+        cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
         cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
+            WorkflowID:        "refund-" + req.OrderID,
             ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
         })
         refund := workflow.ExecuteChildWorkflow(cleanupCtx, w.RefundPayment, refundRequest)
-        return nil, refund.GetChildWorkflowExecution().Get(ctx, nil)
+        if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
+            return nil, startErr
+        }
     }
 
-    var resp PurchaseItemResponse
-    return &resp, shipFuture.Get(ctx, &resp)
+    return &resp, err
 }
 ```
 

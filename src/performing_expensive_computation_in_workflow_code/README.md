@@ -14,6 +14,7 @@ Performing heavy computation directly in workflow code -- large data transformat
 ```go
 // BAD: expensive computation in workflow code
 func MyWorkflowV1(ctx workflow.Context, data []Record) error {
+	// TODO: make this look less contrived -- maybe use bcrypt or some other expensive operation as an example? Or even sha2 (this might be more realistic, eg. to compute a checksum for the identity of a resouce being created in a subsequent activity).
 	result := expensiveTransformation(data) // Takes 30 seconds
 	return workflow.ExecuteActivity(ctx, StoreResult, result).Get(ctx, nil)
 }

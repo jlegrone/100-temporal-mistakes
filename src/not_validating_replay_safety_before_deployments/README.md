@@ -16,10 +16,7 @@ The fix is to run replay tests as part of CI/CD. Periodically export a represent
 ```go
 
 func TestReplayWorkflowHistory(t *testing.T) {
-	replayer := worker.NewWorkflowReplayer()
-	replayer.RegisterWorkflow(MyWorkflow)
-	err := replayer.ReplayWorkflowHistoryFromJSONFile(nil, "testdata/my_workflow_history.json")
-	require.NoError(t, err)
+	require.NoError(t, testsuite.ReplayWorkflowHistoryFromJSONFile(t, MyWorkflow, "testdata/my_workflow_history.json"))
 }
 
 ```

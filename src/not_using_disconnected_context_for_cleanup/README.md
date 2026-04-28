@@ -9,34 +9,20 @@ When a workflow is canceled, the root context and all descendants are canceled. 
 [not_using_disconnected_context_for_cleanup/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_using_disconnected_context_for_cleanup/workflow.go)
 ```go
 
-// MyWorkflowV1 tries to run a cleanup activity after cancelation,
-// but uses the original (already-canceled) context. The cleanup
-// activity is never dispatched.
-func MyWorkflowV1(ctx workflow.Context) error {
-	log := workflow.GetLogger(ctx)
+// PurchaseItemV1 blocks on shipping with no fulfilment deadline and no
+// compensating action. If the workflow is canceled or shipping hangs, the
+// customer is left charged for an item that never arrives.
+func PurchaseItemV1(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Minute,
+		StartToCloseTimeout:    30 * time.Second,
+		ScheduleToCloseTimeout: time.Hour,
 	})
 
-	log.Info("Processing order")
-	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
-
-	selector := workflow.NewSelector(ctx)
-	selector.AddFuture(activityFuture, func(f workflow.Future) {})
-	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
-	selector.Select(ctx)
-
-	if ctx.Err() != nil {
-		log.Warn("Canceling order", "error", ctx.Err())
-		// BUG: ctx is already canceled -- CancelOrder returns CanceledError
-		// immediately without ever being executed.
-		if err := workflow.ExecuteActivity(ctx, CancelOrder).Get(ctx, nil); err != nil {
-			log.Error("Failed to cancel order", "error", err)
-		} else {
-			log.Info("Order canceled")
-		}
+	var ship ShipItemResponse
+	if err := workflow.ExecuteActivity(ctx, ShipItem, ShipItemRequest{OrderID: req.OrderID}).Get(ctx, &ship); err != nil {
+		return nil, err
 	}
-	return activityFuture.Get(ctx, nil)
+	return &PurchaseItemResponse{TrackingID: ship.TrackingID}, nil
 }
 
 ```
@@ -48,36 +34,47 @@ Use a disconnected context for cleanup, so the activity runs even after the work
 [not_using_disconnected_context_for_cleanup/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/not_using_disconnected_context_for_cleanup/workflow.go)
 ```go
 
-// MyWorkflowV2 uses a disconnected context for cleanup, so the
-// activity runs even after the workflow is canceled.
-func MyWorkflowV2(ctx workflow.Context) error {
-	log := workflow.GetLogger(ctx)
+// PurchaseItemV2 fans in shipping completion, a 5-minute fulfilment deadline,
+// and workflow cancelation through a Selector. If shipping doesn't win, it
+// refunds via an abandoned child workflow started on a disconnected context,
+// so the cleanup survives the parent's cancelation.
+func PurchaseItemV2(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Minute,
+		StartToCloseTimeout:    30 * time.Second,
+		ScheduleToCloseTimeout: time.Hour,
 	})
 
-	log.Info("Processing order")
-	activityFuture := workflow.ExecuteActivity(ctx, ProcessOrder)
+	shipFuture := workflow.ExecuteActivity(ctx, ShipItem, ShipItemRequest{OrderID: req.OrderID})
 
-	selector := workflow.NewSelector(ctx)
-	selector.AddFuture(activityFuture, func(f workflow.Future) {})
-	selector.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {})
-	selector.Select(ctx)
+	var ship ShipItemResponse
+	var err error
+	sel := workflow.NewSelector(ctx)
+	sel.AddFuture(shipFuture, func(f workflow.Future) {
+		err = f.Get(ctx, &ship)
+	})
+	sel.AddFuture(workflow.NewTimer(ctx, 5*time.Minute), func(f workflow.Future) {
+		err = errors.New("fulfilment deadline exceeded")
+	})
+	sel.Select(ctx) // fires when shipping completes, the timer fires, or ctx is canceled
 
-	if ctx.Err() != nil {
-		log.Warn("Canceling order", "error", ctx.Err())
-		newCtx, cancel := workflow.NewDisconnectedContext(ctx)
-		defer cancel()
-		newCtx = workflow.WithActivityOptions(newCtx, workflow.ActivityOptions{
-			StartToCloseTimeout: 30 * time.Second,
+	if err != nil {
+		// Start the refund as an abandoned child workflow on a disconnected
+		// context so the cleanup survives the parent's cancelation.
+		cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
+		cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
+			WorkflowID:        "refund-" + req.OrderID,
+			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
 		})
-		if err := workflow.ExecuteActivity(newCtx, CancelOrder).Get(newCtx, nil); err != nil {
-			log.Error("Failed to cancel order", "error", err)
-		} else {
-			log.Info("Order canceled")
+		refund := workflow.ExecuteChildWorkflow(cleanupCtx, RefundPayment, RefundPaymentRequest{
+			OrderID:    req.OrderID,
+			CustomerID: req.CustomerID,
+		})
+		if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
+			return nil, startErr
 		}
 	}
-	return activityFuture.Get(ctx, nil)
+
+	return &PurchaseItemResponse{TrackingID: ship.TrackingID}, err
 }
 
 ```
