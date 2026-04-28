@@ -373,64 +373,40 @@ Common sources of non-determinism in workflow code:
 
 ## Workflows: Versioning Code Changes
 
-<!-- Bad example: add a new ReserveInventory activity call between two existing steps in the PurchaseItem workflow from Part One. In-flight workflows replay against the new code path and fail with non-determinism. -->
-```go
-func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... validate the request
+<!-- Speaker notes:
+- Versioning is required for *any* change to workflow code that would result in a different workflow history when it runs against an existing execution.
+- Common changes that trigger this:
+  - Adding, removing, or reordering activities or child workflows
+  - Adding a timer
+  - Rejecting an update
+-->
+```diff
+ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+     // ... generate a charge request for the item & customer
 
-    // NEW step inserted between existing activities -- breaks replay for in-flight workflows.
-    if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-        return nil, err
-    }
-
-    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
-}
++    if req.RequiresInventoryReservation {
++        v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
++        if v == 1 {
++            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
++                return nil, err
++            }
++        }
++    }
++
+     return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+ }
 ```
 
-<!-- Fix: wrap the new branch with workflow.GetVersion. -->
-```go
-func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... validate the request
+<!-- Speaker notes: GetVersion is reached only inside a conditional branch some workflows never enter. The TemporalChangeVersion search attribute is never set on those executions, so a list-workflow query filtering by version keeps returning unversioned workflows indefinitely. 
 
-    v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
-    if v == 1 {
-        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-            return nil, err
-        }
-    }
-
-    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
-}
-```
-
-<!-- Speaker note hook: once all old executions have closed, you can collapse the branch but keep the GetVersion call so any replayed history still resolves. -->
+Workflows that never take this branch will NEVER set the TemporalChangeVersion search attribute; you can't tell from a list query whether they're safe to clean up.
+-->
 
 ---
 
 ## Workflows: Evaluate Patches Up Front
 
-<!-- Bad example: GetVersion is reached only inside a conditional branch some workflows never enter. The TemporalChangeVersion search attribute is never set on those executions, so a list-workflow query filtering by version keeps returning unversioned workflows indefinitely. -->
-```go
-func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... validate the request
-
-    if req.RequiresInventoryReservation {
-        // BAD: workflows that never take this branch will NEVER set the
-        // TemporalChangeVersion search attribute -- you can't tell from a
-        // list query whether they're safe to clean up.
-        v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
-        if v == 1 {
-            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-                return nil, err
-            }
-        }
-    }
-
-    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
-}
-```
-
-<!-- Fix: hoist the version check to the top of the workflow so every execution records the version, even if the branch it gates is never taken. -->
+<!-- Speaker note: The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken. -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // Evaluate patches first so every execution sets TemporalChangeVersion.
