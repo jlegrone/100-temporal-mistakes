@@ -120,6 +120,10 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 <!-- Speaker note: Temporal is great at retrying activities, but it's still important to think carefully about how we configure timeouts and retry policies in order to survive worst case system outages. For example here I'm invoking my activity with a schedule to close timeout that doesn't give much room for the activity to be retried if the worker or downstream API are temporarily unavailble. -->
 
+---
+
+## Activities: Weathering System Outages (continued)
+
 <!-- Update the schedule to close timeout to 1h in the code example. Include code comment saying "allow retrying for up to 1 hour".
 
 Speaker note: So the first timeout mistake to avoid is a schedule to close timeout that's too short. Pick a value based on how long you want to retry in the face of a serious system outage.
@@ -142,7 +146,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 ---
 
-## Activities: Weathering System Outages
+## Activities: Weathering System Outages (continued)
 
 <!-- Update code example, now adding a retry policy with MaxAttempts set to 3, initial backoff to 1s, backoff coefficient to 2, and max backoff to 30s. -->
 ```go
@@ -168,6 +172,10 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 Speaker note: For reference, the default activity retry policy uses exponential backoff with a 2.0 backoff coefficient, a 1-second initial interval, a 100-second maximum interval, and unlimited attempts. Source: https://docs.temporal.io/encyclopedia/retry-policies. Workflows have no default retry policy.
 -->
+
+---
+
+## Activities: Weathering System Outages (continued)
 
 <!-- Comment out the MaxAttempts field in the code example. Include code comment saying "allow unlimited attempts until the ScheduleToClose timeout is reached".
 
@@ -205,21 +213,23 @@ Three techniques to achieve idempotency:
     - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
     - May help to decompose into multiple activities.
 
+---
+
 ## Activities: Idempotency Keys
 
 <!-- Back to the previous payment code example. Update the code to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and add it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
 ```go
-func getIdempotencyToken(ctx context.Context) string {
-	info := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
-}
-
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
     httpReq.Header.Set("Idempotency-Key", getIdempotencyToken(ctx))
 
     // ... send the HTTP request & handle errors
+}
+
+func getIdempotencyToken(ctx context.Context) string {
+	info := activity.GetInfo(ctx)
+	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
 ```
 
@@ -259,21 +269,19 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
 
 ---
 
-## Activities: Natural Idempotency
+## Activities: Natural Idempotency (continued)
 
 <!-- Updated code example, now ignoring an already exists error for the job. -->
 ```diff
  func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
      jobs := w.client.BatchV1().Jobs(req.Namespace)
--    if _, err := jobs.Create(ctx, &batchv1.Job{
--        Name: req.Name,
--    }); err != nil {
--        return nil, err
+-    // Create the job
 +    // Create the job if it doesn't exist
-+    _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
-+    // Ignore already exists errors; the activity has already run at least once.
-+    if err != nil && !apierrors.IsAlreadyExists(err) {
-+        return nil, err
+     if _, err := jobs.Create(ctx, &batchv1.Job{
+         Name: req.Name,
+-    }); err != nil {
++    }); err != nil && !apierrors.IsAlreadyExists(err) {
+         return nil, err
      }
  
      // Poll for final status
@@ -283,12 +291,13 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
 
 ---
 
-## Activities: Natural Idempotency
+## Activities: Natural Idempotency (continued)
 <!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
 ```go
 func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobRequest) error {
-    _, err := w.client.BatchV1().Jobs(req.Namespace).Create(ctx, &batchv1.Job{ /* ... */ })
-    // Ignore already exists errors; the activity has already run at least once.
+    jobs := w.client.BatchV1().Jobs(req.Namespace)
+    // Create the job if it doesn't exist
+    _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
     if err != nil && !apierrors.IsAlreadyExists(err) {
         return err
     }
@@ -338,6 +347,10 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 So we can try increasing the start to close timeout, but now this also means that if the worker crashes or becomes unresponsive, we'd have to wait much longer before Temporal retries the activity.
 -->
 
+---
+
+## Activities: Handling Worker Disruptions (continued)
+
 <!-- Updated code example: Change the start to close timeout to 5m. -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
@@ -356,6 +369,10 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
     )
 }
 ```
+
+---
+
+## Activities: Handling Worker Disruptions (continued)
 
 <!-- Updated code example: Replace the start to close timeout with a 30s heartbeat timeout.
 
@@ -441,7 +458,7 @@ Common sources of non-determinism in workflow code:
 
 ---
 
-## Workflows: Keeping Code Deterministic
+## Workflows: Keeping Code Deterministic (continued)
 
 <!-- TODO: Link to documentation on workflowcheck and sandboxes in typescript and python SDKs -->
 
@@ -505,7 +522,7 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ---
 
-## Workflows: Evaluate Patches Up Front
+## Workflows: Evaluate Patches Up Front (continued)
 
 <!-- Speaker note: Subsequent changes bump the patch's max version. The decision of whether to reserve inventory now moves into the activity, so the workflow always calls it on the new code path. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
 ```diff
@@ -555,7 +572,7 @@ temporal workflow show --workflow-id <ID> --output json \
 
 ---
 
-## Workflows: Verifying Replay Safety
+## Workflows: Verifying Replay Safety (continued)
 
 <!-- Speaker note: Run replay tests in CI against the captured fixtures. If the new code's command sequence diverges from any recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
 
@@ -589,7 +606,7 @@ temporal workflow count \
 
 ---
 
-## Workflows: Cleaning Up Patches
+## Workflows: Cleaning Up Patches (continued)
 
 <!-- Speaker note: With the count at 0, it's safe to delete the v0 and v1 branches. Bumping the min supported version to 2 keeps the GetVersion call (so existing v2 histories still replay) while making replay fail with an
 explicit error if a stale v0/v1 history ever shows up. -->
