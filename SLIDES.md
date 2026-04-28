@@ -81,88 +81,6 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 ---
 
-## Activities: Implementing Idempotency
-
-Three techniques to achieve idempotency:
-- Passing idempotency key to external APIs
-    - Derive a key from the Workflow ID and activity ID. Pass this to downstream systems (like Stripe) to ignore duplicate requests.
-- Applying database constraints
-    - Use `INSERT ... ON CONFLICT` or conditional writes to ensure records aren't created twice.
-- Using naturally idempotent operations
-    - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
-    - May help to decompose into multiple activities.
-
-## Activities: Natural Idempotency
-
-<!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
-```go
-func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
-    jobs := w.client.BatchV1().Jobs(req.Namespace)
-    if _, err := jobs.Create(ctx, &batchv1.Job{
-        Name: req.Name,
-    }); err != nil {
-        return nil, err
-    }
-
-    cancel := activityhelpers.AutoHeartbeat(ctx)
-    defer cancel()
-
-    // Poll for final status
-    for {
-        j, err := jobs.Get(ctx, req.Name)
-        if err != nil { return nil, err }
-        if status := getJobStatus(j); status.IsTerminal() {
-            return &RunKubernetesJobResponse{Status: status}, nil
-        }
-        time.Sleep(15*time.Second)
-    }
-}
-```
-
-<!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
-
-<!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
-```go
-func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobRequest) error {
-    _, err := w.client.BatchV1().Jobs(req.Namespace).Create(ctx, &batchv1.Job{ /* ... */ })
-    // Ignore already exists errors; the activity has already run at least once.
-    if err != nil && !apierrors.IsAlreadyExists(err) {
-        return err
-    }
-    return nil
-}
-
-func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobRequest) (*AwaitKubernetesJobResponse, error) {
-    // ... Poll for final status
-}
-```
-
-<!-- Speaker note: Now the workflow needs to call both activities, one after the other, but it doesn't matter how many times either of them is retried and we get more visibility into what's going on through the workflow history. -->
-
----
-
-## Activities: Idempotency Keys
-
-<!-- Back to the previous payment code example. Update the code to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and add it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
-```go
-func getIdempotencyToken(ctx context.Context) string {
-	info := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
-}
-
-func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
-    httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
-    httpReq.Header.Set("Idempotency-Key", getIdempotencyToken(ctx))
-
-    // ... send the HTTP request & handle errors
-}
-```
-
-<!-- Speaker note: if you are lucky enough to be using an API that directly supports idempotency keys, whether in the form of a header or a client side request identifier, then you can also compute one based on the workflow and activity IDs. -->
-
----
-
 ## Activities: Weathering System Outages
 
 <!-- New code example, this time showing the workflow code that invokes the payment activity. Set a 30s start to close timeout and a 1m schedule to close timeout. -->
@@ -251,6 +169,88 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 ---
 
+## Activities: Implementing Idempotency
+
+Three techniques to achieve idempotency:
+- Passing idempotency key to external APIs
+    - Derive a key from the Workflow ID and activity ID. Pass this to downstream systems (like Stripe) to ignore duplicate requests.
+- Applying database constraints
+    - Use `INSERT ... ON CONFLICT` or conditional writes to ensure records aren't created twice.
+- Using naturally idempotent operations
+    - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
+    - May help to decompose into multiple activities.
+
+## Activities: Idempotency Keys
+
+<!-- Back to the previous payment code example. Update the code to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and add it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
+```go
+func getIdempotencyToken(ctx context.Context) string {
+	info := activity.GetInfo(ctx)
+	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
+}
+
+func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+    httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
+    httpReq.Header.Set("Idempotency-Key", getIdempotencyToken(ctx))
+
+    // ... send the HTTP request & handle errors
+}
+```
+
+<!-- Speaker note: if you are lucky enough to be using an API that directly supports idempotency keys, whether in the form of a header or a client side request identifier, then you can also compute one based on the workflow and activity IDs. -->
+
+---
+
+## Activities: Natural Idempotency
+
+<!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
+```go
+func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+    jobs := w.client.BatchV1().Jobs(req.Namespace)
+    if _, err := jobs.Create(ctx, &batchv1.Job{
+        Name: req.Name,
+    }); err != nil {
+        return nil, err
+    }
+
+    cancel := activityhelpers.AutoHeartbeat(ctx)
+    defer cancel()
+
+    // Poll for final status
+    for {
+        j, err := jobs.Get(ctx, req.Name)
+        if err != nil { return nil, err }
+        if status := getJobStatus(j); status.IsTerminal() {
+            return &RunKubernetesJobResponse{Status: status}, nil
+        }
+        time.Sleep(15*time.Second)
+    }
+}
+```
+
+<!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
+
+<!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
+```go
+func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobRequest) error {
+    _, err := w.client.BatchV1().Jobs(req.Namespace).Create(ctx, &batchv1.Job{ /* ... */ })
+    // Ignore already exists errors; the activity has already run at least once.
+    if err != nil && !apierrors.IsAlreadyExists(err) {
+        return err
+    }
+    return nil
+}
+
+func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobRequest) (*AwaitKubernetesJobResponse, error) {
+    // ... Poll for final status
+}
+```
+
+<!-- Speaker note: Now the workflow needs to call both activities, one after the other, but it doesn't matter how many times either of them is retried and we get more visibility into what's going on through the workflow history. -->
+
+---
+
 ## Activities: Handling Worker Disruptions
 
 Choosing between StartToClose and Heartbeat timeouts
@@ -273,6 +273,7 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 }
 ```
 
+<!-- Speaker note: Our payments activity was expected to always complete in under 30s — but `AwaitKubernetesJob` polls until the Kubernetes Job finishes, which can take much longer. A short start to close timeout made sense for the previous use case, but setting too short a value here could mean that some requests never complete, no matter how many retry attempts are made. -->
 <!-- Speaker note: Our previous activity example was expected to always complete in under 30s. But that's not the case for all activities. A short start to close timeout made sense for the previous use case, but what about for an activity that could run for much longer? Setting too short a value could mean that some requests never complete, no matter how many retry attempts are made. -->
 
 <!-- Updated code example: Change the start to close timeout to 5m.
