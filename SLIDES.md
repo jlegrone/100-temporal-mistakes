@@ -407,6 +407,49 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 ---
 
+## Workflows: Evaluate Patches Up Front
+
+<!-- Bad example: GetVersion is reached only inside a conditional branch some workflows never enter. The TemporalChangeVersion search attribute is never set on those executions, so a list-workflow query filtering by version keeps returning unversioned workflows indefinitely. -->
+```go
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... validate the request
+
+    if req.RequiresInventoryReservation {
+        // BAD: workflows that never take this branch will NEVER set the
+        // TemporalChangeVersion search attribute -- you can't tell from a
+        // list query whether they're safe to clean up.
+        v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
+        if v == 1 {
+            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
+                return nil, err
+            }
+        }
+    }
+
+    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+}
+```
+
+<!-- Fix: hoist the version check to the top of the workflow so every execution records the version, even if the branch it gates is never taken. -->
+```go
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // Evaluate patches first so every execution sets TemporalChangeVersion.
+    v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
+
+    // ... validate the request
+
+    if req.RequiresInventoryReservation && v == 1 {
+        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
+            return nil, err
+        }
+    }
+
+    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+}
+```
+
+---
+
 ## Workflows: Verifying Replay Safety
 
 <!-- TODO: Add a code example of a replay test using `worker.WorkflowReplayer` against a captured history file.
@@ -586,12 +629,18 @@ func (w *Worker) MonthlyBilling(ctx workflow.Context, req MonthlyBillingRequest)
 
 ---
 
-## Workflows: A Grand Unified Theory
+## Workflows: Design Guidelines
 
-- Workflow code MUST be deterministic. Use the Temporal SDK for time, randomness, and side effects.
-<!-- - ALWAYS verify replay safety in CI. Static analysis catches the obvious; replay tests catch the rest. -->
-- ALWAYS use workflow versioning when changing the shape of a running workflow.
-- NEVER break payload schemas in place. Add fields, never remove or rename.
-- Drain signals/updates before completing, and use a disconnected context for cleanup.
-- NEVER write tight polling loops in workflow code. Push the loop into a heartbeating activity.
-- Plan for history and payload limits -- use ContinueAsNew and pass references, not blobs.
+Workflow functions:
+- MUST be deterministic. Use the Temporal SDK for time, randomness, and side effects.
+- MUST evaluate all patches as the first step (at the top of the function).
+- MUST use internal timers rather than execution timeouts if they need to run compensating actions.[1]
+- SHOULD be designed to complete or ContinueAsNew within 24 hours or when the server suggests ContinueAsNew.
+- SHOULD drain all signals before completing or ContinueAsNew.
+- SHOULD fan out large batches of work to child workflows.
+
+Temporal workers:
+- SHOULD have a replay testing harness.
+- SHOULD be onboarded to worker versioning and pinned workflows.
+
+1. OR use child workflows with ParentClosePolicy of RequestCancel and Signal sentinel pattern.
