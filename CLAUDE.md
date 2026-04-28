@@ -1,10 +1,5 @@
-I am reviewing https://github.com/jlegrone/100-temporal-mistakes/pull/8 and expect to need to make lots of edits, so I have created a new branch from it (jlegrone/content) which is currently checked out.
+## General guidelines for "mistake" entries
 
-I would like to pace myself with the review, and only focus on one broad category of mistakes at a time, one mistake at a time.
-
-Please come up with a plan for the review, starting with sorting every mistake into a category, ordering the categories, ordering the mistakes within each category, and then walking me through each mistake one at a time.
-
-When reviewing each mistake, I would like to inspect the rendered markdown myself. You should also look for suggestions according to:
 0. TLDR section -- should be 1-2 sentences, succinct, and read clearly.
 1. Style (sentence structure and format should follow closely from https://github.com/teivah/100-go-mistakes as an example)
 2. Correctness. In particular, look out for potential hallucinations that cannot be backed up by primary sources, either official temporal docs https://docs.temporal.io, sdk examples https://github.com/temporalio/samples-go https://github.com/temporalio/samples-typescript, or package documentation https://pkg.go.dev/go.temporal.io/sdk). For assertions that can be fact-checked, suggest links directly to the authoritative source (using wikipedia style references).
@@ -13,11 +8,7 @@ When reviewing each mistake, I would like to inspect the rendered markdown mysel
 5. Working code examples! Where it is valuable, mistakes should include code examples. Every piece of code included in this repo must be valid/compile. Linking to external examples in official Temporal repos works, but some mistakes may need to be demonstrated with before & after code directly in this repo. Put example code in `./src/<snake_case_mistake_name>/{workflow,activity,client}.go` etc and use snipsync to automate copying into `./src/<snake_case_mistake_name>/README.md`. Look at `./src/assuming_signal_update_order` as an example. Also don't forget to include tests! For before and after examples, use a "MyWorkflowV1", "MyWorkflowV2" naming convention.
 6. Miscellaneous -- look out for stuff I didn't think about up front too!
 
------
-
-Avoid the tendency to think that Temporal is only for heavy weight, long-running operations. Even if a task takes a millisecond, it can be valuable to orchestrate it from a Temporal workflow; eg. to guarantee it is retried in the event of a system disruption, or that state is reconciled when the operation fails.
-
------
+---
 
 Most mistakes only need a TLDR and 1-3 paragraphs of explanation. For example, this entry from "100 Go Mistakes" has a nice tone and provides enough information without being too long or boring to read:
 
@@ -31,20 +22,24 @@ Most mistakes only need a TLDR and 1-3 paragraphs of explanation. For example, t
 >
 > Remember that Go is a unique language designed for many characteristics, including simplicity. However, if we find a need for getters and setters or, as mentioned, foresee a future need while guaranteeing forward compatibility, there’s nothing wrong with using them.
 
-----
+---
+
+Avoid the tendency to think that Temporal is only for heavy weight, long-running operations. Even if a task takes a millisecond, it can be valuable to orchestrate it from a Temporal workflow; eg. to guarantee it is retried in the event of a system disruption, or that state is reconciled when the operation fails.
+
+---
 
 Make sure that all "good" activity code examples follow the recommended timeout and retry policy configuration settings.
 
-----
+---
 
 Where it makes sense, reuse the same code examples. Eg. when you want to show a workflow fanout pattern from multiple mistake entries, you can embed the same snip id from a single code sample in both.
 
-----
+---
 
 Use "Request"/"Response" (eg. MyWorkflowRequest) instead of "Input"/"Output" (MyWorkflowInput) in code examples.
 
-----
+---
 
 Look for and point out ways to avoid any sentences with a tone that sounds judgemental.
 
-----
+---
