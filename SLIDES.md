@@ -560,51 +560,62 @@ explicit error if a stale v0/v1 history ever shows up. -->
 
 ## Workflows: Designing for Cancelation
 
-<!-- Bad example: blocks until shipping completes with no timeout or compensating refund. If the workflow is canceled or shipping hangs, the customer is left paying for an order that never arrives. -->
-```go
-func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... reserve inventory and charge payment
+<!-- Speaker notes: A Selector fans in shipping, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 
-    // BAD: no timeout, no compensation on cancelation.
-    return workflowhelpers.AwaitActivity(ctx, w.ShipItem, shipRequest)
-}
-```
-
-<!-- Fix: a Selector fans in shipping, a 5m fulfilment deadline, and ctx cancelation. If shipping doesn't win, refund through a child workflow started on a disconnected context with ParentClosePolicy ABANDON, so the refund survives the parent's cancelation and runs to completion. -->
+But this naive version uses the parent's (possibly canceled) ctx, the default ParentClosePolicy, and doesn't wait for the child to be scheduled before returning. Each of those is a bug we'll fix on the next slide. -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... reserve inventory and charge payment
 
     shipFuture := workflow.ExecuteActivity(ctx, w.ShipItem, shipRequest)
 
-    var (
-        resp PurchaseItemResponse
-        err error
-    )
-    sel := workflow.NewSelector(ctx)
-    sel.AddFuture(shipFuture, func(f workflow.Future) {
-        err = f.Get(ctx, &resp)
+    var resp PurchaseItemResponse
+    var err error
+    sel := workflow.NewNamedSelector(ctx, "shipment")
+    sel.AddFuture(shipFuture, func(f workflow.Future) { err = f.Get(ctx, &resp) })
+    sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+        err = workflow.ErrDeadlineExceeded
     })
-    sel.AddFuture(workflow.NewTimer(ctx, 5*time.Minute), func(f workflow.Future) {
-        err = errors.New("fulfilment deadline exceeded")
-    })
-    sel.Select(ctx) // fires when shipping completes, the timer fires, or ctx is canceled
-
+    sel.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) { err = ctx.Err() })
+    
+    sel.Select(ctx)
     if err != nil {
-        // Start the refund as an abandoned child workflow on a disconnected
-        // context so the cleanup survives the parent's cancelation.
+        // BAD: shares the parent's ctx, no abandon policy, doesn't await scheduling.
+        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+        return nil, err
+    }
+
+    return &resp, nil
+}
+```
+
+---
+
+## Workflows: Designing for Cancelation
+
+<!-- Speaker notes: Three changes make the refund actually compensate the customer.
+
+1. workflow.NewDisconnectedContext detaches the cleanup from the parent's cancelation, so the refund command can still be issued.
+2. ParentClosePolicy ABANDON keeps the child running after the parent closes, so the refund completes even if the parent returns immediately.
+3. GetChildWorkflowExecution().Get blocks until the server has accepted the start command, so we know the child is durably scheduled before the parent returns. -->
+```go
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... selector as before, sets err on shipping failure, deadline, or cancelation
+
+    sel.Select(ctx)
+    if err != nil {
         cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
         cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
-            WorkflowID:        "refund-" + req.OrderID,
             ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
         })
         refund := workflow.ExecuteChildWorkflow(cleanupCtx, w.RefundPayment, refundRequest)
         if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
             return nil, startErr
         }
+        return err
     }
 
-    return &resp, err
+    return &resp, nil
 }
 ```
 
