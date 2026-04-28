@@ -458,7 +458,7 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ## Workflows: Verifying Replay Safety
 
-<!-- Speaker note: Run replay tests in CI against captured production histories. If the new code's command sequence diverges from the recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
+<!-- Speaker note: Capture a representative history for each patch branch. Use the TemporalChangeVersion search attribute to bucket existing executions, and pick the earliest one in each bucket so the fixture exercises the most history. -->
 
 ```bash
 # Find the earliest workflow that did not hit either patch branch
@@ -471,10 +471,16 @@ temporal workflow list \
   --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("add-reserve-inventory-1")' \
   --order-by 'StartTime ASC' --limit 1
 
-# Download workflow history to the test fixture path.
+# Download workflow history to a test fixture path.
 temporal workflow show --workflow-id <ID> --output json \
   > testdata/purchase_item_history_<PATCH_VERSION>.json
 ```
+
+---
+
+## Workflows: Verifying Replay Safety
+
+<!-- Speaker note: Run replay tests in CI against the captured fixtures. If the new code's command sequence diverges from any recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
 
 ```go
 func TestReplayWorkflowHistory(t *testing.T) {
@@ -492,45 +498,46 @@ More techniques: https://temporal.io/resources/on-demand/replay-safety-at-datado
 
 ---
 
-## Workflows: Coordinating Signals & Updates
+## Workflows: Cleaning Up Patches
 
-<!-- New running example: an OrderWorkflow that takes CancelOrder signals and AddItem updates.
+<!-- Speaker note: Once every running workflow has either completed or evaluated v2, the v0 and v1 branches can be deleted. Wait until this count returns 0 -- the 5-minute cutoff avoids false positives for workflows that have been started but have not yet persisted the search attribute. -->
 
-Bad example: handler assumes signals/updates arrive in the order users sent them. Show two messages racing and the workflow mishandling the second. -->
-```go
-func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
-    cancelCh := workflow.GetSignalChannel(ctx, "CancelOrder")
-    workflow.SetUpdateHandler(ctx, "AddItem", w.handleAddItem)
-
-    // BAD: assumes the first thing we observe reflects user intent.
-    var canceled bool
-    cancelCh.ReceiveAsync(&canceled)
-    if canceled {
-        return nil, errors.New("canceled")
-    }
-    // ... continue placing the order
-}
+```bash
+# Returns 0 when no in-flight workflow can still be on v0 or v1.
+# Use `date` on Linux
+CUTOFF=$(gdate -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S.%3NZ)
+temporal workflow count \
+  --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('add-reserve-inventory-2') AND StartTime < '$CUTOFF'"
 ```
 
-<!-- Fix: workflow.Await on a precondition before processing, and a final wait for all handlers to drain (workflow.Await(ctx, workflow.AllHandlersFinished)) before returning. Mention update validators briefly. -->
-```go
-func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
-    // ... register signal/update handlers
+---
 
-    if err := workflow.Await(ctx, func() bool {
-        return w.readyToCheckout(ctx) || w.canceled
-    }); err != nil {
-        return nil, err
-    }
+## Workflows: Cleaning Up Patches
 
-    // ... place the order
+<!-- Speaker note: With the count at 0, it's safe to delete the v0 and v1 branches. Bumping the min supported version to 2 keeps the GetVersion call (so existing v2 histories still replay) while making replay fail with an
+explicit error if a stale v0/v1 history ever shows up. -->
 
-    // Drain in-flight handlers before returning so updates aren't lost.
-    if err := workflow.Await(ctx, workflow.AllHandlersFinished); err != nil {
-        return nil, err
-    }
-    return &OrderWorkflowResponse{ /* ... */ }, nil
-}
+```diff
+ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+-    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 2)
++    workflow.GetVersion(ctx, "add-reserve-inventory", 2, 2)
+
+-    switch inventoryResVersion {
+-    case 1:
+-        if req.RequiresInventoryReservation {
+-            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
+-                return nil, err
+-            }
+-        }
+-    case 2:
+-        // The activity decides internally whether to reserve.
+-        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
+-            return nil, err
+-        }
++    if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
++        return nil, err
+     }
+ }
 ```
 
 ---
