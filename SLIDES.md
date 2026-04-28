@@ -350,6 +350,22 @@ Should also:
 
 ---
 
+## Workflows: Living Within Server Limits
+
+<!-- No code example -- just the limits. Numbers sourced from src/overflowing-*.md. -->
+
+Server-imposed limits to be aware of:
+- **Individual payload size**: ~4MB per workflow/activity input or output, signal, or update (inherited from the Temporal server's gRPC message limit).
+- **Workflow history bytes**: 50MB (sum of all events in the workflow). Results in termination.
+- **Workflow history length**: 50,000 events. Results in termination.
+- **Workflow task timeout**: 10 seconds. Results in failed workflow task (retried).
+
+Mitigations:
+- Use `GetContinueAsNewSuggested()` to start a new workflow execution before hitting history size limits.
+- Avoid passing large payloads from activities to workflows, or use external payload storage.
+
+---
+
 ## Workflows: Keeping Code Deterministic
 
 <!-- No code example here -- just orient the audience to the categories of non-determinism they'll need to watch out for. Sourced from src/terms/non-determinism.md. -->
@@ -544,128 +560,43 @@ explicit error if a stale v0/v1 history ever shows up. -->
 
 ## Workflows: Designing for Cancelation
 
-<!-- Bad example: cleanup activity called with the same canceled ctx -- it's never scheduled because the context is already canceled. Also show a defer cleanup() blocked on a channel that never returns. -->
+<!-- Bad example: blocks until shipping completes with no timeout or compensating refund. If the workflow is canceled or shipping hangs, the customer is left paying for an order that never arrives. -->
 ```go
-func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
-    // ... place the order
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... reserve inventory and charge payment
 
-    defer func() {
-        // BAD: ctx may already be canceled here, so RefundPayment never runs.
-        _ = workflowhelpers.AwaitActivity(ctx, w.RefundPayment, refundRequest)
-    }()
-
-    return w.runOrder(ctx, req)
+    // BAD: no timeout, no compensation on cancelation.
+    return workflowhelpers.AwaitActivity(ctx, w.ShipItem, shipRequest)
 }
 ```
 
-<!-- Fix: workflow.NewDisconnectedContext for the cleanup activity. Show structural select on ctx.Done() plus signal channel for the deadlock case. -->
+<!-- Fix: a Selector fans in shipping, a 5m fulfilment deadline, and ctx cancelation. If shipping doesn't win, refund through a child workflow started on a disconnected context with ParentClosePolicy ABANDON, so the refund survives the parent's cancelation and runs to completion. -->
 ```go
-func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
-    // ... place the order
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... reserve inventory and charge payment
 
-    defer func() {
+    shipFuture := workflow.ExecuteActivity(ctx, w.ShipItem, shipRequest)
+
+    var shipped bool
+    sel := workflow.NewSelector(ctx)
+    sel.AddFuture(shipFuture, func(workflow.Future) { shipped = true })
+    sel.AddFuture(workflow.NewTimer(ctx, 5*time.Minute), func(workflow.Future) {})
+    sel.Select(ctx) // returns when shipping completes, the timer fires, or ctx is canceled
+
+    if !shipped {
+        // Refund as a child workflow on a disconnected context so cancelation
+        // can't kill the cleanup.
         cleanupCtx, cancel := workflow.NewDisconnectedContext(ctx)
         defer cancel()
-        _ = workflowhelpers.AwaitActivity(cleanupCtx, w.RefundPayment, refundRequest)
-    }()
-
-    return w.runOrder(ctx, req)
-}
-```
-
----
-
-## Workflows: Don't Block the Task Loop
-
-<!-- Bad example: tight polling loop in workflow code racks up history events. -->
-```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
-    // ... start the job
-
-    for {
-        var resp PollJobStatusResponse
-        if err := workflowhelpers.AwaitActivity(ctx, w.PollJobStatus, pollRequest, &resp); err != nil {
-            return nil, err
-        }
-        if resp.Status.IsTerminal() {
-            return &RunKubernetesJobResponse{Status: resp.Status}, nil
-        }
-        _ = workflow.Sleep(ctx, time.Second) // Each iteration adds events to history.
-    }
-}
-```
-
-<!-- Fix: replace the loop with a single long-running heartbeating activity that polls internally (this is the AwaitKubernetesJob activity from Part One). Briefly mention that clients polling for workflow results should use WorkflowRun.Get instead. -->
-```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
-    // ... start the job
-
-    return workflowhelpers.AwaitActivity(
-        workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-            HeartbeatTimeout:       30 * time.Second,
-            ScheduleToCloseTimeout: time.Hour,
-        }),
-        w.AwaitKubernetesJob,
-        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
-    )
-}
-```
-
----
-
-## Workflows: Living Within Server Limits
-
-<!-- No code example -- just the limits. Numbers sourced from src/overflowing-*.md. -->
-
-Server-imposed limits to be aware of:
-- **Individual payload size**: ~4MB per workflow/activity input or output, signal, or update (inherited from the Temporal server's gRPC message limit).
-- **Workflow history bytes**: 50MB (sum of all events in the workflow). Results in termination.
-- **Workflow history length**: 50,000 events. Results in termination.
-- **Workflow task timeout**: 10 seconds. Results in failed workflow task (retried).
-
-Mitigations:
-- Use `GetContinueAsNewSuggested()` to start a new workflow execution before hitting history size limits.
-- Avoid passing large payloads from activities to workflows, or use external payload storage.
-
----
-
-## Workflows: Composing Workflows
-
-<!-- Bad example: a MonthlyBilling workflow that reads N customer rows and processes them all inline, bloating history and tying success to a single execution. -->
-```go
-func (w *Worker) MonthlyBilling(ctx workflow.Context, req MonthlyBillingRequest) error {
-    var customers ListCustomersResponse
-    if err := workflowhelpers.AwaitActivity(ctx, w.ListCustomers, listRequest, &customers); err != nil {
-        return err
-    }
-    for _, c := range customers.IDs {
-        if err := workflowhelpers.AwaitActivity(ctx, w.BillCustomer, BillCustomerRequest{ID: c}); err != nil {
-            return err
-        }
-    }
-    return nil
-}
-```
-
-<!-- Fix: parent fans out to BillCustomer child workflows with deterministic IDs, ParentClosePolicy ABANDON for fire-and-forget, GetChildWorkflowExecution awaited before parent returns. Brief callout on workflow ID scoping (not-properly-scoping-semantic-workflow-ids). -->
-```go
-func (w *Worker) MonthlyBilling(ctx workflow.Context, req MonthlyBillingRequest) error {
-    // ... list customers
-
-    futures := make([]workflow.ChildWorkflowFuture, 0, len(customers.IDs))
-    for _, c := range customers.IDs {
-        childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-            WorkflowID:        fmt.Sprintf("billing-%s-%s", c, req.Month),
+        cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
             ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
         })
-        f := workflow.ExecuteChildWorkflow(childCtx, w.BillCustomer, BillCustomerRequest{ID: c})
-        if err := f.GetChildWorkflowExecution().Get(ctx, nil); err != nil {
-            return err
-        }
-        futures = append(futures, f)
+        refund := workflow.ExecuteChildWorkflow(cleanupCtx, w.RefundPayment, refundRequest)
+        return nil, refund.GetChildWorkflowExecution().Get(ctx, nil)
     }
-    // ... optionally wait on all futures
-    return nil
+
+    var resp PurchaseItemResponse
+    return &resp, shipFuture.Get(ctx, &resp)
 }
 ```
 
