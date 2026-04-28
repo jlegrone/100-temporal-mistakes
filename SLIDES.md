@@ -27,7 +27,7 @@ theme:
 Need to be robust to:
 - Downstream service errors
 - Worker crashes & hangs
-- Temporal server disruption
+- Temporal server disruptions
 
 Should also:
 - Not amplify bad requests
@@ -37,7 +37,7 @@ Should also:
 
 ## Activities: Handling Downstream Service Errors
 
-<!-- Code for simple example activity that calls an generic payments API and returns the result (modeled after Stripe) -->
+<!-- Code for simple example activity that calls a generic payments API and returns the result (modeled after Stripe) -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
@@ -60,11 +60,13 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
 
+    // Transport-level failures (DNS, dial, TLS) — retryable.
     resp, err := w.httpClient.Do(httpReq)
     if err != nil {
         return nil, err
     }
 
+    // Server returned a response — classify by status code.
     switch resp.StatusCode {
     case http.StatusBadRequest:
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
@@ -121,6 +123,8 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 <!-- Update the schedule to close timeout to 1h in the code example. Include code comment saying "allow retrying for up to 1 hour".
 
 Speaker note: So the first timeout mistake to avoid is a schedule to close timeout that's too short. Pick a value based on how long you want to retry in the face of a serious system outage.
+
+Speaker note: ScheduleToClose doesn't always need to be large. Long values (hours) make sense when the workflow should weather an extended outage and the caller is OK waiting, or is notified asynchronously. Short values (seconds to minutes) make sense when the workflow has a graceful degradation path, when reporting an error quickly is preferable to retrying through an outage, or when an upstream caller is waiting synchronously.
 -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
@@ -160,7 +164,10 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 }
 ```
 
-<!-- Speaker note: Another way an activity's retry behavior can be unexpectedly limited is by setting MaxAttempts. For example now if this activity quickly returns an error, we would exhaust all of our retries in less than 10 seconds, even though our intent was to survive outages of up to 1 hour. -->
+<!-- Speaker note: Another way an activity's retry behavior can be unexpectedly limited is by setting MaxAttempts. For example now if this activity quickly returns an error, we would exhaust all of our retries in less than 10 seconds, even though our intent was to survive outages of up to 1 hour.
+
+Speaker note: For reference, the default activity retry policy uses exponential backoff with a 2.0 backoff coefficient, a 1-second initial interval, a 100-second maximum interval, and unlimited attempts. Source: https://docs.temporal.io/encyclopedia/retry-policies. Workflows have no default retry policy.
+-->
 
 <!-- Comment out the MaxAttempts field in the code example. Include code comment saying "allow unlimited attempts until the ScheduleToClose timeout is reached".
 
@@ -222,6 +229,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 ## Activities: Natural Idempotency
 
+<!-- TODO(jlegrone): rehearse the transition from the payments example to this k8s example so the use-case shift lands smoothly during the talk. -->
+
 <!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
@@ -232,8 +241,31 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
         return nil, err
     }
 
-    cancel := activityhelpers.AutoHeartbeat(ctx)
-    defer cancel()
+    // Poll for final status
+    for {
+        j, err := jobs.Get(ctx, req.Name)
+        if err != nil { return nil, err }
+        if status := getJobStatus(j); status.IsTerminal() {
+            return &RunKubernetesJobResponse{Status: status}, nil
+        }
+        activity.RecordHeartbeat(ctx)
+        time.Sleep(15 * time.Second)
+    }
+}
+```
+
+---
+
+## Activities: Natural Idempotency
+
+```go
+func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+    jobs := w.client.BatchV1().Jobs(req.Namespace)
+    _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
+    // Ignore already exists errors; the activity has already run at least once.
+    if err != nil && !apierrors.IsAlreadyExists(err) {
+        return err
+    }
 
     // Poll for final status
     for {
@@ -242,10 +274,15 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
         if status := getJobStatus(j); status.IsTerminal() {
             return &RunKubernetesJobResponse{Status: status}, nil
         }
-        time.Sleep(15*time.Second)
+        activity.RecordHeartbeat(ctx)
+        time.Sleep(15 * time.Second)
     }
 }
 ```
+
+---
+
+## Activities: Natural Idempotency
 
 <!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
 
@@ -265,7 +302,13 @@ func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobR
 }
 ```
 
-<!-- Speaker note: Now the workflow needs to call both activities, one after the other, but it doesn't matter how many times either of them is retried and we get more visibility into what's going on through the workflow history. -->
+<!-- Speaker note: Now the workflow needs to call both activities, one after the other, but it doesn't matter how many times either of them is retried and we get more visibility into what's going on through the workflow history.
+
+Speaker note (likely audience question -- "should activities be small? what about lots of activities?"):
+- Fine-grained activities are usually a win: more visibility in workflow history, smaller retry scope, easier to make idempotent.
+- A worker can register many activity types with no per-type runtime cost; the only direct cost of more activities is in workflow history (each invocation adds events).
+- The tradeoff comes back in the next section -- workflow history size limits.
+-->
 
 ---
 
@@ -342,11 +385,11 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 
 ## Activities: A Grand Unified Theory
 
-- Activities MUST be idempotent.
+- Activities SHOULD be idempotent. Temporal can re-execute an activity at least once during failover or retry, so any side effect needs to be safe to repeat (or naturally idempotent, like a read).
 - ALWAYS set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
 - ALWAYS set EITHER **Heartbeat** OR **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
 - Activities that perform cleanup on cancelation MUST send heartbeats.
-- NEVER set `MaxAttempts` in your activity retry policy. Instead use `ScheduleToClose` timeout and backoff configuration to tune retry behavior and duration.
+- PREFER unlimited attempts with `ScheduleToClose` as the bound. Reserve `MaxAttempts` for cases where each attempt has external cost -- account lockouts, alert fatigue, dispute thresholds.
 - Respect standard error codes from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior as needed.
 
 ** Consider implementing and/or enforcing these policies in an interceptor.
@@ -376,10 +419,10 @@ Server-imposed limits to be aware of:
 - **Individual payload size**: ~4MB per workflow/activity input or output, signal, or update (inherited from the Temporal server's gRPC message limit).
 - **Workflow history bytes**: 50MB (sum of all events in the workflow). Results in termination.
 - **Workflow history length**: 50,000 events. Results in termination.
-- **Workflow task timeout**: 10 seconds. Results in failed workflow task (retried).
+- **Workflow task timeout**: 10 seconds (per workflow task -- not the workflow execution timeout). Results in failed workflow task (retried).
 
 Mitigations:
-- Use `GetContinueAsNewSuggested()` to start a new workflow execution before hitting history size limits.
+- Use **ContinueAsNew** to start a fresh execution with reset history. Check `GetContinueAsNewSuggested()` to know when the server is recommending it.
 - Avoid passing large payloads from activities to workflows, or use external payload storage.
 
 ---
@@ -389,12 +432,12 @@ Mitigations:
 <!-- No code example here -- just orient the audience to the categories of non-determinism they'll need to watch out for. Sourced from src/terms/non-determinism.md. -->
 
 Common sources of non-determinism in workflow code:
-- Network calls
+- Network calls (HTTP, DB queries, gRPC) -- re-execute on every replay and may return different results
 - System time (`time.Now()` vs `workflow.Now()`)
 - Random number generation
 - Usage of environment variables
 - Interactions with the filesystem
-- Coroutines not managed by the Temporal SDK
+- Goroutines spawned outside `workflow.Go` -- the SDK doesn't record their scheduling, and they often race with the workflow function for shared state
 - Variable references from outside the workflow function scope
 
 ---
@@ -410,8 +453,9 @@ Common sources of non-determinism in workflow code:
 <!-- Speaker notes:
 - Versioning is required for *any* change to workflow code that would result in a different workflow history when it runs against an existing execution.
 - Common changes that trigger this:
-  - Adding, removing, or reordering activities or child workflows
-  - Adding a timer
+  - Adding, removing, or reordering activities, child workflows, signals, or timers -- anything that changes the recorded command sequence
+  - Changing activity arguments or activity options
+  - Adding or changing a `workflow.SideEffect`
   - Rejecting an update
 -->
 ```diff
@@ -554,7 +598,8 @@ explicit error if a stale v0/v1 history ever shows up. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 2)
-+    // Continue evaluating the search attribute but with bumped min supported version
++    // Bump min supported version to 2 so v2 histories continue to replay,
++    // and any leftover v0/v1 history fails loudly instead of silently diverging.
 +    workflow.GetVersion(ctx, "add-reserve-inventory", 2, 2)
 
 -    switch inventoryResVersion {
@@ -614,7 +659,10 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 1. workflow.NewDisconnectedContext detaches the cleanup from the parent's cancelation, so the refund command can still be issued.
 2. ParentClosePolicy ABANDON keeps the child running after the parent closes, so the refund completes even if the parent returns immediately.
-3. GetChildWorkflowExecution().Get blocks until the server has accepted the start command, so we know the child is durably scheduled before the parent returns. -->
+3. GetChildWorkflowExecution().Get blocks until the server has accepted the start command, so we know the child is durably scheduled before the parent returns.
+
+Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other SDKs have equivalent mechanisms under different names -- the concept of decoupling cleanup from parent cancelation is universal.
+-->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ...
@@ -639,6 +687,97 @@ func (w *Worker) startDisconnectedRefundWorkflow(ctx workflow.Context, req Refun
     return fut.GetChildWorkflowExecution().Get(ctx, nil) // Block until child workflow start
 }
 ```
+
+---
+
+## Workflows: Use Internal Timers for Compensation
+
+> [!TIP]
+> When a workflow execution timeout fires, Temporal *terminates* the workflow -- it does not *cancel* it. No deferred functions run, no cancelation handlers fire. If you need a chance to compensate, build the deadline yourself with an internal timer.
+
+```go
+// Reserve at least 1 minute for compensation before the hard timeout.
+softTimeout, err := getSoftTimeout(ctx, time.Minute)
+if err != nil {
+    return err
+}
+// ... race the soft timeout against child completion and ctx.Done()
+```
+
+Source: `src/assuming_workflow_timeouts_allow_graceful_cleanup/`
+
+---
+
+## Workflows: Cap Workflow Lifetime With ContinueAsNew
+
+> [!TIP]
+> Long-running workflows accumulate history events, lengthening replay time and eventually hitting the 50k event limit. Cap lifetime by completing or calling **ContinueAsNew** within 24 hours.
+
+```go
+if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
+    return workflow.NewContinueAsNewError(ctx, MyWorkflow, state)
+}
+```
+
+Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control.
+
+Source: `src/not_using_continue_as_new/`
+
+---
+
+## Workflows: Drain Signals Before Completing
+
+> [!TIP]
+> If a workflow completes or calls ContinueAsNew while signals are buffered in its channel, those signals are silently lost. Drain the channel before returning.
+
+```go
+for {
+    var signal MySignal
+    if ok := signalCh.ReceiveAsync(&signal); !ok {
+        break
+    }
+    state.Apply(signal)
+}
+return workflow.NewContinueAsNewError(ctx, MyWorkflow, state)
+```
+
+Apply the drained signals to your state -- don't just read and discard them. Make sure all completion paths (success, error, ContinueAsNew) include draining.
+
+Source: `src/not_draining_signals_before_completing_workflow/`
+
+---
+
+## Workflows: Fan Out Large Batches to Child Workflows
+
+> [!TIP]
+> Concentrating all batch work in one workflow causes history overflow and lock contention. Distribute work across child workflows instead.
+
+Activities scheduled concurrently compete for the workflow lock, and large histories push against the 50k event limit. Split work into size-limited batches and handle each batch in a separate child workflow. Nest as needed -- batches of batches -- to create a tree with concurrency control at each level.
+
+Source: `src/naive-batch-processing-implementation.md`
+
+---
+
+## Workers: Worker Versioning and Pinned Workflows
+
+> [!TIP]
+> Worker versioning with pinned workflows ensures each running workflow replays against the same code version it started on -- removing most of the patching burden as deployments roll forward.
+
+<!-- TODO(jlegrone): backfill from a dedicated mistake entry once one is written; for now, link the official docs. -->
+
+Reference: https://docs.temporal.io/worker-versioning
+
+---
+
+## Workers: External Payload Storage for Large Payloads
+
+> [!TIP]
+> Individual workflow/activity request/response payloads, signals, and updates cannot exceed 4 MB by default (inherited from the Temporal server's gRPC limit). Use external storage when larger data must flow through workflow code.
+
+Trim inputs and outputs to the minimum the caller needs. Store large data in an external system (database, blob storage, sessions) and pass references (IDs, URLs) instead. When larger payloads are genuinely required, an external storage codec can offload them at the serialization layer.
+
+Reference: https://docs.temporal.io/external-storage  
+Source: `src/overflowing-maximum-individual-payload-size.md`
 
 ---
 
