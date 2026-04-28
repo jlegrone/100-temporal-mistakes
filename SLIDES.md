@@ -530,37 +530,17 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 
 ## Workflows: Living Within Server Limits
 
-<!-- Bad example: a long-lived SubscriptionWorkflow that loops on signals indefinitely, history grows past the warning threshold. Speaker note hook: show the symptom (event count climbing). -->
-```go
-func (w *Worker) SubscriptionWorkflow(ctx workflow.Context, req SubscriptionWorkflowRequest) error {
-    renewals := workflow.GetSignalChannel(ctx, "Renew")
-    for {
-        var renewal RenewRequest
-        renewals.Receive(ctx, &renewal)
-        if err := workflowhelpers.AwaitActivity(ctx, w.ProcessRenewal, renewal); err != nil {
-            return err
-        }
-        // History grows on every renewal -- eventually trips server limits.
-    }
-}
-```
+<!-- No code example -- just the limits. Numbers sourced from src/overflowing-*.md. -->
 
-<!-- Fix: ContinueAsNew once history reaches a threshold, carrying state forward. -->
-```go
-func (w *Worker) SubscriptionWorkflow(ctx workflow.Context, req SubscriptionWorkflowRequest) error {
-    renewals := workflow.GetSignalChannel(ctx, "Renew")
-    for i := 0; i < 1000; i++ {
-        var renewal RenewRequest
-        renewals.Receive(ctx, &renewal)
-        if err := workflowhelpers.AwaitActivity(ctx, w.ProcessRenewal, renewal); err != nil {
-            return err
-        }
-    }
-    return workflow.NewContinueAsNewError(ctx, w.SubscriptionWorkflow, req.Carrying(/* ... */))
-}
-```
+Server-imposed limits to design around:
+- **Individual payload size**: 4MB per workflow/activity input or output, signal, or update (default; inherited from the Temporal server's gRPC message limit).
+- **Workflow history bytes**: 50MB total per execution (default). Workflow is terminated when exceeded -- no cleanup runs.
+- **Workflow history length**: 50,000 events per execution (default). Same termination behavior.
 
-<!-- Sub-bullet: pass a small reference (e.g. an S3 key) between activities instead of a 5MB blob. -->
+Mitigations:
+- Use `ContinueAsNew` to reset history before approaching either limit (e.g. at 10k events or 24h of runtime).
+- Pass references (IDs, URLs) instead of blobs between activities and workflows.
+- For genuinely large payloads, offload at the serialization layer with an external storage codec.
 
 ---
 
