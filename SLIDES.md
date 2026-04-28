@@ -430,8 +430,12 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ## Workflows: Verifying Replay Safety
 
-<!-- TODO: Add a code example of a replay test using `worker.WorkflowReplayer` against a captured history file.
--->
+<!-- Speaker note: Run replay tests in CI against captured production histories. If the new code's command sequence diverges from the recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
+```go
+func TestReplayWorkflowHistory(t *testing.T) {
+    require.NoError(t, testsuite.ReplayWorkflowHistory(t, PurchaseItem, "testdata/purchase_item_history.json"))
+}
+```
 
 ---
 

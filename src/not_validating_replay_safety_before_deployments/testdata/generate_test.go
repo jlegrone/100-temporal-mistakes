@@ -22,6 +22,7 @@ import (
 func TestGenerateHistory(t *testing.T) {
 	c, taskQueue := internaltestsuite.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(parent.MyWorkflow)
+		r.RegisterActivity(parent.MyActivity)
 	})
 
 	run, err := c.ExecuteWorkflow(t.Context(), client.StartWorkflowOptions{

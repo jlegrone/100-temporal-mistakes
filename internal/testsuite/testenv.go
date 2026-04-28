@@ -9,6 +9,7 @@ import (
 type TB interface {
 	Helper()
 	Log(args ...any)
+	Fatal(error)
 }
 
 // NewTestWorkflowEnvironment creates a test workflow environment with
