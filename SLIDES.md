@@ -130,6 +130,7 @@ Speaker note: So the first timeout mistake to avoid is a schedule to close timeo
 
 Speaker note: ScheduleToClose doesn't always need to be large. Long values (hours) make sense when the workflow should weather an extended outage and the caller is OK waiting, or is notified asynchronously. Short values (seconds to minutes) make sense when the workflow has a graceful degradation path, when reporting an error quickly is preferable to retrying through an outage, or when an upstream caller is waiting synchronously.
 -->
+<!-- TODO: make this a diff against the previous slide -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... generate a charge request for the item & customer
@@ -155,7 +156,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
-        ScheduleToCloseTimeout: time.Hour,
+        ScheduleToCloseTimeout: time.Hour, // allow retrying for up to 1 hour
         RetryPolicy: &temporal.RetryPolicy{
             MaximumAttempts:    3,
             InitialInterval:    time.Second,
@@ -163,7 +164,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
             MaximumInterval:    30 * time.Second,
         },
     })
-    
+
     // ... execute the ChargePayment activity
 }
 ```
@@ -460,7 +461,10 @@ Common sources of non-determinism in workflow code:
 
 ## Workflows: Keeping Code Deterministic (continued)
 
-<!-- TODO: Link to documentation on workflowcheck and sandboxes in typescript and python SDKs -->
+Tools to catch non-determinism:
+- **Go**: [`workflowcheck`](https://github.com/temporalio/sdk-go/tree/master/contrib/tools/workflowcheck) -- opt-in static analyzer that flags non-deterministic calls in workflow code.
+- **Python**: [Workflow sandbox](https://docs.temporal.io/develop/python/python-sdk-sandbox) -- enabled by default; restricts imports and module access at runtime.
+- **TypeScript**: V8 isolate sandboxing is built-in -- workflow code runs in a separate V8 context with no Node.js APIs.
 
 ---
 
@@ -498,7 +502,7 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ---
 
-## Workflows: Evaluate Patches Up Front
+## Workflows: Evaluate Change Versions Up Front
 
 <!-- Speaker note: The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken. -->
 ```diff
@@ -522,7 +526,7 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ---
 
-## Workflows: Evaluate Patches Up Front (continued)
+## Workflows: Evaluate Change Versions Up Front (continued)
 
 <!-- Speaker note: Subsequent changes bump the patch's max version. The decision of whether to reserve inventory now moves into the activity, so the workflow always calls it on the new code path. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
 ```diff
