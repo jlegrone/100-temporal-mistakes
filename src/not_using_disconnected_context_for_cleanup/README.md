@@ -46,35 +46,34 @@ func PurchaseItemV2(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseIte
 
 	shipFuture := workflow.ExecuteActivity(ctx, ShipItem, ShipItemRequest{OrderID: req.OrderID})
 
-	var ship ShipItemResponse
-	var err error
-	sel := workflow.NewSelector(ctx)
+	var (
+		shipResp ShipItemResponse
+		err      error
+		sel      = workflow.NewNamedSelector(ctx, "shipment")
+	)
 	sel.AddFuture(shipFuture, func(f workflow.Future) {
-		err = f.Get(ctx, &ship)
+		err = f.Get(ctx, &shipResp)
 	})
-	sel.AddFuture(workflow.NewTimer(ctx, 5*time.Minute), func(f workflow.Future) {
-		err = errors.New("fulfilment deadline exceeded")
+	sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+		err = workflow.ErrDeadlineExceeded
 	})
-	sel.Select(ctx) // fires when shipping completes, the timer fires, or ctx is canceled
+	sel.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) {
+		err = ctx.Err()
+	})
+	sel.Select(ctx) // fires when the item is shipped, the timer fires, or ctx is canceled
 
 	if err != nil {
-		// Start the refund as an abandoned child workflow on a disconnected
-		// context so the cleanup survives the parent's cancelation.
-		cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
-		cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
-			WorkflowID:        "refund-" + req.OrderID,
-			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-		})
-		refund := workflow.ExecuteChildWorkflow(cleanupCtx, RefundPayment, RefundPaymentRequest{
-			OrderID:    req.OrderID,
-			CustomerID: req.CustomerID,
-		})
-		if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
+		if startErr := workflowhelpers.StartDisconnectedChildWorkflow(
+			ctx,
+			RefundPayment,
+			RefundPaymentRequest{OrderID: req.OrderID, CustomerID: req.CustomerID},
+			workflow.ChildWorkflowOptions{WorkflowID: "refund-" + req.OrderID},
+		); startErr != nil {
 			return nil, startErr
 		}
 	}
 
-	return &PurchaseItemResponse{TrackingID: ship.TrackingID}, err
+	return &PurchaseItemResponse{TrackingID: shipResp.TrackingID}, err
 }
 
 ```

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"go.temporal.io/api/enums/v1"
+	"github.com/jlegrone/100-temporal-mistakes/internal/workflowhelpers"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -112,19 +112,12 @@ func PurchaseItemV2(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseIte
 	sel.Select(ctx) // fires when the item is shipped, the timer fires, or ctx is canceled
 
 	if err != nil {
-		// Start the refund as an abandoned child workflow on a disconnected
-		// context so the cleanup survives the parent's cancelation.
-		cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
-		cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
-			WorkflowID:        "refund-" + req.OrderID,
-			ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-		})
-		refund := workflow.ExecuteChildWorkflow(cleanupCtx, RefundPayment, RefundPaymentRequest{
-			OrderID:    req.OrderID,
-			CustomerID: req.CustomerID,
-		})
-		// Get the child workflow future to ensure that it has been started.
-		if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
+		if startErr := workflowhelpers.StartDisconnectedChildWorkflow(
+			ctx,
+			RefundPayment,
+			RefundPaymentRequest{OrderID: req.OrderID, CustomerID: req.CustomerID},
+			workflow.ChildWorkflowOptions{WorkflowID: "refund-" + req.OrderID},
+		); startErr != nil {
 			return nil, startErr
 		}
 	}

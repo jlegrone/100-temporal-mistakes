@@ -569,15 +569,16 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
     shipFuture := workflow.ExecuteActivity(ctx, w.ShipItem, shipRequest)
 
-    var resp PurchaseItemResponse
+    var shipment ShipItemResponse
     var err error
     sel := workflow.NewNamedSelector(ctx, "shipment")
-    sel.AddFuture(shipFuture, func(f workflow.Future) { err = f.Get(ctx, &resp) })
+
+    sel.AddFuture(shipFuture, func(f workflow.Future) { err = f.Get(ctx, &shipment) })
     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
         err = workflow.ErrDeadlineExceeded
     })
     sel.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) { err = ctx.Err() })
-    
+
     sel.Select(ctx)
     if err != nil {
         // BAD: shares the parent's ctx, no abandon policy, doesn't await scheduling.
@@ -585,7 +586,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
         return nil, err
     }
 
-    return &resp, nil
+    return &PurchaseItemResponse{TrackingID: shipment.TrackingID}, nil
 }
 ```
 
@@ -600,22 +601,24 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 3. GetChildWorkflowExecution().Get blocks until the server has accepted the start command, so we know the child is durably scheduled before the parent returns. -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... selector as before, sets err on shipping failure, deadline, or cancelation
 
     sel.Select(ctx)
     if err != nil {
-        cleanupCtx, _ := workflow.NewDisconnectedContext(ctx)
-        cleanupCtx = workflow.WithChildOptions(cleanupCtx, workflow.ChildWorkflowOptions{
-            ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-        })
-        refund := workflow.ExecuteChildWorkflow(cleanupCtx, w.RefundPayment, refundRequest)
-        if startErr := refund.GetChildWorkflowExecution().Get(cleanupCtx, nil); startErr != nil {
-            return nil, startErr
+        if startErr := w.startDisconnectedRefundWorkflow(ctx, refundRequest); startErr != nil {
+            workflow.GetLogger(ctx).Warn("failed to start refund", "error", startErr)
         }
-        return err
+        return nil, err
     }
 
-    return &resp, nil
+}
+
+func (w *Worker) startDisconnectedRefundWorkflow(ctx workflow.Context, req RefundRequest) error {
+    ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
+        ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON
+    })
+    ctx, _ = workflow.NewDisconnectedContext(ctx)
+    fut := workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, req)
+    return fut.GetChildWorkflowExecution().Get(ctx, nil)
 }
 ```
 
