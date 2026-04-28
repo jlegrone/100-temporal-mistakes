@@ -231,10 +231,13 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 <!-- TODO(jlegrone): rehearse the transition from the payments example to this k8s example so the use-case shift lands smoothly during the talk. -->
 
+<!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
+
 <!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
     jobs := w.client.BatchV1().Jobs(req.Namespace)
+    // Create the job
     if _, err := jobs.Create(ctx, &batchv1.Job{
         Name: req.Name,
     }); err != nil {
@@ -258,34 +261,29 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
 
 ## Activities: Natural Idempotency
 
-```go
-func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
-    jobs := w.client.BatchV1().Jobs(req.Namespace)
-    _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
-    // Ignore already exists errors; the activity has already run at least once.
-    if err != nil && !apierrors.IsAlreadyExists(err) {
-        return err
-    }
-
-    // Poll for final status
-    for {
-        j, err := jobs.Get(ctx, req.Name)
-        if err != nil { return nil, err }
-        if status := getJobStatus(j); status.IsTerminal() {
-            return &RunKubernetesJobResponse{Status: status}, nil
-        }
-        activity.RecordHeartbeat(ctx)
-        time.Sleep(15 * time.Second)
-    }
-}
+<!-- Updated code example, now ignoring an already exists error for the job. -->
+```diff
+ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+     jobs := w.client.BatchV1().Jobs(req.Namespace)
+-    if _, err := jobs.Create(ctx, &batchv1.Job{
+-        Name: req.Name,
+-    }); err != nil {
+-        return nil, err
++    // Create the job if it doesn't exist
++    _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
++    // Ignore already exists errors; the activity has already run at least once.
++    if err != nil && !apierrors.IsAlreadyExists(err) {
++        return nil, err
+     }
+ 
+     // Poll for final status
+     // ...
+ }
 ```
 
 ---
 
 ## Activities: Natural Idempotency
-
-<!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
-
 <!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
 ```go
 func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobRequest) error {
@@ -298,7 +296,8 @@ func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobR
 }
 
 func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobRequest) (*AwaitKubernetesJobResponse, error) {
-    // ... Poll for final status
+    // Poll for final status
+    // ...
 }
 ```
 
