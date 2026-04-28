@@ -338,4 +338,280 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 
 # Part Two: Workflows
 
-<!-- TODO -->
+Need to be robust to:
+- Workflow code changing across deployments
+- Server-imposed history & payload limits
+- Signals arriving in unpredictable order
+- Cancelation requests at any point in execution
+
+Should also:
+- Stay deterministic across replays
+- Yield quickly to the workflow task event loop
+
+---
+
+## Workflows: Keeping Code Deterministic
+
+<!-- No code example here -- just orient the audience to the categories of non-determinism they'll need to watch out for. Sourced from src/terms/non-determinism.md. -->
+
+Common sources of non-determinism in workflow code:
+- Network calls
+- System time (`time.Now()` vs `workflow.Now()`)
+- Random number generation
+- Usage of environment variables
+- Interactions with the filesystem
+- Coroutines not managed by the Temporal SDK
+- Variable references from outside the workflow function scope
+
+---
+
+## Workflows: Keeping Code Deterministic
+
+<!-- TODO: Link to documentation on workflowcheck and sandboxes in typescript and python SDKs -->
+
+---
+
+## Workflows: Versioning Code Changes
+
+<!-- Bad example: add a new ReserveInventory activity call between two existing steps in the PurchaseItem workflow from Part One. In-flight workflows replay against the new code path and fail with non-determinism. -->
+```go
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... validate the request
+
+    // NEW step inserted between existing activities -- breaks replay for in-flight workflows.
+    if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
+        return nil, err
+    }
+
+    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+}
+```
+
+<!-- Fix: wrap the new branch with workflow.GetVersion. -->
+```go
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... validate the request
+
+    v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
+    if v == 1 {
+        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
+            return nil, err
+        }
+    }
+
+    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+}
+```
+
+<!-- Speaker note hook: once all old executions have closed, you can collapse the branch but keep the GetVersion call so any replayed history still resolves. -->
+
+---
+
+## Workflows: Verifying Replay Safety
+
+<!-- TODO: Add a code example of a replay test using `worker.WorkflowReplayer` against a captured history file.
+-->
+
+---
+
+## Workflows: Coordinating Signals & Updates
+
+<!-- New running example: an OrderWorkflow that takes CancelOrder signals and AddItem updates.
+
+Bad example: handler assumes signals/updates arrive in the order users sent them. Show two messages racing and the workflow mishandling the second. -->
+```go
+func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
+    cancelCh := workflow.GetSignalChannel(ctx, "CancelOrder")
+    workflow.SetUpdateHandler(ctx, "AddItem", w.handleAddItem)
+
+    // BAD: assumes the first thing we observe reflects user intent.
+    var canceled bool
+    cancelCh.ReceiveAsync(&canceled)
+    if canceled {
+        return nil, errors.New("canceled")
+    }
+    // ... continue placing the order
+}
+```
+
+<!-- Fix: workflow.Await on a precondition before processing, and a final wait for all handlers to drain (workflow.Await(ctx, workflow.AllHandlersFinished)) before returning. Mention update validators briefly. -->
+```go
+func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
+    // ... register signal/update handlers
+
+    if err := workflow.Await(ctx, func() bool {
+        return w.readyToCheckout(ctx) || w.canceled
+    }); err != nil {
+        return nil, err
+    }
+
+    // ... place the order
+
+    // Drain in-flight handlers before returning so updates aren't lost.
+    if err := workflow.Await(ctx, workflow.AllHandlersFinished); err != nil {
+        return nil, err
+    }
+    return &OrderWorkflowResponse{ /* ... */ }, nil
+}
+```
+
+---
+
+## Workflows: Designing for Cancelation
+
+<!-- Bad example: cleanup activity called with the same canceled ctx -- it's never scheduled because the context is already canceled. Also show a defer cleanup() blocked on a channel that never returns. -->
+```go
+func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
+    // ... place the order
+
+    defer func() {
+        // BAD: ctx may already be canceled here, so RefundPayment never runs.
+        _ = workflowhelpers.AwaitActivity(ctx, w.RefundPayment, refundRequest)
+    }()
+
+    return w.runOrder(ctx, req)
+}
+```
+
+<!-- Fix: workflow.NewDisconnectedContext for the cleanup activity. Show structural select on ctx.Done() plus signal channel for the deadlock case. -->
+```go
+func (w *Worker) OrderWorkflow(ctx workflow.Context, req OrderWorkflowRequest) (*OrderWorkflowResponse, error) {
+    // ... place the order
+
+    defer func() {
+        cleanupCtx, cancel := workflow.NewDisconnectedContext(ctx)
+        defer cancel()
+        _ = workflowhelpers.AwaitActivity(cleanupCtx, w.RefundPayment, refundRequest)
+    }()
+
+    return w.runOrder(ctx, req)
+}
+```
+
+---
+
+## Workflows: Don't Block the Task Loop
+
+<!-- Bad example: tight polling loop in workflow code racks up history events. -->
+```go
+func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+    // ... start the job
+
+    for {
+        var resp PollJobStatusResponse
+        if err := workflowhelpers.AwaitActivity(ctx, w.PollJobStatus, pollRequest, &resp); err != nil {
+            return nil, err
+        }
+        if resp.Status.IsTerminal() {
+            return &RunKubernetesJobResponse{Status: resp.Status}, nil
+        }
+        _ = workflow.Sleep(ctx, time.Second) // Each iteration adds events to history.
+    }
+}
+```
+
+<!-- Fix: replace the loop with a single long-running heartbeating activity that polls internally (this is the AwaitKubernetesJob activity from Part One). Briefly mention that clients polling for workflow results should use WorkflowRun.Get instead. -->
+```go
+func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+    // ... start the job
+
+    return workflowhelpers.AwaitActivity(
+        workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+            HeartbeatTimeout:       30 * time.Second,
+            ScheduleToCloseTimeout: time.Hour,
+        }),
+        w.AwaitKubernetesJob,
+        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+    )
+}
+```
+
+---
+
+## Workflows: Living Within Server Limits
+
+<!-- Bad example: a long-lived SubscriptionWorkflow that loops on signals indefinitely, history grows past the warning threshold. Speaker note hook: show the symptom (event count climbing). -->
+```go
+func (w *Worker) SubscriptionWorkflow(ctx workflow.Context, req SubscriptionWorkflowRequest) error {
+    renewals := workflow.GetSignalChannel(ctx, "Renew")
+    for {
+        var renewal RenewRequest
+        renewals.Receive(ctx, &renewal)
+        if err := workflowhelpers.AwaitActivity(ctx, w.ProcessRenewal, renewal); err != nil {
+            return err
+        }
+        // History grows on every renewal -- eventually trips server limits.
+    }
+}
+```
+
+<!-- Fix: ContinueAsNew once history reaches a threshold, carrying state forward. -->
+```go
+func (w *Worker) SubscriptionWorkflow(ctx workflow.Context, req SubscriptionWorkflowRequest) error {
+    renewals := workflow.GetSignalChannel(ctx, "Renew")
+    for i := 0; i < 1000; i++ {
+        var renewal RenewRequest
+        renewals.Receive(ctx, &renewal)
+        if err := workflowhelpers.AwaitActivity(ctx, w.ProcessRenewal, renewal); err != nil {
+            return err
+        }
+    }
+    return workflow.NewContinueAsNewError(ctx, w.SubscriptionWorkflow, req.Carrying(/* ... */))
+}
+```
+
+<!-- Sub-bullet: pass a small reference (e.g. an S3 key) between activities instead of a 5MB blob. -->
+
+---
+
+## Workflows: Composing Workflows
+
+<!-- Bad example: a MonthlyBilling workflow that reads N customer rows and processes them all inline, bloating history and tying success to a single execution. -->
+```go
+func (w *Worker) MonthlyBilling(ctx workflow.Context, req MonthlyBillingRequest) error {
+    var customers ListCustomersResponse
+    if err := workflowhelpers.AwaitActivity(ctx, w.ListCustomers, listRequest, &customers); err != nil {
+        return err
+    }
+    for _, c := range customers.IDs {
+        if err := workflowhelpers.AwaitActivity(ctx, w.BillCustomer, BillCustomerRequest{ID: c}); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+<!-- Fix: parent fans out to BillCustomer child workflows with deterministic IDs, ParentClosePolicy ABANDON for fire-and-forget, GetChildWorkflowExecution awaited before parent returns. Brief callout on workflow ID scoping (not-properly-scoping-semantic-workflow-ids). -->
+```go
+func (w *Worker) MonthlyBilling(ctx workflow.Context, req MonthlyBillingRequest) error {
+    // ... list customers
+
+    futures := make([]workflow.ChildWorkflowFuture, 0, len(customers.IDs))
+    for _, c := range customers.IDs {
+        childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+            WorkflowID:        fmt.Sprintf("billing-%s-%s", c, req.Month),
+            ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+        })
+        f := workflow.ExecuteChildWorkflow(childCtx, w.BillCustomer, BillCustomerRequest{ID: c})
+        if err := f.GetChildWorkflowExecution().Get(ctx, nil); err != nil {
+            return err
+        }
+        futures = append(futures, f)
+    }
+    // ... optionally wait on all futures
+    return nil
+}
+```
+
+---
+
+## Workflows: A Grand Unified Theory
+
+- Workflow code MUST be deterministic. Use the Temporal SDK for time, randomness, and side effects.
+<!-- - ALWAYS verify replay safety in CI. Static analysis catches the obvious; replay tests catch the rest. -->
+- ALWAYS use workflow versioning when changing the shape of a running workflow.
+- NEVER break payload schemas in place. Add fields, never remove or rename.
+- Drain signals/updates before completing, and use a disconnected context for cleanup.
+- NEVER write tight polling loops in workflow code. Push the loop into a heartbeating activity.
+- Plan for history and payload limits -- use ContinueAsNew and pass references, not blobs.
