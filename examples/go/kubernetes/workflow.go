@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"time"
 
+	"github.com/jlegrone/100-temporal-mistakes/internal/workflowhelpers"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	batchv1 "k8s.io/api/batch/v1"
@@ -27,28 +28,33 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 	retryPolicy := &temporal.RetryPolicy{
 		InitialInterval:    time.Second,
 		BackoffCoefficient: 2.0,
-		MaximumInterval:    30 * time.Second,
+		MaximumInterval:    time.Minute,
 	}
 
-	startCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout:    30 * time.Second,
-		ScheduleToCloseTimeout: time.Hour,
-		RetryPolicy:            retryPolicy,
-	})
-	startReq := StartKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace, Spec: req.Spec}
-	var startResp StartKubernetesJobResponse
-	if err := workflow.ExecuteActivity(startCtx, w.StartKubernetesJob, startReq).Get(startCtx, &startResp); err != nil {
+	startResp, err := workflowhelpers.AwaitActivity(
+		workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+			// This activity should return quickly, so no heartbeats needed.
+			StartToCloseTimeout:    30 * time.Second,
+			ScheduleToCloseTimeout: time.Hour,
+			RetryPolicy:            retryPolicy,
+		}),
+		w.StartKubernetesJob,
+		StartKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace, Spec: req.Spec})
+	if err != nil {
 		return nil, err
 	}
 
-	awaitCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		HeartbeatTimeout:       30 * time.Second,
-		ScheduleToCloseTimeout: time.Hour,
-		RetryPolicy:            retryPolicy,
-	})
-	awaitReq := AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace}
-	var awaitResp AwaitKubernetesJobResponse
-	if err := workflow.ExecuteActivity(awaitCtx, w.AwaitKubernetesJob, awaitReq).Get(awaitCtx, &awaitResp); err != nil {
+	awaitResp, err := workflowhelpers.AwaitActivity(
+		workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+			// This activity may run for a long time, so use Heartbeat instead of StartToClose timeout.
+			HeartbeatTimeout:       30 * time.Second,
+			ScheduleToCloseTimeout: time.Hour,
+			RetryPolicy:            retryPolicy,
+		}),
+		w.AwaitKubernetesJob,
+		AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+	)
+	if err != nil {
 		return nil, err
 	}
 	return &RunKubernetesJobResponse{UID: startResp.UID, Status: awaitResp.Status}, nil

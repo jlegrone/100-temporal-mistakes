@@ -161,7 +161,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 <!-- New code example, this time showing the workflow code that invokes the payment activity. Set a 30s start to close timeout and a 1m schedule to close timeout. -->
 ```go
-func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... generate a charge request for the item & customer
 
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
@@ -181,7 +181,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemR
 Speaker note: So the first timeout mistake to avoid is a schedule to close timeout that's too short. Pick a value based on how long you want to retry in the face of a serious system outage.
 -->
 ```go
-func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... generate a charge request for the item & customer
 
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
@@ -200,7 +200,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemR
 
 <!-- Update code example, now adding a retry policy with MaxAttempts set to 3, initial backoff to 1s, backoff coefficient to 2, and max backoff to 30s. -->
 ```go
-func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... generate a charge request for the item & customer
 
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
@@ -225,7 +225,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemR
 Speaker note: I think a much simpler mental model is to allow unlimited attempts, and only use retry policy to tune the backoff behavior like initial interval and maximum backoff duration as needed.
 -->
 ```go
-func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... generate a charge request for the item & customer
 
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
@@ -252,15 +252,13 @@ Choosing between StartToClose and Heartbeat timeouts
 <!-- New workflow code example, this time invoking our (longer running) AwaitKubernetesJob activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+    // Start the job
+    
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Hour,
     })
-    var resp AwaitKubernetesJobResponse
-    if err := workflow.ExecuteActivity(ctx, w.AwaitKubernetesJob, req).Get(ctx, &resp); err != nil {
-        return nil, err
-    }
-    // ... return the result ...
+    return workflowhelpers.AwaitActivity(ctx, w.AwaitKubernetesJob, req)
 }
 ```
 
