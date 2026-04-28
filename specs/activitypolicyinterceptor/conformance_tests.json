@@ -1,18 +1,18 @@
 {
   "$schema_version": "2.0",
-  "spec_document": "SPEC.md",
+  "spec_document": "README.md",
   "description": "Conformance tests for the Activity Policy Interceptor specification. Each test specifies an interceptor configuration, a scenario (either scheduling an activity from a workflow or executing an activity), and the expected outcome. Implementations in any host SDK should be able to translate each test into a runnable case using their SDK's test harness.",
   "conventions": {
     "duration_unit": "seconds (integer or fractional)",
     "unset_field": "null",
-    "config_defaults": "Configuration options not listed in a test's interceptor_config use the defaults from SPEC.md (Severities map fully Error, AutoHeartbeat=true, Logger=null).",
+    "config_defaults": "Configuration options not listed in a test's interceptor_config use the defaults from README.md (Severities map fully Error, AutoHeartbeat=true, Logger=null).",
     "severities_map_default": "All four policy identifiers default to Error: schedule_to_close_required, max_attempts_must_be_zero_or_at_least_3, local_activity_start_to_close_under_10s_required, timeouts_permit_retries.",
     "scenario_types": {
       "schedule_activity": "Workflow attempts to schedule an activity with the given options. Test harness inspects whether the call was forwarded, mutated, or violated.",
       "execute_activity": "Activity runs for the given duration on the worker with the interceptor active. Test harness inspects observable side effects (heartbeats, returns, etc.)."
     },
     "expected_outcome_values": {
-      "violation": "The interceptor blocked the scheduling call and surfaced an ApplicationFailure. The `application_failure` field describes the expected shape per SPEC.md requirements 27-30.",
+      "violation": "The interceptor blocked the scheduling call and surfaced an ApplicationFailure. The `application_failure` field describes the expected shape per README.md requirements 27-30.",
       "forwarded": "The interceptor allowed the scheduling call to proceed unchanged and emitted no violation log.",
       "forwarded_with_mutation": "The interceptor modified the activity options before forwarding (e.g., applied a default heartbeat). The `mutated_options` field lists expected post-mutation values.",
       "warn_logged_and_forwarded": "The interceptor emitted a warning log entry and forwarded the call unchanged. The `logged_policies` field names the expected policy identifiers in the log entries.",

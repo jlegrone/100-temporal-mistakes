@@ -141,16 +141,6 @@ When the upstream requirements refer to a `PolicyViolationError`, the concrete a
 
 ---
 
-## Testing
-
-31. THE INTERCEPTOR SHALL include unit tests covering at minimum: each individual policy violation under `Error` severity, each individual policy violation under `Warn` severity, each individual policy under `Ignore` severity (no enforcement), a multi-policy violation, the default-heartbeat behavior (requirement 9), `AutoHeartbeat == true`, `AutoHeartbeat == false`, and the happy path (valid options).
-
-32. THE INTERCEPTOR SHALL include at least one example showing the interceptor wired into a worker and demonstrating a successful activity execution end-to-end.
-
-33. THE INTERCEPTOR SHALL achieve at least 80% line coverage on the implementation, measured by the host language's standard coverage tool.
-
----
-
 ## Conformance Tests
 
 Conformance test cases live in [`conformance_tests.json`](conformance_tests.json) alongside this spec. Each test specifies an interceptor configuration, a scenario (scheduling or executing an activity), and the expected outcome (violation, forwarded, or execution side effects). Implementations in any host SDK should translate these tests into runnable cases using the SDK's test harness.
