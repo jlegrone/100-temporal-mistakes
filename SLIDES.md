@@ -273,14 +273,12 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 }
 ```
 
-<!-- Speaker note: Our payments activity was expected to always complete in under 30s — but `AwaitKubernetesJob` polls until the Kubernetes Job finishes, which can take much longer. A short start to close timeout made sense for the previous use case, but setting too short a value here could mean that some requests never complete, no matter how many retry attempts are made. -->
-<!-- Speaker note: Our previous activity example was expected to always complete in under 30s. But that's not the case for all activities. A short start to close timeout made sense for the previous use case, but what about for an activity that could run for much longer? Setting too short a value could mean that some requests never complete, no matter how many retry attempts are made. -->
+<!-- Speaker note: Our previous activity example was expected to always complete in under 30s. But that's not the case for all activities. A short start to close timeout made sense for the payments use case, but what about waiting for a k8s job that could run for much longer? Setting too short a value could mean that some activities never complete, no matter how many retry attempts are made.
 
-<!-- Updated code example: Change the start to close timeout to 5m.
-
-Speaker note:
 So we can try increasing the start to close timeout, but now this also means that if the worker crashes or becomes unresponsive, we'd have to wait much longer before Temporal retries the activity.
 -->
+
+<!-- Updated code example: Change the start to close timeout to 5m. -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
     // Start the job
