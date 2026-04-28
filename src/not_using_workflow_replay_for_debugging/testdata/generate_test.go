@@ -7,7 +7,7 @@ import (
 
 	parent "github.com/jlegrone/100-temporal-mistakes/src/not_using_workflow_replay_for_debugging"
 
-	internaltestsuite "github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
@@ -20,7 +20,7 @@ import (
 //
 //	go test ./src/not_using_workflow_replay_for_debugging/testdata/ -run TestGenerateHistory -count=1
 func TestGenerateHistory(t *testing.T) {
-	c, taskQueue := internaltestsuite.StartDevServerWorker(t, func(r worker.Registry) {
+	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(parent.MyWorkflow)
 		r.RegisterActivity(parent.GreetActivity)
 	})

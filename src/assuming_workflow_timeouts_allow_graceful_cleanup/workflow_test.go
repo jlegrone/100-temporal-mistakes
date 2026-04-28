@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	internaltestsuite "github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/testsuite"
 )
 
 func TestV1_CompensationNeverRuns(t *testing.T) {
-	env := internaltestsuite.NewTestWorkflowEnvironment(t)
+	env := testhelpers.NewTestWorkflowEnvironment(t)
 	env.RegisterWorkflow(LongRunningWorkflow)
 	env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
 
@@ -76,7 +76,7 @@ func TestMyWorkflowV2(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := internaltestsuite.NewTestWorkflowEnvironment(t)
+			env := testhelpers.NewTestWorkflowEnvironment(t)
 			env.RegisterWorkflow(LongRunningWorkflow)
 			env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
 

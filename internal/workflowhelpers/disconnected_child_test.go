@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/jlegrone/100-temporal-mistakes/internal/workflowhelpers"
 )
 
@@ -32,7 +32,7 @@ func TestStartDisconnectedChildWorkflow_StartsChildAndReturns(t *testing.T) {
 		)
 	}
 
-	env := testsuite.NewTestWorkflowEnvironment(t)
+	env := testhelpers.NewTestWorkflowEnvironment(t)
 	env.RegisterWorkflow(cleanupWorkflow)
 
 	env.ExecuteWorkflow(parent)
@@ -52,7 +52,7 @@ func TestStartDisconnectedChildWorkflow_RunsAfterParentCancelation(t *testing.T)
 		)
 	}
 
-	env := testsuite.NewTestWorkflowEnvironment(t)
+	env := testhelpers.NewTestWorkflowEnvironment(t)
 	env.RegisterWorkflow(cleanupWorkflow)
 	env.RegisterDelayedCallback(env.CancelWorkflow, 0)
 

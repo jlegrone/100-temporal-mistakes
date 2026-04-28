@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
@@ -52,7 +52,7 @@ func slowLocalActivityWorkflow(ctx workflow.Context, request any) error {
 // @@@SNIPSTART fallible-local-activities-test
 
 func TestLocalActivityRetriesExhausted(t *testing.T) {
-	c, taskQueue := testsuite.StartDevServerWorker(t, func(r worker.Registry) {
+	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(failingLocalActivityWorkflow)
 		r.RegisterActivity(alwaysFails)
 	})
@@ -66,7 +66,7 @@ func TestLocalActivityRetriesExhausted(t *testing.T) {
 }
 
 func TestLocalActivityTooSlow(t *testing.T) {
-	c, taskQueue := testsuite.StartDevServerWorker(t, func(r worker.Registry) {
+	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(slowLocalActivityWorkflow)
 		r.RegisterActivity(slowActivity)
 	})
@@ -80,7 +80,7 @@ func TestLocalActivityTooSlow(t *testing.T) {
 }
 
 func TestLocalActivityGrowsHistory(t *testing.T) {
-	c, taskQueue := testsuite.StartDevServerWorker(t, func(r worker.Registry) {
+	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(failingLocalActivityWorkflow)
 		r.RegisterActivity(alwaysFails)
 	})

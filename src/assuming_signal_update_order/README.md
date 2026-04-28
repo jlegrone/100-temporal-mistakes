@@ -82,7 +82,7 @@ For workflows that aggregate multiple signals or updates, use property-based tes
 ```go
 func TestWorkflowOrderInvariance(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		env := testsuite.NewTestWorkflowEnvironment(t)
+		env := testhelpers.NewTestWorkflowEnvironment(t)
 
 		// Generate changes with increasing ULIDs.
 		var changes []Change

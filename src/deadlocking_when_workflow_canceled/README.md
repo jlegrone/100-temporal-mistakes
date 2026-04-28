@@ -62,7 +62,7 @@ It's also a good idea to write tests that ensure your workflow handles cancellat
 ```go
 
 func TestV2_HandlesGracefulCancelation(t *testing.T) {
-	env := testsuite.NewTestWorkflowEnvironment(t)
+	env := testhelpers.NewTestWorkflowEnvironment(t)
 
 	env.RegisterDelayedCallback(func() {
 		env.CancelWorkflow()

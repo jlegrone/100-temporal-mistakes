@@ -3,7 +3,7 @@ package assuming_signal_update_order
 import (
 	"testing"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -12,7 +12,7 @@ import (
 // @@@SNIPSTART assuming-signal-update-order-test
 func TestWorkflowOrderInvariance(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		env := testsuite.NewTestWorkflowEnvironment(t)
+		env := testhelpers.NewTestWorkflowEnvironment(t)
 
 		// Generate changes with increasing ULIDs.
 		var changes []Change

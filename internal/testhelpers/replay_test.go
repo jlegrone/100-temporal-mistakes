@@ -1,4 +1,4 @@
-package testsuite_test
+package testhelpers_test
 
 import (
 	"encoding/json"
@@ -13,13 +13,13 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 )
 
 func replayTestWorkflow(_ workflow.Context) error { return nil }
 
 func TestAssertWorkflowReplayFromJSONFiles(t *testing.T) {
-	c, taskQueue := testsuite.StartDevServerWorker(t, func(r worker.Registry) {
+	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(replayTestWorkflow)
 	})
 
@@ -38,7 +38,7 @@ func TestAssertWorkflowReplayFromJSONFiles(t *testing.T) {
 		paths[i] = path
 	}
 
-	testsuite.AssertWorkflowReplayFromJSONFiles(t, replayTestWorkflow, paths)
+	testhelpers.AssertWorkflowReplayFromJSONFiles(t, replayTestWorkflow, paths)
 }
 
 func writeHistoryJSON(t *testing.T, c client.Client, run client.WorkflowRun, path string) {

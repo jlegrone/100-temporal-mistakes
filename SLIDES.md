@@ -582,7 +582,7 @@ temporal workflow show --workflow-id <ID> --output json \
 
 ```go
 func TestReplayWorkflowHistory(t *testing.T) {
-    testsuite.AssertWorkflowReplayFromJSONFiles(t, 
+    testhelpers.AssertWorkflowReplayFromJSONFiles(t, 
         PurchaseItem,
         "testdata/purchase_item_history_v0.json",
         "testdata/purchase_item_history_v1.json",

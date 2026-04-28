@@ -10,7 +10,7 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testsuite"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/jlegrone/100-temporal-mistakes/internal/workflowhelpers"
 )
 
@@ -45,7 +45,7 @@ func TestAwaitActivity_ReturnsTypedResponse(t *testing.T) {
 		return workflowhelpers.AwaitActivity(ctx, worker.Echo, req)
 	}
 
-	env := testsuite.NewTestWorkflowEnvironment(t)
+	env := testhelpers.NewTestWorkflowEnvironment(t)
 	env.RegisterActivity(worker.Echo)
 	env.ExecuteWorkflow(wf, echoRequest{Message: "hello"})
 
@@ -70,7 +70,7 @@ func TestAwaitActivity_PropagatesActivityError(t *testing.T) {
 		return workflowhelpers.AwaitActivity(ctx, worker.failingEcho, req)
 	}
 
-	env := testsuite.NewTestWorkflowEnvironment(t)
+	env := testhelpers.NewTestWorkflowEnvironment(t)
 	env.RegisterActivity(worker.failingEcho)
 	env.ExecuteWorkflow(wf, echoRequest{Message: "hello"})
 

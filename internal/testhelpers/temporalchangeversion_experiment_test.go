@@ -1,4 +1,4 @@
-package testsuite_test
+package testhelpers_test
 
 import (
 	"context"
