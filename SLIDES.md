@@ -461,7 +461,19 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 <!-- Speaker note: Run replay tests in CI against captured production histories. If the new code's command sequence diverges from the recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
 
 ```bash
-# TODO: Show command to search for the earliest workflow with a given version number (or missing version, for v0?) and download it to the right path in testdata using the Temporal CLI
+# Find the earliest workflow that did not hit either patch branch
+temporal workflow list \
+  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion NOT IN ("add-reserve-inventory-1", "add-reserve-inventory-2")' \
+  --order-by 'StartTime ASC' --limit 1
+
+# Find the earliest workflow that took version 1 of the patch.
+temporal workflow list \
+  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("add-reserve-inventory-1")' \
+  --order-by 'StartTime ASC' --limit 1
+
+# Download workflow history to the test fixture path.
+temporal workflow show --workflow-id <ID> --output json \
+  > testdata/purchase_item_history_<PATCH_VERSION>.json
 ```
 
 ```go
