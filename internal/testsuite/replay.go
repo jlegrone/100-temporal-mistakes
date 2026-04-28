@@ -1,6 +1,8 @@
 package testsuite
 
 import (
+	"testing"
+
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/worker"
 )
@@ -12,6 +14,21 @@ func ReplayWorkflowHistoryFromJSONFile(t TB, workflowFn any, historyPath string)
 	t.Helper()
 	replayer := newWorkflowHistoryReplayer(t, workflowFn)
 	return replayer.ReplayWorkflowHistoryFromJSONFile(&tLogger{t: t}, historyPath)
+}
+
+// AssertWorkflowReplayFromJSONFiles replays each named workflow history
+// against the provided workflow function as a subtest. The file names are used
+// as the subtest names.
+func AssertWorkflowReplayFromJSONFiles(t *testing.T, workflowFn any, historyFiles []string) {
+	t.Helper()
+	for _, historyFile := range historyFiles {
+		t.Run(historyFile, func(t *testing.T) {
+			t.Helper()
+			if err := ReplayWorkflowHistoryFromJSONFile(t, workflowFn, historyFile); err != nil {
+				t.Error(err)
+			}
+		})
+	}
 }
 
 func newWorkflowHistoryReplayer(t TB, workflowFn any) worker.WorkflowReplayer {
@@ -28,5 +45,6 @@ func newWorkflowHistoryReplayer(t TB, workflowFn any) worker.WorkflowReplayer {
 	if err != nil {
 		t.Fatal(err)
 	}
+	replayer.RegisterWorkflow(workflowFn)
 	return replayer
 }

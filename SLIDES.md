@@ -428,18 +428,50 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ---
 
+## Workflows: Evaluate Patches Up Front
+
+<!-- Speaker note: Subsequent changes bump the patch's max version. The decision of whether to reserve inventory now moves into the activity, so the workflow always calls it on the new code path. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
+```diff
+ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+-    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
++    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 2)
+
+     // ... generate a charge request for the item & customer
+
+     switch inventoryResVersion {
+     case 1:
+         if req.RequiresInventoryReservation {
+             // ... await ReserveInventory activity
+         }
++    case 2:
++        // The activity now decides internally whether to reserve.
++        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
++            return nil, err
++        }
+     }
+
+     return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+ }
+```
+
+---
+
 ## Workflows: Verifying Replay Safety
 
 <!-- Speaker note: Run replay tests in CI against captured production histories. If the new code's command sequence diverges from the recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
 ```go
 func TestReplayWorkflowHistory(t *testing.T) {
-    err := testsuite.ReplayWorkflowHistoryFromJSONFile(t, 
+    testsuite.AssertWorkflowReplayFromJSONFiles(t, 
         PurchaseItem,
         "testdata/purchase_item_history_v0.json",
+        "testdata/purchase_item_history_v1.json",
     )
-    require.NoError(t, err)
 }
 ```
+
+** Check the code coverage for the version branches in your workflow! If they aren't covered, then the replay test is not validating your change.
+
+More techniques: https://temporal.io/resources/on-demand/replay-safety-at-datadog
 
 ---
 
