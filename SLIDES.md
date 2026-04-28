@@ -253,12 +253,17 @@ Choosing between StartToClose and Heartbeat timeouts
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
     // Start the job
-    
-    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-        StartToCloseTimeout:    30 * time.Second,
-        ScheduleToCloseTimeout: time.Hour,
-    })
-    return workflowhelpers.AwaitActivity(ctx, w.AwaitKubernetesJob, req)
+    // ...
+
+    // Wait for the job to complete
+    return workflowhelpers.AwaitActivity(
+        workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+            StartToCloseTimeout:    30 * time.Second,
+            ScheduleToCloseTimeout: time.Hour,
+        }),
+        w.AwaitKubernetesJob,
+        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+    )
 }
 ```
 
@@ -271,15 +276,19 @@ So we can try increasing the start to close timeout, but now this also means tha
 -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
-    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-        StartToCloseTimeout:    5 * time.Minute,
-        ScheduleToCloseTimeout: time.Hour,
-    })
-    var resp AwaitKubernetesJobResponse
-    if err := workflow.ExecuteActivity(ctx, w.AwaitKubernetesJob, req).Get(ctx, &resp); err != nil {
-        return nil, err
-    }
-    // ... return the result ...
+    // Start the job
+    // ...
+
+    // Wait for the job to complete
+    return workflowhelpers.AwaitActivity(
+        workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+            // Allow the activity to poll the job status for up to five minutes before timing out.
+            StartToCloseTimeout:    5 * time.Minute,
+            ScheduleToCloseTimeout: time.Hour,
+        }),
+        w.AwaitKubernetesJob,
+        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+    )
 }
 ```
 
@@ -290,15 +299,19 @@ Speaker notes:
  -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
-    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-        HeartbeatTimeout:       30 * time.Second,
-        ScheduleToCloseTimeout: time.Hour,
-    })
-    var resp AwaitKubernetesJobResponse
-    if err := workflow.ExecuteActivity(ctx, w.AwaitKubernetesJob, req).Get(ctx, &resp); err != nil {
-        return nil, err
-    }
-    // ... return the result ...
+    // Start the job
+    // ...
+
+    // Wait for the job to complete
+    return workflowhelpers.AwaitActivity(
+        workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+            // This activity may run for a long time, so use Heartbeat instead of StartToClose timeout.
+            HeartbeatTimeout:       30 * time.Second,
+            ScheduleToCloseTimeout: time.Hour,
+        }),
+        w.AwaitKubernetesJob,
+        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+    )
 }
 ```
 
