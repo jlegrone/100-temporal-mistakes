@@ -35,6 +35,12 @@ func GetNextRetryDelay(ctx context.Context, minBackoffCoefficient float64) time.
 	return getNextRetryDelay(activity.GetInfo(ctx), minBackoffCoefficient)
 }
 
+// I'm not saying that ScheduleToClose timeouts always have to be some really long duration;
+// it might make sense to use a much smaller duration if, for example, the workflow is going
+// to go down an alternative graceful degradation path when this activity fails or times out.
+// But typically to short circuit an activity it's a lot more direct to just return a
+// non-retryable application error.
+
 func getNextRetryDelay(info activity.Info, minBackoffCoefficient float64) time.Duration {
 	policy := info.RetryPolicy
 	if policy == nil {

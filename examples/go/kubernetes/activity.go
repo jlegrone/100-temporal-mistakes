@@ -99,7 +99,7 @@ func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobR
 	defer cancel()
 
 	jobs := w.client.BatchV1().Jobs(req.Namespace)
-	ticker := time.Tick(30 * time.Second)
+	tock := time.Tick(30 * time.Second)
 
 	for {
 		j, err := jobs.Get(ctx, req.Name, metav1.GetOptions{})
@@ -115,7 +115,7 @@ func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobR
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-ticker:
+		case <-tock:
 			continue
 		}
 	}

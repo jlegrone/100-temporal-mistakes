@@ -3,9 +3,18 @@ package payments
 import (
 	"time"
 
+	"github.com/jlegrone/100-temporal-mistakes/internal/workflowhelpers"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
+
+type PurchaseItemRequest struct {
+	SKU string
+}
+
+type PurchaseItemResponse struct {
+	Payment *ChargePaymentResponse
+}
 
 // ChargePaymentWorkflow invokes the ChargePayment activity with the
 // timeout/retry configuration developed in "Activities: Weathering System
@@ -15,23 +24,44 @@ import (
 //   - ScheduleToClose 1h caps total retry duration through a worst-case outage.
 //   - MaximumAttempts is left unset so retries continue until ScheduleToClose
 //     is reached; the policy only tunes backoff.
-func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+	// Decide the amount to charge based on SKU. Normally this might be a database lookup instead of a side effect.
+	chargeRequest, err := workflowhelpers.SideEffect(ctx, func(ctx workflow.Context) *ChargePaymentRequest {
+		return generateChargeRequestForSKU(req.SKU)
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout:    30 * time.Second,
-		ScheduleToCloseTimeout: time.Hour, // allow retrying for up to 1 hour
+		ScheduleToCloseTimeout: time.Hour,
 		RetryPolicy: &temporal.RetryPolicy{
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 2.0,
-			MaximumInterval:    30 * time.Second,
+			MaximumInterval:    time.Minute,
 			// MaximumAttempts intentionally unset: allow unlimited attempts
 			// until the ScheduleToClose timeout is reached.
 		},
 	})
 
-	var w *Worker
-	var resp ChargePaymentResponse
-	if err := workflow.ExecuteActivity(ctx, w.ChargePayment, req).Get(ctx, &resp); err != nil {
+	resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, *chargeRequest)
+	if err != nil {
 		return nil, err
 	}
-	return &resp, nil
+
+	return &PurchaseItemResponse{
+		Payment: resp,
+	}, nil
+}
+
+func generateChargeRequestForSKU(SKU string) *ChargePaymentRequest {
+	switch SKU {
+	case "1234":
+		return &ChargePaymentRequest{
+			AmountCents: 100,
+		}
+	default:
+		return nil
+	}
 }
