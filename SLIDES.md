@@ -407,21 +407,23 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 ## Workflows: Evaluate Patches Up Front
 
 <!-- Speaker note: The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken. -->
-```go
-func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // Evaluate patches first so every execution sets TemporalChangeVersion.
-    v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
+```diff
+ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
++    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
++
+     // ... generate a charge request for the item & customer
 
-    // ... validate the request
-
-    if req.RequiresInventoryReservation && v == 1 {
-        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-            return nil, err
-        }
-    }
-
-    return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
-}
++    switch inventoryResVersion {
++    case 1:
++        if req.RequiresInventoryReservation {
++            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
++                return nil, err
++            }
++        }
++    }
++
+     return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+ }
 ```
 
 ---
