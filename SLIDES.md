@@ -575,15 +575,15 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequ
 
 <!-- No code example -- just the limits. Numbers sourced from src/overflowing-*.md. -->
 
-Server-imposed limits to design around:
-- **Individual payload size**: 4MB per workflow/activity input or output, signal, or update (default; inherited from the Temporal server's gRPC message limit).
-- **Workflow history bytes**: 50MB total per execution (default). Workflow is terminated when exceeded -- no cleanup runs.
-- **Workflow history length**: 50,000 events per execution (default). Same termination behavior.
+Server-imposed limits to be aware of:
+- **Individual payload size**: ~4MB per workflow/activity input or output, signal, or update (inherited from the Temporal server's gRPC message limit).
+- **Workflow history bytes**: 50MB (sum of all events in the workflow). Results in termination.
+- **Workflow history length**: 50,000 events. Results in termination.
+- **Workflow task timeout**: 10 seconds. Results in failed workflow task (retried).
 
 Mitigations:
-- Use `ContinueAsNew` to reset history before approaching either limit (e.g. at 10k events or 24h of runtime).
-- Pass references (IDs, URLs) instead of blobs between activities and workflows.
-- For genuinely large payloads, offload at the serialization layer with an external storage codec.
+- Use `GetContinueAsNewSuggested()` to start a new workflow execution before hitting history size limits.
+- Avoid passing large payloads from activities to workflows, or use external payload storage.
 
 ---
 
@@ -642,5 +642,6 @@ Workflow functions:
 Temporal workers:
 - SHOULD have a replay testing harness.
 - SHOULD be onboarded to worker versioning and pinned workflows.
+- SHOULD enable external payload storage if activity responses are ~1MB or larger.
 
 1. OR use child workflows with ParentClosePolicy of RequestCancel and Signal sentinel pattern.
