@@ -1,3 +1,21 @@
+---
+title: "100 Temporal Mistakes"
+subtitle: "And How to Avoid Them"
+author: "Jacob LeGrone"
+theme:
+  background_color: "#FFFFFF"
+  title_color: "#1E1E2E"
+  text_color: "#333333"
+  accent_color: "#7C3AED"
+  code_bg_color: "#1E1E2E"
+  code_text_color: "#D4D4D4"
+  diff_add_color: "#10f300"
+  diff_remove_color: "#f00000"
+  font_heading: "Arial"
+  font_body: "Arial"
+  code_font: "Courier New"
+---
+
 # Introduction
 
 <!-- QR code linking to slides in markdown format for those who want to follow along with code examples -->
@@ -408,7 +426,7 @@ Common sources of non-determinism in workflow code:
 +            }
 +        }
 +    }
-+
+
      return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
  }
 ```
@@ -426,7 +444,7 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 +    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
-+
+
      // ... generate a charge request for the item & customer
 
 +    switch inventoryResVersion {
@@ -437,7 +455,7 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 +            }
 +        }
 +    }
-+
+
      return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
  }
 ```
@@ -536,6 +554,7 @@ explicit error if a stale v0/v1 history ever shows up. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 2)
++    // Continue evaluating the search attribute but with bumped min supported version
 +    workflow.GetVersion(ctx, "add-reserve-inventory", 2, 2)
 
 -    switch inventoryResVersion {
@@ -568,12 +587,9 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
     // ... reserve inventory and charge payment
 
     shipFuture := workflow.ExecuteActivity(ctx, w.ShipItem, shipRequest)
-
-    var shipment ShipItemResponse
-    var err error
     sel := workflow.NewNamedSelector(ctx, "shipment")
 
-    sel.AddFuture(shipFuture, func(f workflow.Future) { err = f.Get(ctx, &shipment) })
+    sel.AddFuture(shipFuture, func(f workflow.Future) { err = f.Get(ctx, &shipmentResponse) })
     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
         err = workflow.ErrDeadlineExceeded
     })
@@ -586,7 +602,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
         return nil, err
     }
 
-    return &PurchaseItemResponse{TrackingID: shipment.TrackingID}, nil
+    return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
 }
 ```
 
@@ -601,6 +617,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 3. GetChildWorkflowExecution().Get blocks until the server has accepted the start command, so we know the child is durably scheduled before the parent returns. -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ...
 
     sel.Select(ctx)
     if err != nil {
@@ -610,15 +627,16 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
         return nil, err
     }
 
+    // ...
 }
 
 func (w *Worker) startDisconnectedRefundWorkflow(ctx workflow.Context, req RefundRequest) error {
     ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
-        ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON
+        ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON // "ABANDON" parent close policy
     })
-    ctx, _ = workflow.NewDisconnectedContext(ctx)
+    ctx, _ = workflow.NewDisconnectedContext(ctx) // Disconnected workflow context
     fut := workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, req)
-    return fut.GetChildWorkflowExecution().Get(ctx, nil)
+    return fut.GetChildWorkflowExecution().Get(ctx, nil) // Block until child workflow start
 }
 ```
 
