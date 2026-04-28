@@ -161,12 +161,16 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 <!-- New code example, this time showing the workflow code that invokes the payment activity. Set a 30s start to close timeout and a 1m schedule to close timeout. -->
 ```go
-func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... generate a charge request for the item & customer
+
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Minute,
     })
-    // ... execute the ChargePayment activity
+    resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+
+    // ...
 }
 ```
 
@@ -177,12 +181,16 @@ func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*Cha
 Speaker note: So the first timeout mistake to avoid is a schedule to close timeout that's too short. Pick a value based on how long you want to retry in the face of a serious system outage.
 -->
 ```go
-func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... generate a charge request for the item & customer
+
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Hour, // allow retrying for up to 1 hour
     })
-    // ... execute the activity ...
+
+    resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+    // ...
 }
 ```
 
@@ -192,7 +200,9 @@ func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*Cha
 
 <!-- Update code example, now adding a retry policy with MaxAttempts set to 3, initial backoff to 1s, backoff coefficient to 2, and max backoff to 30s. -->
 ```go
-func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+func PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... generate a charge request for the item & customer
+
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Hour,
@@ -203,7 +213,8 @@ func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*Cha
             MaximumInterval:    30 * time.Second,
         },
     })
-    // ... execute the activity ...
+    
+    // ... execute the ChargePayment activity
 }
 ```
 
@@ -215,17 +226,20 @@ Speaker note: I think a much simpler mental model is to allow unlimited attempts
 -->
 ```go
 func ChargePaymentWorkflow(ctx workflow.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+    // ... generate a charge request for the item & customer
+
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Hour,
         RetryPolicy: &temporal.RetryPolicy{
-            // MaximumAttempts: 3, // allow unlimited attempts until the ScheduleToClose timeout is reached
+            // MaximumAttempts: 0, // allow unlimited attempts until the ScheduleToClose timeout is reached
             InitialInterval:    time.Second,
             BackoffCoefficient: 2,
             MaximumInterval:    30 * time.Second,
         },
     })
-    // ... execute the activity ...
+
+    // ... execute the ChargePayment activity
 }
 ```
 
