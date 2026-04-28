@@ -433,7 +433,11 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 <!-- Speaker note: Run replay tests in CI against captured production histories. If the new code's command sequence diverges from the recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
 ```go
 func TestReplayWorkflowHistory(t *testing.T) {
-    require.NoError(t, testsuite.ReplayWorkflowHistory(t, PurchaseItem, "testdata/purchase_item_history.json"))
+    err := testsuite.ReplayWorkflowHistoryFromJSONFile(t, 
+        PurchaseItem,
+        "testdata/purchase_item_history_v0.json",
+    )
+    require.NoError(t, err)
 }
 ```
 
