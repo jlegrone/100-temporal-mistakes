@@ -22,8 +22,10 @@ import (
 // Mapping:
 //   - 2xx, 3xx: nil
 //   - 408 Request Timeout, 425 Too Early: retryable application error
-//   - 429 Too Many Requests: retryable, with a 1.5x multiplier applied to the
-//     next retry delay via [temporal.ApplicationErrorOptions.NextRetryDelay]
+//   - 429 Too Many Requests: retryable, with the next retry delay computed
+//     using a minimum backoff coefficient of 3 (set via
+//     [temporal.ApplicationErrorOptions.NextRetryDelay]) so that the caller
+//     backs off more aggressively than the policy's default coefficient.
 //   - 4xx codes listed in the non-retryable case below: non-retryable
 //     application error (the request is malformed or rejected on its merits)
 //   - 5xx and any unrecognized status: retryable application error

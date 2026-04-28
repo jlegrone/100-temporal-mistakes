@@ -16,9 +16,9 @@ type PurchaseItemResponse struct {
 	Payment *ChargePaymentResponse
 }
 
-// ChargePaymentWorkflow invokes the ChargePayment activity with the
-// timeout/retry configuration developed in "Activities: Weathering System
-// Outages":
+// PurchaseItem looks up the charge for the requested SKU and invokes the
+// ChargePayment activity with the timeout/retry configuration developed in
+// "Activities: Weathering System Outages":
 //
 //   - StartToClose 30s caps a single attempt.
 //   - ScheduleToClose 1h caps total retry duration through a worst-case outage.

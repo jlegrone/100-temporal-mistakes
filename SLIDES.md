@@ -1,3 +1,9 @@
+# Introduction
+
+<!-- QR code linking to slides in markdown format for those who want to follow along with code examples -->
+
+---
+
 # Part One: Activities
 
 Need to be robust to:
@@ -54,7 +60,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 ## Activities: Avoid Overloading Services With Retries
 
-<!-- Updated code example that also increases the next retry backoff time when external service returns a resource overloaded error (HTTP 429) using the activityhelpers.GetNextRetryDelay function and multiplying its return value by 1.5. -->
+<!-- Updated code example that also increases the next retry backoff time when external service returns a resource overloaded error (HTTP 429) using the activityhelpers.GetNextRetryDelay function with a minimum backoff coefficient of 3, so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     // ... build and send the HTTP request
@@ -141,7 +147,7 @@ func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobR
 ```go
 func getIdempotencyToken(ctx context.Context) string {
 	info := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%d", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
+	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
 
