@@ -47,7 +47,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
         return nil, err
     }
 
-    // ... decode the HTTP response and return
+    // Decode the HTTP response and return
+    // ...
 }
 ```
 
@@ -72,7 +73,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
     }
 
-    // ... decode the HTTP response and return
+    // Decode the HTTP response and return
+    // ...
 }
 ```
 
@@ -95,7 +97,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
             temporal.ApplicationErrorOptions{NextRetryDelay: delay})
     }
 
-    // ... decode the HTTP response and return
+    // Decode the HTTP response and return
+    // ...
 }
 ```
 
