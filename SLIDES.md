@@ -61,13 +61,12 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
 
-    // Transport-level failures (DNS, dial, TLS) — retryable.
     resp, err := w.httpClient.Do(httpReq)
     if err != nil {
         return nil, err
     }
 
-    // Server returned a response — classify by status code.
+    // 
     switch resp.StatusCode {
     case http.StatusBadRequest:
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)

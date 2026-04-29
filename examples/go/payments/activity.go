@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -53,17 +54,16 @@ func NewWorker(endpoint string) *Worker {
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
 	httpReq, err := w.buildChargeRequest(ctx, req)
 	if err != nil {
-		return nil, temporal.NewApplicationErrorWithCause(
-			err.Error(), "BuildRequest", err,
-		)
+		// Errors returned by buildChargeRequest are determinstic, so don't retry them.
+		return nil, temporal.NewApplicationErrorWithOptions(err.Error(), "BuildRequest", temporal.ApplicationErrorOptions{
+			NonRetryable: true,
+			Cause:        err,
+		})
 	}
-	httpReq.Header.Set("Idempotency-Key", activityhelpers.GetIdempotencyToken(ctx))
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := activityhelpers.DefaultHTTPClient.Do(httpReq)
 	if err != nil {
-		return nil, temporal.NewApplicationErrorWithCause(
-			fmt.Sprintf("call payment service: %v", err), "Network", err,
-		)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -73,8 +73,18 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 	var out ChargePaymentResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, temporal.NewApplicationErrorWithCause(
-			fmt.Sprintf("decode response: %v", err), "DecodeResponse", err,
+		// A type mismatch between the JSON value and the Go field is a
+		// schema disagreement that won't resolve on retry; everything else
+		// (syntax errors from a truncated body, I/O errors mid-stream) can
+		// reasonably be retried.
+		var typeErr *json.UnmarshalTypeError
+		return nil, temporal.NewApplicationErrorWithOptions(
+			fmt.Sprintf("decode response: %v", err),
+			"DecodeResponse",
+			temporal.ApplicationErrorOptions{
+				NonRetryable: errors.As(err, &typeErr),
+				Cause:        err,
+			},
 		)
 	}
 	return &out, nil

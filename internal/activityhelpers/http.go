@@ -3,13 +3,145 @@ package activityhelpers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"go.temporal.io/sdk/temporal"
 )
+
+// HTTPTransportErrorType is the ApplicationError type used for transport-layer
+// failures from [http.Client.Do].
+const HTTPTransportErrorType = "Transport"
+
+// HTTPTransportErrorDetails is attached as the structured details payload on
+// an ApplicationError produced by [HTTPClient.Do] when the underlying request
+// fails at the transport layer. It lets callers branch on the cause without
+// parsing error messages.
+type HTTPTransportErrorDetails struct {
+	// Op is the HTTP operation that failed (e.g. "Post").
+	Op string `json:"op"`
+	// URL is the destination of the failed request, with any password
+	// stripped by net/http.
+	URL string `json:"url"`
+	// Reason is a short, machine-readable classification of the failure.
+	// One of: "dns-not-found", "timeout", "transport".
+	Reason string `json:"reason"`
+}
+
+// classifyHTTPTransportError converts a transport-layer error from
+// [http.Client.Do] into a Temporal ApplicationError. Errors that retries
+// cannot fix (an unresolvable hostname) are marked non-retryable; recoverable
+// errors (timeouts, connection refused, transient DNS failures) are left
+// retryable so the activity's RetryPolicy applies.
+//
+// In all cases the original error is preserved as the cause and a
+// [HTTPTransportErrorDetails] payload is attached so consumers can branch on
+// the classification programmatically rather than parsing the message.
+func classifyHTTPTransportError(err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return temporal.NewApplicationErrorWithCause(err.Error(), HTTPTransportErrorType, err)
+	}
+
+	details := HTTPTransportErrorDetails{
+		Op:     urlErr.Op,
+		URL:    urlErr.URL,
+		Reason: "transport",
+	}
+
+	// NXDOMAIN means the configured endpoint doesn't exist; a retry against
+	// the same hostname will keep failing the same way. Transient DNS
+	// failures (SERVFAIL, etc.) keep IsNotFound=false and stay retryable.
+	var dnsErr *net.DNSError
+	nonRetryable := false
+	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+		details.Reason = "dns-not-found"
+		nonRetryable = true
+	} else if urlErr.Timeout() {
+		details.Reason = "timeout"
+	}
+
+	return temporal.NewApplicationErrorWithOptions(urlErr.Error(), HTTPTransportErrorType, temporal.ApplicationErrorOptions{
+		Cause:        err,
+		NonRetryable: nonRetryable,
+		Details:      []interface{}{details},
+	})
+}
+
+// defaultIdempotencyHeader is the header [httpClient] populates from
+// [GetIdempotencyToken] when no override is configured. The name follows the
+// convention popularized by Stripe; see
+// https://docs.stripe.com/api/idempotent_requests.
+const defaultIdempotencyHeader = "Idempotency-Key"
+
+// httpClient wraps an *http.Client to add behavior that activities almost
+// always want:
+//
+//   - Transport-layer failures from [http.Client.Do] are translated into
+//     structured Temporal ApplicationErrors so callsites don't have to convert
+//     *url.Error themselves.
+//   - The configured idempotency header is populated from
+//     [GetIdempotencyToken] (using the request's context) when the caller
+//     hasn't already set it, so retries of the same activity reach the
+//     upstream service with the same key.
+//
+// HTTP responses (any status) are returned to the caller unchanged; pair the
+// client with [HTTPResponseError] to map status codes onto retry behavior.
+type httpClient struct {
+	// Client is the underlying *http.Client. A nil value is treated as
+	// [http.DefaultClient].
+	Client *http.Client
+
+	// IdempotencyHeader is the request header populated from
+	// [GetIdempotencyToken] when the request doesn't already include it.
+	// Empty defaults to [defaultIdempotencyHeader] ("Idempotency-Key");
+	// override it for upstream services that expect a different name (for
+	// example, "X-Idempotency-Key").
+	IdempotencyHeader string
+}
+
+// DefaultHTTPClient is the package-supplied client backed by
+// [http.DefaultClient] using "Idempotency-Key" as its idempotency header.
+// Concurrency-safety matches the underlying *http.Client.
+var DefaultHTTPClient = &httpClient{
+	Client:            http.DefaultClient,
+	IdempotencyHeader: defaultIdempotencyHeader,
+}
+
+// Do executes req on the underlying client. Before sending, it populates the
+// configured idempotency header from [GetIdempotencyToken] using
+// req.Context(); if the caller has already populated the header or the
+// request was built with a non-activity context (so no token is available),
+// the existing value is left untouched. Transport-layer failures are returned
+// as Temporal ApplicationErrors (with a [HTTPTransportErrorDetails] payload);
+// successful HTTP exchanges are returned to the caller for status-code
+// mapping.
+func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
+	header := c.IdempotencyHeader
+	if header == "" {
+		header = defaultIdempotencyHeader
+	}
+	if req.Header.Get(header) == "" {
+		if token := GetIdempotencyToken(req.Context()); token != "" {
+			req.Header.Set(header, token)
+		}
+	}
+
+	client := c.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, classifyHTTPTransportError(err)
+	}
+	return resp, nil
+}
 
 // HTTPResponseError translates an HTTP response into a [temporal.ApplicationError]
 // suitable for returning from an activity. It returns nil for 2xx and 3xx

@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
+
+	"github.com/jlegrone/100-temporal-mistakes/internal/activityhelpers"
 )
 
 func newActivityEnv() *testsuite.TestActivityEnvironment {
@@ -101,4 +103,63 @@ func TestChargePayment_GenericServerErrorIsRetryable(t *testing.T) {
 	if errors.As(err, &appErr) {
 		require.False(t, appErr.NonRetryable())
 	}
+}
+
+func TestChargePayment_DecodeTypeMismatchIsNonRetryable(t *testing.T) {
+	// Server returns a 200 OK with valid JSON whose "id" field is a number,
+	// not a string. This is a schema mismatch (json.UnmarshalTypeError) and
+	// must not be retried.
+	srv := fakeServer(t, http.StatusOK, `{"id":12345,"status":"succeeded"}`)
+	w := NewWorker(srv.URL)
+
+	env := newActivityEnv()
+	env.RegisterActivity(w.ChargePayment)
+	_, err := env.ExecuteActivity(w.ChargePayment, ChargePaymentRequest{})
+	require.Error(t, err)
+
+	var appErr *temporal.ApplicationError
+	require.True(t, errors.As(err, &appErr), "expected ApplicationError, got %T: %v", err, err)
+	require.Equal(t, "DecodeResponse", appErr.Type())
+	require.True(t, appErr.NonRetryable(), "schema mismatch must be non-retryable")
+}
+
+func TestChargePayment_DecodeSyntaxErrorIsRetryable(t *testing.T) {
+	// Truncated JSON body — a transient cause (network blip, server crash
+	// mid-write) is plausible, so leave the error retryable.
+	srv := fakeServer(t, http.StatusOK, `{"id":"ch_123",`)
+	w := NewWorker(srv.URL)
+
+	env := newActivityEnv()
+	env.RegisterActivity(w.ChargePayment)
+	_, err := env.ExecuteActivity(w.ChargePayment, ChargePaymentRequest{})
+	require.Error(t, err)
+
+	var appErr *temporal.ApplicationError
+	require.True(t, errors.As(err, &appErr), "expected ApplicationError, got %T: %v", err, err)
+	require.Equal(t, "DecodeResponse", appErr.Type())
+	require.False(t, appErr.NonRetryable(), "truncated body must remain retryable")
+}
+
+func TestChargePayment_ConnectionRefusedIsRetryable(t *testing.T) {
+	// Bind a port, capture its URL, then close the listener so subsequent
+	// connect attempts get ECONNREFUSED.
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	endpoint := srv.URL
+	srv.Close()
+
+	w := NewWorker(endpoint)
+	env := newActivityEnv()
+	env.RegisterActivity(w.ChargePayment)
+	_, err := env.ExecuteActivity(w.ChargePayment, ChargePaymentRequest{})
+	require.Error(t, err)
+
+	var appErr *temporal.ApplicationError
+	require.True(t, errors.As(err, &appErr), "expected ApplicationError, got %T: %v", err, err)
+	require.Equal(t, activityhelpers.HTTPTransportErrorType, appErr.Type())
+	require.False(t, appErr.NonRetryable(), "connection refused must remain retryable")
+
+	var details activityhelpers.HTTPTransportErrorDetails
+	require.NoError(t, appErr.Details(&details))
+	require.NotEmpty(t, details.URL)
+	require.Contains(t, []string{"transport", "timeout"}, details.Reason)
 }
