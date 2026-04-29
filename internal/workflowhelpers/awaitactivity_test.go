@@ -40,7 +40,9 @@ func TestAwaitActivity_ReturnsTypedResponse(t *testing.T) {
 
 	wf := func(ctx workflow.Context, req echoRequest) (*echoResponse, error) {
 		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-			StartToCloseTimeout: time.Second,
+			ScheduleToCloseTimeout: time.Minute,
+			StartToCloseTimeout:    time.Second,
+			HeartbeatTimeout:       time.Second,
 		})
 		return workflowhelpers.AwaitActivity(ctx, worker.Echo, req)
 	}
@@ -62,10 +64,9 @@ func TestAwaitActivity_PropagatesActivityError(t *testing.T) {
 
 	wf := func(ctx workflow.Context, req echoRequest) (*echoResponse, error) {
 		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-			StartToCloseTimeout: time.Second,
-			RetryPolicy: &temporal.RetryPolicy{
-				MaximumAttempts: 1,
-			},
+			ScheduleToCloseTimeout: time.Minute,
+			StartToCloseTimeout:    time.Second,
+			HeartbeatTimeout:       time.Second,
 		})
 		return workflowhelpers.AwaitActivity(ctx, worker.failingEcho, req)
 	}
@@ -79,5 +80,7 @@ func TestAwaitActivity_PropagatesActivityError(t *testing.T) {
 }
 
 func (w *echoWorker) failingEcho(_ context.Context, _ echoRequest) (*echoResponse, error) {
-	return nil, errors.New("boom")
+	// Use a non-retryable application error so the activity fails immediately
+	// without relying on a constrained MaximumAttempts retry policy.
+	return nil, temporal.NewNonRetryableApplicationError("boom", "test", nil)
 }

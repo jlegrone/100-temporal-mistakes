@@ -33,8 +33,8 @@ from temporalio.worker import (
 
 # Policy identifiers (must match conformance_tests.json).
 POLICY_SCHEDULE_TO_CLOSE_REQUIRED = "schedule_to_close_required"
-POLICY_MAX_ATTEMPTS = "max_attempts_must_be_zero_or_at_least_3"
-POLICY_LOCAL_ACTIVITY_START_TO_CLOSE = "local_activity_start_to_close_under_10s_required"
+POLICY_MAX_ATTEMPTS = "max_attempts_too_low"
+POLICY_LOCAL_ACTIVITY_START_TO_CLOSE = "local_activity_start_to_close_too_long"
 POLICY_TIMEOUTS_PERMIT_RETRIES = "timeouts_permit_retries"
 
 POLICY_VIOLATION_ERROR_TYPE = "PolicyViolationError"
@@ -139,7 +139,7 @@ def _evaluate_policies(
             )
         )
 
-    # Policy 4: max_attempts_must_be_zero_or_at_least_3 (regular and local).
+    # Policy 4: max_attempts_too_low (regular and local).
     if retry_policy is not None:
         max_attempts = getattr(retry_policy, "maximum_attempts", None)
         if max_attempts is not None and 0 < max_attempts < 3:
@@ -151,7 +151,7 @@ def _evaluate_policies(
                 )
             )
 
-    # Policy 19: local_activity_start_to_close_under_10s_required.
+    # Policy 19: local_activity_start_to_close_too_long.
     if is_local:
         if _is_unset_or_zero(start_to_close) or (
             start_to_close is not None

@@ -1,4 +1,4 @@
-package testhelpers
+package activitypolicy
 
 import (
 	"errors"
@@ -31,12 +31,12 @@ func TestEvaluatePolicies(t *testing.T) {
 		},
 		"missing schedule_to_close": {
 			startTo: 30 * time.Second,
-			want:    []string{PolicyScheduleToCloseRequired},
+			want:    []string{ScheduleToCloseRequired},
 		},
 		"max_attempts=2 violates": {
 			schedule: time.Hour, startTo: 30 * time.Second,
 			retry: &temporal.RetryPolicy{MaximumAttempts: 2},
-			want:  []string{PolicyMaxAttemptsMustBeZeroOrAtLeast3},
+			want:  []string{MaxAttemptsTooLow},
 		},
 		"max_attempts=3 allowed": {
 			schedule: time.Hour, startTo: 30 * time.Second,
@@ -50,7 +50,7 @@ func TestEvaluatePolicies(t *testing.T) {
 		},
 		"timeouts_permit_retries violation no heartbeat": {
 			schedule: 60 * time.Second, startTo: 30 * time.Second,
-			want: []string{PolicyTimeoutsPermitRetries},
+			want: []string{TimeoutsPermitRetries},
 		},
 		"timeouts_permit_retries skipped with heartbeat": {
 			schedule: 60 * time.Second, startTo: 30 * time.Second, heartbeat: 10 * time.Second,
@@ -62,11 +62,11 @@ func TestEvaluatePolicies(t *testing.T) {
 		},
 		"local activity stc too long": {
 			schedule: 60 * time.Second, startTo: 30 * time.Second, isLocal: true,
-			want: []string{PolicyLocalActivityStartToCloseUnder10s},
+			want: []string{LocalActivityStartToCloseTooLong},
 		},
 		"local activity stc unset": {
 			schedule: 60 * time.Second, isLocal: true,
-			want: []string{PolicyLocalActivityStartToCloseUnder10s},
+			want: []string{LocalActivityStartToCloseTooLong},
 		},
 		"local activity happy": {
 			schedule: 30 * time.Second, startTo: 5 * time.Second, isLocal: true,
@@ -76,8 +76,8 @@ func TestEvaluatePolicies(t *testing.T) {
 			startTo: 30 * time.Second,
 			retry:   &temporal.RetryPolicy{MaximumAttempts: 2},
 			want: []string{
-				PolicyScheduleToCloseRequired,
-				PolicyMaxAttemptsMustBeZeroOrAtLeast3,
+				ScheduleToCloseRequired,
+				MaxAttemptsTooLow,
 			},
 		},
 	}
@@ -167,26 +167,26 @@ func multiViolationWorkflow(ctx workflow.Context) error {
 // Integration test helpers
 // ----------------------------------------------------------------------
 
-func newTestEnv(t *testing.T, opts ActivityPolicyOptions) *testsuite.TestWorkflowEnvironment {
+func newTestEnv(t *testing.T, opts Options) *testsuite.TestWorkflowEnvironment {
 	t.Helper()
 	suite := &testsuite.WorkflowTestSuite{}
 	env := suite.NewTestWorkflowEnvironment()
 	env.SetWorkerOptions(worker.Options{
-		Interceptors: []interceptor.WorkerInterceptor{NewActivityPolicyInterceptor(opts)},
+		Interceptors: []interceptor.WorkerInterceptor{New(opts)},
 	})
 	env.RegisterActivity(noopActivity)
 	return env
 }
 
-func assertPolicyViolation(t *testing.T, err error, want ...string) *PolicyViolationDetails {
+func assertPolicyViolation(t *testing.T, err error, want ...string) *ViolationDetails {
 	t.Helper()
 	require.Error(t, err)
 	var appErr *temporal.ApplicationError
 	require.True(t, errors.As(err, &appErr), "expected ApplicationError, got %T: %v", err, err)
-	assert.Equal(t, PolicyViolationErrorType, appErr.Type())
+	assert.Equal(t, ViolationErrorType, appErr.Type())
 	assert.True(t, appErr.NonRetryable(), "expected non-retryable error")
 
-	var details PolicyViolationDetails
+	var details ViolationDetails
 	require.NoError(t, appErr.Details(&details))
 	assert.Equal(t, want, details.Policies)
 	return &details
@@ -197,7 +197,7 @@ func assertPolicyViolation(t *testing.T, err error, want ...string) *PolicyViola
 // ----------------------------------------------------------------------
 
 func TestIntegration_HappyRegular(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(happyRegularWorkflow)
 	env.ExecuteWorkflow(happyRegularWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
@@ -208,7 +208,7 @@ func TestIntegration_HappyRegular(t *testing.T) {
 }
 
 func TestIntegration_HappyLocal(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(happyLocalWorkflow)
 	env.ExecuteWorkflow(happyLocalWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
@@ -219,17 +219,17 @@ func TestIntegration_HappyLocal(t *testing.T) {
 }
 
 func TestIntegration_MissingScheduleToClose_Error(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(missingScheduleToCloseWorkflow)
 	env.ExecuteWorkflow(missingScheduleToCloseWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
-	assertPolicyViolation(t, env.GetWorkflowError(), PolicyScheduleToCloseRequired)
+	assertPolicyViolation(t, env.GetWorkflowError(), ScheduleToCloseRequired)
 }
 
 func TestIntegration_MissingScheduleToClose_Ignore(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{
+	env := newTestEnv(t, Options{
 		Severities: map[string]Severity{
-			PolicyScheduleToCloseRequired: SeverityIgnore,
+			ScheduleToCloseRequired: SeverityIgnore,
 		},
 	})
 	env.RegisterWorkflow(missingScheduleToCloseWorkflow)
@@ -239,36 +239,36 @@ func TestIntegration_MissingScheduleToClose_Ignore(t *testing.T) {
 }
 
 func TestIntegration_MaxAttemptsTwo_Violation(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(maxAttemptsTwoWorkflow)
 	env.ExecuteWorkflow(maxAttemptsTwoWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
-	assertPolicyViolation(t, env.GetWorkflowError(), PolicyMaxAttemptsMustBeZeroOrAtLeast3)
+	assertPolicyViolation(t, env.GetWorkflowError(), MaxAttemptsTooLow)
 }
 
 func TestIntegration_TimeoutsPermitRetries_Violation(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(timeoutsPermitRetriesWorkflow)
 	env.ExecuteWorkflow(timeoutsPermitRetriesWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
-	assertPolicyViolation(t, env.GetWorkflowError(), PolicyTimeoutsPermitRetries)
+	assertPolicyViolation(t, env.GetWorkflowError(), TimeoutsPermitRetries)
 }
 
 func TestIntegration_LocalActivityTooLong(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(localActivityTooLongWorkflow)
 	env.ExecuteWorkflow(localActivityTooLongWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
-	assertPolicyViolation(t, env.GetWorkflowError(), PolicyLocalActivityStartToCloseUnder10s)
+	assertPolicyViolation(t, env.GetWorkflowError(), LocalActivityStartToCloseTooLong)
 }
 
 func TestIntegration_MultiViolation_CanonicalOrder(t *testing.T) {
-	env := newTestEnv(t, ActivityPolicyOptions{})
+	env := newTestEnv(t, Options{})
 	env.RegisterWorkflow(multiViolationWorkflow)
 	env.ExecuteWorkflow(multiViolationWorkflow)
 	require.True(t, env.IsWorkflowCompleted())
 	assertPolicyViolation(t, env.GetWorkflowError(),
-		PolicyScheduleToCloseRequired,
-		PolicyMaxAttemptsMustBeZeroOrAtLeast3,
+		ScheduleToCloseRequired,
+		MaxAttemptsTooLow,
 	)
 }

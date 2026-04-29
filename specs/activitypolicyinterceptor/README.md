@@ -35,8 +35,8 @@ Throughout this spec, "the interceptor" refers to the activity policy intercepto
    | Policy identifier | Default severity |
    |---|---|
    | `schedule_to_close_required` | `Error` |
-   | `max_attempts_must_be_zero_or_at_least_3` | `Error` |
-   | `local_activity_start_to_close_under_10s_required` | `Error` |
+   | `max_attempts_too_low` | `Error` |
+   | `local_activity_start_to_close_too_long` | `Error` |
    | `timeouts_permit_retries` | `Error` |
 
 4. WHEN a policy is evaluated AND its configured severity is `Ignore` THE INTERCEPTOR SHALL NOT enforce the policy and SHALL NOT emit a log entry for it.
@@ -69,7 +69,7 @@ Throughout this spec, "the interceptor" refers to the activity policy intercepto
 
 ## Workflow-Side Validation: Maximum Attempts
 
-12. THE INTERCEPTOR SHALL evaluate the `max_attempts_must_be_zero_or_at_least_3` policy on every workflow-initiated activity scheduling call (regular and local). The policy is violated when the retry policy's `maximum_attempts` is set to 1 or 2.
+12. THE INTERCEPTOR SHALL evaluate the `max_attempts_too_low` policy on every workflow-initiated activity scheduling call (regular and local). The policy is violated when the retry policy's `maximum_attempts` is set to 1 or 2.
 
 13. THE INTERCEPTOR SHALL NOT raise a violation when the retry policy is unset, when `maximum_attempts` is unset, when `maximum_attempts == 0` (unlimited per Temporal semantics), or when `maximum_attempts >= 3`.
 
@@ -91,7 +91,7 @@ Throughout this spec, "the interceptor" refers to the activity policy intercepto
 
 18. WHERE the host SDK exposes a separate [local activity](https://docs.temporal.io/local-activity) scheduling path THE INTERCEPTOR SHALL evaluate the same workflow-side validation policies on local activity scheduling calls as on regular activities, EXCEPT that requirements 9–11 (default heartbeat) do not apply, since local activities do not support heartbeats.
 
-19. THE INTERCEPTOR SHALL evaluate the `local_activity_start_to_close_under_10s_required` policy on every workflow-initiated local activity scheduling call. The policy is violated when the local activity's `start_to_close_timeout` is unset, zero, or greater than or equal to 10 seconds.
+19. THE INTERCEPTOR SHALL evaluate the `local_activity_start_to_close_too_long` policy on every workflow-initiated local activity scheduling call. The policy is violated when the local activity's `start_to_close_timeout` is unset, zero, or greater than or equal to 10 seconds.
 
 20. WHEN this policy is violated and logged at `Warn` severity THE INTERCEPTOR SHALL include the additional log field `start_to_close_seconds=<value>`.
 
@@ -99,7 +99,7 @@ Throughout this spec, "the interceptor" refers to the activity policy intercepto
 
 ## Workflow-Side Validation: Multiple Violations
 
-21. WHEN a single activity-scheduling call violates more than one policy AND at least one violated policy has severity `Error` THE INTERCEPTOR SHALL surface a single `PolicyViolationError` whose `policies` array contains all violated policy identifiers whose severity is `Warn` or `Error` (i.e., excluding `Ignore`), in this canonical order: `schedule_to_close_required`, `max_attempts_must_be_zero_or_at_least_3`, `local_activity_start_to_close_under_10s_required`, `timeouts_permit_retries`.
+21. WHEN a single activity-scheduling call violates more than one policy AND at least one violated policy has severity `Error` THE INTERCEPTOR SHALL surface a single `PolicyViolationError` whose `policies` array contains all violated policy identifiers whose severity is `Warn` or `Error` (i.e., excluding `Ignore`), in this canonical order: `schedule_to_close_required`, `max_attempts_too_low`, `local_activity_start_to_close_too_long`, `timeouts_permit_retries`.
 
 22. WHEN a single activity-scheduling call violates more than one policy AND no violated policy has severity `Error` THE INTERCEPTOR SHALL emit one warning log entry per violated policy whose severity is `Warn`, AND SHALL forward the scheduling call to the next interceptor unchanged.
 

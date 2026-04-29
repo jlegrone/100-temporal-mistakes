@@ -30,7 +30,7 @@ To downgrade or disable individual policies:
 ActivityPolicyInterceptor(
     Options(
         severities={
-            "max_attempts_must_be_zero_or_at_least_3": Severity.WARN,
+            "max_attempts_too_low": Severity.WARN,
             "timeouts_permit_retries": Severity.IGNORE,
         },
         auto_heartbeat=False,

@@ -6,7 +6,7 @@
     "duration_unit": "seconds (integer or fractional)",
     "unset_field": "null",
     "config_defaults": "Configuration options not listed in a test's interceptor_config use the defaults from README.md (Severities map fully Error, AutoHeartbeat=true, Logger=null).",
-    "severities_map_default": "All four policy identifiers default to Error: schedule_to_close_required, max_attempts_must_be_zero_or_at_least_3, local_activity_start_to_close_under_10s_required, timeouts_permit_retries.",
+    "severities_map_default": "All four policy identifiers default to Error: schedule_to_close_required, max_attempts_too_low, local_activity_start_to_close_too_long, timeouts_permit_retries.",
     "scenario_types": {
       "schedule_activity": "Workflow attempts to schedule an activity with the given options. Test harness inspects whether the call was forwarded, mutated, or violated.",
       "execute_activity": "Activity runs for the given duration on the worker with the interceptor active. Test harness inspects observable side effects (heartbeats, returns, etc.)."
@@ -194,7 +194,7 @@
         "application_failure": {
           "type": "PolicyViolationError",
           "non_retryable": true,
-          "details_payload_policies": ["max_attempts_must_be_zero_or_at_least_3"]
+          "details_payload_policies": ["max_attempts_too_low"]
         },
         "activity_scheduled_on_worker": false
       }
@@ -332,7 +332,7 @@
         "application_failure": {
           "type": "PolicyViolationError",
           "non_retryable": true,
-          "details_payload_policies": ["local_activity_start_to_close_under_10s_required"]
+          "details_payload_policies": ["local_activity_start_to_close_too_long"]
         },
         "activity_scheduled_on_worker": false
       }
@@ -361,7 +361,7 @@
           "non_retryable": true,
           "details_payload_policies": [
             "schedule_to_close_required",
-            "max_attempts_must_be_zero_or_at_least_3"
+            "max_attempts_too_low"
           ]
         },
         "activity_scheduled_on_worker": false

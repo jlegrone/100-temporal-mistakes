@@ -6,12 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+
+	"github.com/jlegrone/100-temporal-mistakes/examples/go/activitypolicyinterceptor"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 )
 
 // alwaysFails simulates an unreliable external call.
@@ -49,13 +51,22 @@ func slowLocalActivityWorkflow(ctx workflow.Context, request any) error {
 	return workflow.ExecuteLocalActivity(localCtx, slowActivity, request).Get(ctx, nil)
 }
 
+// allowLongLocalActivity downgrades the local-activity start-to-close policy
+// to Warn so this mistake's examples (which intentionally omit
+// start_to_close_timeout to keep the focus on retry/timeout failure modes)
+// can still run while emitting a warn-mode log entry.
+var allowLongLocalActivity = testhelpers.WithActivityPolicySeverity(
+	activitypolicy.LocalActivityStartToCloseTooLong,
+	activitypolicy.SeverityWarn,
+)
+
 // @@@SNIPSTART fallible-local-activities-test
 
 func TestLocalActivityRetriesExhausted(t *testing.T) {
 	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(failingLocalActivityWorkflow)
 		r.RegisterActivity(alwaysFails)
-	})
+	}, allowLongLocalActivity)
 
 	run, err := c.ExecuteWorkflow(t.Context(), client.StartWorkflowOptions{
 		TaskQueue:          taskQueue,
@@ -69,7 +80,7 @@ func TestLocalActivityTooSlow(t *testing.T) {
 	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(slowLocalActivityWorkflow)
 		r.RegisterActivity(slowActivity)
-	})
+	}, allowLongLocalActivity)
 
 	run, err := c.ExecuteWorkflow(t.Context(), client.StartWorkflowOptions{
 		TaskQueue:          taskQueue,
@@ -83,7 +94,7 @@ func TestLocalActivityGrowsHistory(t *testing.T) {
 	c, taskQueue := testhelpers.StartDevServerWorker(t, func(r worker.Registry) {
 		r.RegisterWorkflow(failingLocalActivityWorkflow)
 		r.RegisterActivity(alwaysFails)
-	})
+	}, allowLongLocalActivity)
 
 	run, err := c.ExecuteWorkflow(t.Context(), client.StartWorkflowOptions{
 		TaskQueue:           taskQueue,

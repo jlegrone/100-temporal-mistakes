@@ -5,14 +5,35 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/worker"
+
+	"github.com/jlegrone/100-temporal-mistakes/examples/go/activitypolicyinterceptor"
+	"github.com/jlegrone/100-temporal-mistakes/internal/testhelpers"
 )
+
+// allowMissingScheduleToClose downgrades the schedule_to_close_required policy
+// to Warn so this mistake's compensation-activity examples (which intentionally
+// keep the activity options minimal) can run while still surfacing the warn
+// log entry from the policy interceptor.
+func allowMissingScheduleToClose(env *testsuite.TestWorkflowEnvironment) {
+	env.SetWorkerOptions(worker.Options{
+		Interceptors: []interceptor.WorkerInterceptor{
+			activitypolicy.New(activitypolicy.Options{
+				Severities: map[string]activitypolicy.Severity{
+					activitypolicy.ScheduleToCloseRequired: activitypolicy.SeverityWarn,
+				},
+			}),
+		},
+	})
+}
 
 func TestV1_CompensationNeverRuns(t *testing.T) {
 	env := testhelpers.NewTestWorkflowEnvironment(t)
+	allowMissingScheduleToClose(env)
 	env.RegisterWorkflow(LongRunningWorkflow)
 	env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
 
@@ -77,6 +98,7 @@ func TestMyWorkflowV2(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			env := testhelpers.NewTestWorkflowEnvironment(t)
+			allowMissingScheduleToClose(env)
 			env.RegisterWorkflow(LongRunningWorkflow)
 			env.OnActivity(CompensateActivity, mock.Anything).Return(nil).Maybe()
 

@@ -1,12 +1,9 @@
-// Package testhelpers
-//
-// activity_policy_interceptor.go is the Go reference implementation of the
-// Activity Policy Interceptor specification.
+// Package activitypolicy is the Go reference implementation of the Activity
+// Policy Interceptor specification.
 //
 // See specs/activitypolicyinterceptor/README.md for the language-agnostic spec.
 // Requirement numbers cited in inline comments refer to that document.
-
-package testhelpers
+package activitypolicy
 
 import (
 	"context"
@@ -24,23 +21,23 @@ import (
 
 // Policy identifiers (must match conformance_tests.json).
 const (
-	PolicyScheduleToCloseRequired           = "schedule_to_close_required"
-	PolicyMaxAttemptsMustBeZeroOrAtLeast3   = "max_attempts_must_be_zero_or_at_least_3"
-	PolicyLocalActivityStartToCloseUnder10s = "local_activity_start_to_close_under_10s_required"
-	PolicyTimeoutsPermitRetries             = "timeouts_permit_retries"
+	ScheduleToCloseRequired          = "schedule_to_close_required"
+	MaxAttemptsTooLow                = "max_attempts_too_low"
+	LocalActivityStartToCloseTooLong = "local_activity_start_to_close_too_long"
+	TimeoutsPermitRetries            = "timeouts_permit_retries"
 
-	// PolicyViolationErrorType is the value of the ApplicationFailure's `type`
+	// ViolationErrorType is the value of the ApplicationFailure's `type`
 	// field for every violation surfaced by this interceptor (spec req 27).
-	PolicyViolationErrorType = "PolicyViolationError"
+	ViolationErrorType = "PolicyViolationError"
 )
 
 // canonicalOrder is the order used when aggregating multiple violations into
 // one PolicyViolationError (spec req 21).
 var canonicalOrder = []string{
-	PolicyScheduleToCloseRequired,
-	PolicyMaxAttemptsMustBeZeroOrAtLeast3,
-	PolicyLocalActivityStartToCloseUnder10s,
-	PolicyTimeoutsPermitRetries,
+	ScheduleToCloseRequired,
+	MaxAttemptsTooLow,
+	LocalActivityStartToCloseTooLong,
+	TimeoutsPermitRetries,
 }
 
 const (
@@ -78,17 +75,17 @@ func (s Severity) String() string {
 // defaultSeverities are applied per spec requirement 3 to any policy not
 // explicitly configured by the caller.
 var defaultSeverities = map[string]Severity{
-	PolicyScheduleToCloseRequired:           SeverityError,
-	PolicyMaxAttemptsMustBeZeroOrAtLeast3:   SeverityError,
-	PolicyLocalActivityStartToCloseUnder10s: SeverityError,
-	PolicyTimeoutsPermitRetries:             SeverityError,
+	ScheduleToCloseRequired:          SeverityError,
+	MaxAttemptsTooLow:                SeverityError,
+	LocalActivityStartToCloseTooLong: SeverityError,
+	TimeoutsPermitRetries:            SeverityError,
 }
 
-// ActivityPolicyOptions configures the interceptor per spec requirement 1.
+// Options configures the interceptor per spec requirement 1.
 //
 // The zero value applies the spec defaults: every policy at SeverityError,
 // AutoHeartbeat enabled, and the workflow's built-in logger.
-type ActivityPolicyOptions struct {
+type Options struct {
 	// Severities overrides individual policies. Unspecified entries fall back
 	// to defaultSeverities.
 	Severities map[string]Severity
@@ -100,23 +97,23 @@ type ActivityPolicyOptions struct {
 	Logger *slog.Logger
 }
 
-func (o ActivityPolicyOptions) severityFor(policy string) Severity {
+func (o Options) severityFor(policy string) Severity {
 	if sev, ok := o.Severities[policy]; ok {
 		return sev
 	}
 	return defaultSeverities[policy]
 }
 
-func (o ActivityPolicyOptions) autoHeartbeat() bool {
+func (o Options) autoHeartbeat() bool {
 	if o.AutoHeartbeat == nil {
 		return true
 	}
 	return *o.AutoHeartbeat
 }
 
-// PolicyViolationDetails is the structured payload placed at details[0] of
+// ViolationDetails is the structured payload placed at details[0] of
 // every PolicyViolationError ApplicationFailure (spec req 29).
-type PolicyViolationDetails struct {
+type ViolationDetails struct {
 	Policies     []string `json:"policies"`
 	ActivityType string   `json:"activity_type"`
 	WorkflowID   string   `json:"workflow_id"`
@@ -124,9 +121,9 @@ type PolicyViolationDetails struct {
 	Explanation  string   `json:"explanation"`
 }
 
-// NewActivityPolicyInterceptor returns a worker interceptor implementing the
+// New returns a worker interceptor implementing the
 // Activity Policy Interceptor spec.
-func NewActivityPolicyInterceptor(opts ActivityPolicyOptions) interceptor.WorkerInterceptor {
+func New(opts Options) interceptor.WorkerInterceptor {
 	return &activityPolicyInterceptor{opts: opts}
 }
 
@@ -136,7 +133,7 @@ func NewActivityPolicyInterceptor(opts ActivityPolicyOptions) interceptor.Worker
 
 type activityPolicyInterceptor struct {
 	interceptor.WorkerInterceptorBase
-	opts ActivityPolicyOptions
+	opts Options
 }
 
 func (a *activityPolicyInterceptor) InterceptActivity(
@@ -165,7 +162,7 @@ func (a *activityPolicyInterceptor) InterceptWorkflow(
 
 type workflowInbound struct {
 	interceptor.WorkflowInboundInterceptorBase
-	opts ActivityPolicyOptions
+	opts Options
 }
 
 func (w *workflowInbound) Init(outbound interceptor.WorkflowOutboundInterceptor) error {
@@ -181,7 +178,7 @@ func (w *workflowInbound) Init(outbound interceptor.WorkflowOutboundInterceptor)
 
 type workflowOutbound struct {
 	interceptor.WorkflowOutboundInterceptorBase
-	opts ActivityPolicyOptions
+	opts Options
 }
 
 func (w *workflowOutbound) ExecuteActivity(
@@ -316,25 +313,25 @@ func evaluatePolicies(
 	// Policy 1: schedule_to_close_required (regular and local).
 	if scheduleToClose <= 0 {
 		out = append(out, violation{
-			policy:      PolicyScheduleToCloseRequired,
+			policy:      ScheduleToCloseRequired,
 			explanation: "ScheduleToCloseTimeout must be set to a positive value",
 		})
 	}
 
-	// Policy 4: max_attempts_must_be_zero_or_at_least_3 (regular and local).
+	// Policy 4: max_attempts_too_low (regular and local).
 	if retryPolicy != nil && retryPolicy.MaximumAttempts > 0 && retryPolicy.MaximumAttempts < 3 {
 		out = append(out, violation{
-			policy:      PolicyMaxAttemptsMustBeZeroOrAtLeast3,
+			policy:      MaxAttemptsTooLow,
 			explanation: "RetryPolicy.MaximumAttempts must be 0 (unlimited) or >= 3",
 			extra:       map[string]any{"max_attempts": retryPolicy.MaximumAttempts},
 		})
 	}
 
-	// Policy 19: local_activity_start_to_close_under_10s_required.
+	// Policy 19: local_activity_start_to_close_too_long.
 	if isLocal {
 		if startToClose <= 0 || startToClose >= localActivityMaxStartToClose {
 			out = append(out, violation{
-				policy:      PolicyLocalActivityStartToCloseUnder10s,
+				policy:      LocalActivityStartToCloseTooLong,
 				explanation: "local activity StartToCloseTimeout must be set and < 10s",
 				extra:       map[string]any{"start_to_close_seconds": startToClose.Seconds()},
 			})
@@ -347,7 +344,7 @@ func evaluatePolicies(
 		minRequired := time.Duration(scheduleToCloseRatio * float64(startToClose))
 		if scheduleToClose < minRequired {
 			out = append(out, violation{
-				policy: PolicyTimeoutsPermitRetries,
+				policy: TimeoutsPermitRetries,
 				explanation: fmt.Sprintf(
 					"ScheduleToCloseTimeout must be >= %vx StartToCloseTimeout when HeartbeatTimeout is unset",
 					scheduleToCloseRatio,
@@ -382,7 +379,7 @@ func buildPolicyViolationError(
 	}
 	explanation := strings.Join(explanations, "; ")
 	message := fmt.Sprintf("activity policy violation: %s: %s", strings.Join(policies, ","), explanation)
-	details := PolicyViolationDetails{
+	details := ViolationDetails{
 		Policies:     policies,
 		ActivityType: activityType,
 		WorkflowID:   workflowID,
@@ -391,7 +388,7 @@ func buildPolicyViolationError(
 	}
 	return temporal.NewApplicationErrorWithOptions(
 		message,
-		PolicyViolationErrorType,
+		ViolationErrorType,
 		temporal.ApplicationErrorOptions{
 			NonRetryable: true,
 			Details:      []interface{}{details},
@@ -405,7 +402,7 @@ func buildPolicyViolationError(
 
 type activityInbound struct {
 	interceptor.ActivityInboundInterceptorBase
-	opts ActivityPolicyOptions
+	opts Options
 }
 
 func (a *activityInbound) ExecuteActivity(
