@@ -159,11 +159,9 @@ func checkError[T error](err error) (T, bool) {
 // DefaultMappers returns ErrorMappers for common stdlib error types this
 // codebase already uses. There is one mapper per standard library package,
 // named after that package's import path ("encoding/json", "net",
-// "net/url"); each dispatches over the package's error types with a series
-// of typed checks via [checkError]. Callers can prepend their own rules and
-// append these as a backstop.
+// "net/url").
 //
-// Order is intentional: more specific packages come first so that, for
+// Order is important: more specific packages come first so that, for
 // example, a *url.Error that wraps a *net.DNSError is claimed by "net"
 // before the generic "net/url" backstop.
 func DefaultMappers() []ErrorMapper {
@@ -171,12 +169,18 @@ func DefaultMappers() []ErrorMapper {
 		NewErrorMapper("encoding/json", func(err error) (error, bool) {
 			if err, ok := checkError[*json.UnmarshalTypeError](err); ok {
 				return temporal.NewApplicationErrorWithOptions(err.Error(), "json.UnmarshalTypeError", temporal.ApplicationErrorOptions{
+					// Schema disagreement between sender and receiver;
+					// neither side will change shape on retry.
 					NonRetryable: true,
 					Cause:        err,
 				}), true
 			}
 			if err, ok := checkError[*json.SyntaxError](err); ok {
 				return temporal.NewApplicationErrorWithOptions(err.Error(), "json.SyntaxError", temporal.ApplicationErrorOptions{
+					// Malformed JSON in a fully-buffered payload — the
+					// bytes are deterministic, so retrying parses the
+					// same garbage again. (Streaming I/O truncation
+					// surfaces as io.ErrUnexpectedEOF, not SyntaxError.)
 					NonRetryable: true,
 					Cause:        err,
 				}), true
@@ -186,6 +190,10 @@ func DefaultMappers() []ErrorMapper {
 		NewErrorMapper("net", func(err error) (error, bool) {
 			if dnsErr, ok := checkError[*net.DNSError](err); ok {
 				return temporal.NewApplicationErrorWithOptions(err.Error(), "net.DNSError", temporal.ApplicationErrorOptions{
+					// IsNotFound means NXDOMAIN: the configured host
+					// genuinely doesn't exist. Other DNS failures
+					// (SERVFAIL, timeouts) can be transient, so leave
+					// those retryable.
 					NonRetryable: dnsErr.IsNotFound,
 					Cause:        err,
 					Details:      []interface{}{dnsNotFoundDetails{Name: dnsErr.Name}},
