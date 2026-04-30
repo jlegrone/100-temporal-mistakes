@@ -1,0 +1,16 @@
+[package]
+name = "activitypolicyinterceptor-model"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Stateright model verifying that the activitypolicyinterceptor's accepted timeout/retry configurations permit ≥2 retries when each worker crashes 1ms after starting an attempt."
+
+[dependencies]
+stateright = "0.31"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+
+[profile.test]
+opt-level = 2

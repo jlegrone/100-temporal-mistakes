@@ -51,8 +51,13 @@ _CANONICAL_ORDER = (
 DEFAULT_HEARTBEAT_TIMEOUT = timedelta(seconds=30)
 # Fallback cadence for auto-heartbeat when no heartbeat timeout is configured (req 23).
 DEFAULT_AUTO_HEARTBEAT_CADENCE = timedelta(seconds=30)
-# Lower bound for schedule-to-close vs start-to-close ratio (req 16).
-SCHEDULE_TO_CLOSE_RATIO = 2.1
+# Default value for Options.required_retries (req 1).
+DEFAULT_REQUIRED_RETRIES = 2
+# Temporal default retry-policy values used by req 16 when the corresponding
+# RetryPolicy fields are unset.
+DEFAULT_RETRY_INITIAL_INTERVAL = timedelta(seconds=1)
+DEFAULT_RETRY_BACKOFF_COEFFICIENT = 2.0
+DEFAULT_MAX_INTERVAL_MULTIPLIER = 100
 # Local-activity start-to-close upper bound (req 19).
 LOCAL_ACTIVITY_MAX_START_TO_CLOSE = timedelta(seconds=10)
 
@@ -86,12 +91,16 @@ class Options:
             heartbeats during activity execution at half the configured
             heartbeat-timeout cadence (or every 30s when no heartbeat timeout
             is configured).
+        required_retries: Minimum number of retries the timeout configuration
+            must permit per req 16. Defaults to 2. A value of 0 disables the
+            timeouts_permit_retries policy entirely.
         logger: Optional structured logger handle. Defaults to the workflow's
             built-in logger inside workflow code.
     """
 
     severities: dict[str, Severity] = dataclasses.field(default_factory=dict)
     auto_heartbeat: bool = True
+    required_retries: int = DEFAULT_REQUIRED_RETRIES
     logger: Optional[logging.Logger] = None
 
     def severity_for(self, policy: str) -> Severity:
@@ -123,6 +132,7 @@ def _evaluate_policies(
     heartbeat: Optional[timedelta],
     retry_policy: Any,
     is_local: bool,
+    required_retries: int = DEFAULT_REQUIRED_RETRIES,
 ) -> list[_Violation]:
     """Evaluate the four validation policies in canonical order.
 
@@ -169,26 +179,82 @@ def _evaluate_policies(
                 )
             )
 
-    # Policy 16: timeouts_permit_retries — only when heartbeat is unset.
+    # Policy 16: timeouts_permit_retries — closed-form check that the
+    # (required_retries+1)-th attempt can start within schedule_to_close
+    # under the worst-case crash-during-attempt failure model.
     if (
-        not is_local
-        and heartbeat is None
-        and start_to_close is not None
+        required_retries > 0
         and schedule_to_close is not None
-        and schedule_to_close.total_seconds()
-        < SCHEDULE_TO_CLOSE_RATIO * start_to_close.total_seconds()
+        and schedule_to_close.total_seconds() > 0
     ):
-        violations.append(
-            _Violation(
-                policy=POLICY_TIMEOUTS_PERMIT_RETRIES,
-                explanation=(
-                    f"schedule_to_close_timeout must be >= {SCHEDULE_TO_CLOSE_RATIO}x "
-                    "start_to_close_timeout when heartbeat_timeout is unset"
-                ),
-            )
-        )
+        detect = _detection_delay(heartbeat, start_to_close)
+        if detect is not None and detect.total_seconds() > 0:
+            min_required = _min_schedule_to_close(detect, retry_policy, required_retries)
+            if schedule_to_close < min_required:
+                violations.append(
+                    _Violation(
+                        policy=POLICY_TIMEOUTS_PERMIT_RETRIES,
+                        explanation=(
+                            f"schedule_to_close_timeout must be >= {min_required} "
+                            f"to permit {required_retries} retries "
+                            f"(detection_delay={detect})"
+                        ),
+                        extra_fields={
+                            "required_retries": required_retries,
+                            "detection_delay_seconds": detect.total_seconds(),
+                            "min_schedule_to_close_seconds": min_required.total_seconds(),
+                        },
+                    )
+                )
 
     return _canonicalize(violations)
+
+
+def _detection_delay(
+    heartbeat: Optional[timedelta], start_to_close: Optional[timedelta]
+) -> Optional[timedelta]:
+    """Implements the detection_delay definition from spec req 16: heartbeat
+    when set, otherwise start_to_close. Returns None if neither is set."""
+    if heartbeat is not None and heartbeat.total_seconds() > 0:
+        return heartbeat
+    if start_to_close is not None and start_to_close.total_seconds() > 0:
+        return start_to_close
+    return None
+
+
+def _retry_interval(n: int, retry_policy: Any) -> timedelta:
+    """Returns interval(n) per spec req 16. Unset retry-policy fields fall back
+    to Temporal's documented defaults."""
+    initial = DEFAULT_RETRY_INITIAL_INTERVAL
+    backoff = DEFAULT_RETRY_BACKOFF_COEFFICIENT
+    max_interval: Optional[timedelta] = None
+    if retry_policy is not None:
+        rp_initial = getattr(retry_policy, "initial_interval", None)
+        if isinstance(rp_initial, timedelta) and rp_initial.total_seconds() > 0:
+            initial = rp_initial
+        rp_backoff = getattr(retry_policy, "backoff_coefficient", None)
+        if isinstance(rp_backoff, (int, float)) and rp_backoff > 0:
+            backoff = float(rp_backoff)
+        rp_max = getattr(retry_policy, "maximum_interval", None)
+        if isinstance(rp_max, timedelta) and rp_max.total_seconds() > 0:
+            max_interval = rp_max
+    if max_interval is None:
+        max_interval = initial * DEFAULT_MAX_INTERVAL_MULTIPLIER
+    scaled_seconds = initial.total_seconds() * (backoff ** (n - 1))
+    if scaled_seconds > max_interval.total_seconds():
+        return max_interval
+    return timedelta(seconds=scaled_seconds)
+
+
+def _min_schedule_to_close(
+    detect: timedelta, retry_policy: Any, required_retries: int
+) -> timedelta:
+    """Computes N×detection_delay + Σ retry_interval(n) for n in 1..=N — the
+    lower bound implied by spec req 16."""
+    total = detect * required_retries
+    for i in range(1, required_retries + 1):
+        total += _retry_interval(i, retry_policy)
+    return total
 
 
 def _canonicalize(violations: list[_Violation]) -> list[_Violation]:
@@ -280,6 +346,7 @@ class _OutboundInterceptor(WorkflowOutboundInterceptor):
             heartbeat=heartbeat,
             retry_policy=retry_policy,
             is_local=is_local,
+            required_retries=self._opts.required_retries,
         )
         if not violations:
             return

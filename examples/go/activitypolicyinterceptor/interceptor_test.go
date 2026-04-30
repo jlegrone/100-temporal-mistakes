@@ -23,58 +23,105 @@ func TestEvaluatePolicies(t *testing.T) {
 		schedule, startTo, heartbeat time.Duration
 		retry                        *temporal.RetryPolicy
 		isLocal                      bool
+		requiredRetries              int
 		want                         []string
 	}{
 		"happy regular": {
 			schedule: time.Hour, heartbeat: 30 * time.Second,
-			want: nil,
+			requiredRetries: 2,
+			want:            nil,
 		},
 		"missing schedule_to_close": {
-			startTo: 30 * time.Second,
-			want:    []string{ScheduleToCloseRequired},
+			startTo: 30 * time.Second, requiredRetries: 2,
+			want: []string{ScheduleToCloseRequired},
 		},
 		"max_attempts=2 violates": {
 			schedule: time.Hour, startTo: 30 * time.Second,
-			retry: &temporal.RetryPolicy{MaximumAttempts: 2},
-			want:  []string{MaxAttemptsTooLow},
+			retry:           &temporal.RetryPolicy{MaximumAttempts: 2},
+			requiredRetries: 2,
+			want:            []string{MaxAttemptsTooLow},
 		},
 		"max_attempts=3 allowed": {
 			schedule: time.Hour, startTo: 30 * time.Second,
-			retry: &temporal.RetryPolicy{MaximumAttempts: 3},
-			want:  nil,
+			retry:           &temporal.RetryPolicy{MaximumAttempts: 3},
+			requiredRetries: 2,
+			want:            nil,
 		},
 		"max_attempts=0 allowed": {
 			schedule: time.Hour, startTo: 30 * time.Second,
-			retry: &temporal.RetryPolicy{MaximumAttempts: 0},
-			want:  nil,
+			retry:           &temporal.RetryPolicy{MaximumAttempts: 0},
+			requiredRetries: 2,
+			want:            nil,
 		},
 		"timeouts_permit_retries violation no heartbeat": {
+			// detect=30s, intervals=1+2=3s, 2*30+3=63 > 60 → violation.
 			schedule: 60 * time.Second, startTo: 30 * time.Second,
-			want: []string{TimeoutsPermitRetries},
+			requiredRetries: 2,
+			want:            []string{TimeoutsPermitRetries},
 		},
-		"timeouts_permit_retries skipped with heartbeat": {
+		"timeouts_permit_retries violation with heartbeat retry interval too long": {
+			// detect=10s, intervals=5+10=15s, 2*10+15=35 > 11 → violation.
+			schedule: 11 * time.Second, startTo: 11 * time.Second, heartbeat: 10 * time.Second,
+			retry: &temporal.RetryPolicy{
+				InitialInterval:    5 * time.Second,
+				BackoffCoefficient: 2.0,
+			},
+			requiredRetries: 2,
+			want:            []string{TimeoutsPermitRetries},
+		},
+		"timeouts_permit_retries allowed with heartbeat default policy": {
+			// detect=10s, intervals=1+2=3s, 2*10+3=23 ≤ 60 → ok.
 			schedule: 60 * time.Second, startTo: 30 * time.Second, heartbeat: 10 * time.Second,
-			want: nil,
+			requiredRetries: 2,
+			want:            nil,
 		},
-		"timeouts_permit_retries adequate ratio": {
+		"timeouts_permit_retries allowed at boundary": {
+			// 2*30+1+2=63 ≤ 70 → ok.
 			schedule: 70 * time.Second, startTo: 30 * time.Second,
-			want: nil,
+			requiredRetries: 2,
+			want:            nil,
+		},
+		"timeouts_permit_retries skipped when N=0": {
+			schedule: 60 * time.Second, startTo: 30 * time.Second,
+			requiredRetries: 0,
+			want:            nil,
+		},
+		"timeouts_permit_retries N=1 allows N=2 boundary": {
+			// detect=30, intervals=1, 1*30+1=31 ≤ 60 → ok at N=1.
+			schedule: 60 * time.Second, startTo: 30 * time.Second,
+			requiredRetries: 1,
+			want:            nil,
+		},
+		"timeouts_permit_retries max_interval clamps backoff": {
+			// detect=5, intervals=1+2=3 (capped), 2*5+3=13 ≤ 30 → ok.
+			schedule: 30 * time.Second, startTo: 10 * time.Second, heartbeat: 5 * time.Second,
+			retry: &temporal.RetryPolicy{
+				InitialInterval:    1 * time.Second,
+				BackoffCoefficient: 10.0,
+				MaximumInterval:    2 * time.Second,
+			},
+			requiredRetries: 2,
+			want:            nil,
 		},
 		"local activity stc too long": {
-			schedule: 60 * time.Second, startTo: 30 * time.Second, isLocal: true,
-			want: []string{LocalActivityStartToCloseTooLong},
+			schedule: 200 * time.Second, startTo: 30 * time.Second, isLocal: true,
+			requiredRetries: 2,
+			want:            []string{LocalActivityStartToCloseTooLong},
 		},
 		"local activity stc unset": {
 			schedule: 60 * time.Second, isLocal: true,
-			want: []string{LocalActivityStartToCloseTooLong},
+			requiredRetries: 2,
+			want:            []string{LocalActivityStartToCloseTooLong},
 		},
 		"local activity happy": {
 			schedule: 30 * time.Second, startTo: 5 * time.Second, isLocal: true,
-			want: nil,
+			requiredRetries: 2,
+			want:            nil,
 		},
 		"multi-violation canonical order": {
-			startTo: 30 * time.Second,
-			retry:   &temporal.RetryPolicy{MaximumAttempts: 2},
+			startTo:         30 * time.Second,
+			retry:           &temporal.RetryPolicy{MaximumAttempts: 2},
+			requiredRetries: 2,
 			want: []string{
 				ScheduleToCloseRequired,
 				MaxAttemptsTooLow,
@@ -83,7 +130,7 @@ func TestEvaluatePolicies(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			vs := evaluatePolicies(tc.schedule, tc.startTo, tc.heartbeat, tc.retry, tc.isLocal)
+			vs := evaluatePolicies(tc.schedule, tc.startTo, tc.heartbeat, tc.retry, tc.isLocal, tc.requiredRetries)
 			var got []string
 			for _, v := range vs {
 				got = append(got, v.policy)
@@ -147,8 +194,9 @@ func timeoutsPermitRetriesWorkflow(ctx workflow.Context) error {
 }
 
 func localActivityTooLongWorkflow(ctx workflow.Context) error {
+	// schedule_to_close=200s isolates from timeouts_permit_retries (2*30+1+2=63 ≤ 200).
 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{
-		ScheduleToCloseTimeout: 60 * time.Second,
+		ScheduleToCloseTimeout: 200 * time.Second,
 		StartToCloseTimeout:    30 * time.Second,
 	})
 	return workflow.ExecuteLocalActivity(ctx, noopActivity).Get(ctx, nil)

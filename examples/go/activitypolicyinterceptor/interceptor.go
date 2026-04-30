@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -44,10 +45,16 @@ const (
 	// defaultHeartbeatTimeout is applied per spec requirement 9 when neither
 	// heartbeat nor start-to-close is set on a regular activity.
 	defaultHeartbeatTimeout = 30 * time.Second
-	// scheduleToCloseRatio is the lower bound used by spec requirement 16.
-	scheduleToCloseRatio = 2.1
 	// localActivityMaxStartToClose is the upper bound used by spec requirement 19.
 	localActivityMaxStartToClose = 10 * time.Second
+	// defaultRequiredRetries is applied per spec requirement 1 when the caller
+	// does not configure RequiredRetries.
+	defaultRequiredRetries = 2
+	// Temporal default retry-policy values used by spec requirement 16 when
+	// the corresponding RetryPolicy fields are unset.
+	defaultRetryInitialInterval    = 1 * time.Second
+	defaultRetryBackoffCoefficient = 2.0
+	defaultMaxIntervalMultiplier   = 100
 )
 
 // Severity is the closed enumeration defined by spec requirement 2.
@@ -84,7 +91,7 @@ var defaultSeverities = map[string]Severity{
 // Options configures the interceptor per spec requirement 1.
 //
 // The zero value applies the spec defaults: every policy at SeverityError,
-// AutoHeartbeat enabled, and the workflow's built-in logger.
+// AutoHeartbeat enabled, RequiredRetries=2, and the workflow's built-in logger.
 type Options struct {
 	// Severities overrides individual policies. Unspecified entries fall back
 	// to defaultSeverities.
@@ -92,6 +99,10 @@ type Options struct {
 	// AutoHeartbeat controls the activity-side auto-heartbeat helper. Defaults
 	// to true per spec requirement 23.
 	AutoHeartbeat *bool
+	// RequiredRetries is the minimum number of retries the timeout
+	// configuration must permit per spec requirement 16. Defaults to 2 when
+	// nil. A value of 0 disables the timeouts_permit_retries policy entirely.
+	RequiredRetries *int
 	// Logger is the destination for warn-mode log entries. When nil, the
 	// workflow's logger is used.
 	Logger *slog.Logger
@@ -109,6 +120,13 @@ func (o Options) autoHeartbeat() bool {
 		return true
 	}
 	return *o.AutoHeartbeat
+}
+
+func (o Options) requiredRetries() int {
+	if o.RequiredRetries == nil {
+		return defaultRequiredRetries
+	}
+	return *o.RequiredRetries
 }
 
 // ViolationDetails is the structured payload placed at details[0] of
@@ -201,6 +219,7 @@ func (w *workflowOutbound) ExecuteActivity(
 		opts.HeartbeatTimeout,
 		opts.RetryPolicy,
 		false, /* isLocal */
+		w.opts.requiredRetries(),
 	)
 
 	if err := w.handleViolations(ctx, activityType, violations); err != nil {
@@ -223,6 +242,7 @@ func (w *workflowOutbound) ExecuteLocalActivity(
 		0, /* heartbeat: local activities don't support heartbeats */
 		opts.RetryPolicy,
 		true, /* isLocal */
+		w.opts.requiredRetries(),
 	)
 	if err := w.handleViolations(ctx, activityType, violations); err != nil {
 		fut, settable := workflow.NewFuture(ctx)
@@ -307,6 +327,7 @@ func evaluatePolicies(
 	scheduleToClose, startToClose, heartbeat time.Duration,
 	retryPolicy *temporal.RetryPolicy,
 	isLocal bool,
+	requiredRetries int,
 ) []violation {
 	var out []violation
 
@@ -338,22 +359,77 @@ func evaluatePolicies(
 		}
 	}
 
-	// Policy 16: timeouts_permit_retries — only when heartbeat is unset on a
-	// regular activity with both other timeouts set.
-	if !isLocal && heartbeat == 0 && startToClose > 0 && scheduleToClose > 0 {
-		minRequired := time.Duration(scheduleToCloseRatio * float64(startToClose))
-		if scheduleToClose < minRequired {
-			out = append(out, violation{
-				policy: TimeoutsPermitRetries,
-				explanation: fmt.Sprintf(
-					"ScheduleToCloseTimeout must be >= %vx StartToCloseTimeout when HeartbeatTimeout is unset",
-					scheduleToCloseRatio,
-				),
-			})
+	// Policy 16: timeouts_permit_retries — closed-form check that the
+	// (RequiredRetries+1)-th attempt can start within schedule_to_close under
+	// the worst-case crash-during-attempt failure model.
+	if requiredRetries > 0 && scheduleToClose > 0 {
+		detect := detectionDelay(heartbeat, startToClose)
+		if detect > 0 {
+			minRequired := minScheduleToClose(detect, retryPolicy, requiredRetries)
+			if scheduleToClose < minRequired {
+				out = append(out, violation{
+					policy: TimeoutsPermitRetries,
+					explanation: fmt.Sprintf(
+						"ScheduleToCloseTimeout must be >= %s to permit %d retries (detection_delay=%s)",
+						minRequired, requiredRetries, detect,
+					),
+					extra: map[string]any{
+						"required_retries":              requiredRetries,
+						"detection_delay_seconds":       detect.Seconds(),
+						"min_schedule_to_close_seconds": minRequired.Seconds(),
+					},
+				})
+			}
 		}
 	}
 
 	return canonicalize(out)
+}
+
+// detectionDelay implements the "detection_delay" definition from spec
+// requirement 16: heartbeat_timeout when set, otherwise start_to_close_timeout.
+func detectionDelay(heartbeat, startToClose time.Duration) time.Duration {
+	if heartbeat > 0 {
+		return heartbeat
+	}
+	return startToClose
+}
+
+// retryInterval returns interval(n) per spec requirement 16, where the unset
+// fields of retryPolicy fall back to Temporal's documented defaults.
+func retryInterval(n int, retryPolicy *temporal.RetryPolicy) time.Duration {
+	initial := defaultRetryInitialInterval
+	backoff := defaultRetryBackoffCoefficient
+	var maxInterval time.Duration
+	if retryPolicy != nil {
+		if retryPolicy.InitialInterval > 0 {
+			initial = retryPolicy.InitialInterval
+		}
+		if retryPolicy.BackoffCoefficient > 0 {
+			backoff = retryPolicy.BackoffCoefficient
+		}
+		if retryPolicy.MaximumInterval > 0 {
+			maxInterval = retryPolicy.MaximumInterval
+		}
+	}
+	if maxInterval == 0 {
+		maxInterval = time.Duration(defaultMaxIntervalMultiplier) * initial
+	}
+	scaled := float64(initial) * math.Pow(backoff, float64(n-1))
+	if scaled > float64(maxInterval) {
+		return maxInterval
+	}
+	return time.Duration(scaled)
+}
+
+// minScheduleToClose computes N×detection_delay + Σ retry_interval(n) for
+// n in 1..=N, the lower bound implied by spec requirement 16.
+func minScheduleToClose(detect time.Duration, retryPolicy *temporal.RetryPolicy, n int) time.Duration {
+	sum := time.Duration(n) * detect
+	for i := 1; i <= n; i++ {
+		sum += retryInterval(i, retryPolicy)
+	}
+	return sum
 }
 
 func canonicalize(in []violation) []violation {

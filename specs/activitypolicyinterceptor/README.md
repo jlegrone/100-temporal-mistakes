@@ -12,7 +12,7 @@ The five theory policies covered by this spec and their interceptor treatment:
 | 2 | Set a heartbeat or start-to-close timeout | Implement — default `heartbeat_timeout` to 30s when neither is set |
 | 3 | Cleanup activities must heartbeat | Implement — auto-heartbeat helper |
 | 4 | Set [maximum attempts](https://docs.temporal.io/encyclopedia/retry-policies) to 0 (unlimited) or to a value ≥ 3 | Validate — surface violation |
-| 5 | Timeout configuration must permit at least one retry | Validate — surface violation |
+| 5 | Timeout configuration must permit at least `RequiredRetries` retries (default 2) | Validate — surface violation |
 
 Throughout this spec, "the interceptor" refers to the activity policy interceptor as installed on a worker. "The host SDK" refers to whichever Temporal SDK the implementer is targeting. Spec readers are assumed to be familiar with Temporal concepts; concept names follow the linked upstream documentation and may be spelled differently in each SDK.
 
@@ -26,6 +26,7 @@ Throughout this spec, "the interceptor" refers to the activity policy intercepto
    |---|---|---|
    | `Severities` | map of policy identifier → `Severity` | see requirement 3 |
    | `AutoHeartbeat` | boolean | `true` |
+   | `RequiredRetries` | non-negative integer; minimum number of retries the timeout configuration must permit (per requirement 16) | `2` |
    | `Logger` | structured logger handle, or null for the host SDK's default | `null` |
 
 2. THE INTERCEPTOR SHALL define `Severity` as a closed enumeration with exactly three values: `Ignore`, `Warn`, `Error`. No other values are permitted.
@@ -79,11 +80,22 @@ Throughout this spec, "the interceptor" refers to the activity policy intercepto
 
 ## Workflow-Side Validation: Timeouts Permit Retries
 
-15. THE INTERCEPTOR SHALL evaluate the `timeouts_permit_retries` policy on every workflow-initiated activity scheduling call. The policy is violated when the activity's timeout configuration demonstrably leaves no room for at least one retry attempt.
+15. THE INTERCEPTOR SHALL evaluate the `timeouts_permit_retries` policy on every workflow-initiated activity scheduling call. The policy guarantees that the timeout configuration leaves room for at least `N = RequiredRetries` retries to start within the schedule-to-close budget under the worst-case failure model in which every attempt fails immediately after starting and is detected only via the activity's configured timeouts.
 
-16. THE INTERCEPTOR SHALL treat the following as a violation of the `timeouts_permit_retries` policy: `heartbeat_timeout` is unset AND `start_to_close_timeout` is set AND `schedule_to_close_timeout` is set AND `schedule_to_close_timeout < 2.1 * start_to_close_timeout`. WHEN `heartbeat_timeout` is set, this start-to-close-vs-schedule-to-close ratio rule SHALL NOT apply (heartbeat-driven retry detection covers worker failure during a long start-to-close window).
+16. Define the following derived values from the activity options. When the retry policy or any of its fields are unset, the values default to Temporal's documented defaults: `initial_interval = 1s`, `backoff_coefficient = 2.0`, `maximum_interval` unset.
 
-17. THE INTERCEPTOR SHOULD also detect other observable timeout configurations that prevent retries (e.g., a retry policy whose `maximum_interval` exceeds the remaining `schedule_to_close_timeout` budget after the first attempt) and surface them under the same `timeouts_permit_retries` policy identifier.
+    - `detection_delay = heartbeat_timeout` when `heartbeat_timeout` is set, otherwise `start_to_close_timeout`. This represents the worst-case time Temporal needs to detect a failed attempt: heartbeat-driven detection fires within one heartbeat interval, while start-to-close-only detection takes the full attempt timeout.
+    - `retry_interval(n) = min(M, initial_interval × backoff_coefficient^(n-1))` for `n ≥ 1`, where `M = maximum_interval` when set and `100 × initial_interval` otherwise (Temporal's default upper bound).
+
+    THE INTERCEPTOR SHALL treat the activity options as a violation of the `timeouts_permit_retries` policy when `schedule_to_close_timeout` is set, at least one of `heartbeat_timeout` or `start_to_close_timeout` is set (so `detection_delay` is determinable), and the following inequality holds:
+
+    ```
+    N × detection_delay + Σ retry_interval(n) for n in 1..=N  >  schedule_to_close_timeout
+    ```
+
+    Equivalently, the (N+1)-th attempt cannot start within the schedule-to-close budget. THE INTERCEPTOR SHALL NOT raise this violation when `N == 0`.
+
+17. WHEN this policy is violated and logged at `Warn` severity THE INTERCEPTOR SHALL include the additional log fields `required_retries=<N>`, `detection_delay_seconds=<value>`, and `min_schedule_to_close_seconds=<value>` (the lower bound implied by the inequality in requirement 16, expressed in seconds).
 
 ---
 

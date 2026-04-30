@@ -5,7 +5,7 @@
   "conventions": {
     "duration_unit": "seconds (integer or fractional)",
     "unset_field": "null",
-    "config_defaults": "Configuration options not listed in a test's interceptor_config use the defaults from README.md (Severities map fully Error, AutoHeartbeat=true, Logger=null).",
+    "config_defaults": "Configuration options not listed in a test's interceptor_config use the defaults from README.md (Severities map fully Error, AutoHeartbeat=true, RequiredRetries=2, Logger=null).",
     "severities_map_default": "All four policy identifiers default to Error: schedule_to_close_required, max_attempts_too_low, local_activity_start_to_close_too_long, timeouts_permit_retries.",
     "scenario_types": {
       "schedule_activity": "Workflow attempts to schedule an activity with the given options. Test harness inspects whether the call was forwarded, mutated, or violated.",
@@ -246,9 +246,9 @@
       }
     },
     {
-      "id": "TC-TimeoutsPermitRetries-Violation",
+      "id": "TC-TimeoutsPermitRetries-NoHeartbeat-Violation",
       "spec_requirement": 16,
-      "name": "schedule_to_close < 2.1x start_to_close (no heartbeat) violates timeouts_permit_retries",
+      "name": "no-heartbeat schedule_to_close=60s, start_to_close=30s violates: 2*30 + 1 + 2 = 63 > 60",
       "interceptor_config": {},
       "scenario": {
         "type": "schedule_activity",
@@ -271,9 +271,9 @@
       }
     },
     {
-      "id": "TC-TimeoutsPermitRetries-Allowed-WithHeartbeat",
+      "id": "TC-TimeoutsPermitRetries-Heartbeat-Allowed",
       "spec_requirement": 16,
-      "name": "Tight schedule_to_close vs start_to_close ratio is allowed when heartbeat_timeout is set",
+      "name": "heartbeat=10s with default retry policy: 2*10 + 1 + 2 = 23s <= schedule_to_close=60s is allowed",
       "interceptor_config": {},
       "scenario": {
         "type": "schedule_activity",
@@ -292,9 +292,9 @@
       }
     },
     {
-      "id": "TC-TimeoutsPermitRetries-Allowed-AdequateRatio",
+      "id": "TC-TimeoutsPermitRetries-NoHeartbeat-Allowed",
       "spec_requirement": 16,
-      "name": "schedule_to_close >= 2.1x start_to_close (no heartbeat) is allowed",
+      "name": "no-heartbeat schedule_to_close=70s, start_to_close=30s allowed: 2*30 + 1 + 2 = 63 <= 70",
       "interceptor_config": {},
       "scenario": {
         "type": "schedule_activity",
@@ -313,6 +313,132 @@
       }
     },
     {
+      "id": "TC-TimeoutsPermitRetries-Heartbeat-RetryIntervalTooLong-Violation",
+      "spec_requirement": 16,
+      "name": "heartbeat=10s, initial_interval=5s, schedule_to_close=11s: 2*10 + 5 + 10 = 35 > 11 violates even though heartbeat is set",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 11,
+          "start_to_close_seconds": 11,
+          "heartbeat_seconds": 10,
+          "retry_policy": {
+            "initial_interval_seconds": 5,
+            "backoff_coefficient": 2.0
+          }
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["timeouts_permit_retries"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-MaxIntervalCaps-Allowed",
+      "spec_requirement": 16,
+      "name": "maximum_interval clips per-attempt backoff: heartbeat=5s, initial=1s, backoff=10, max_interval=2s -> 2*5 + 1 + 2 = 13 <= 30",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 30,
+          "start_to_close_seconds": 10,
+          "heartbeat_seconds": 5,
+          "retry_policy": {
+            "initial_interval_seconds": 1,
+            "backoff_coefficient": 10.0,
+            "maximum_interval_seconds": 2
+          }
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-RequiredRetries-Zero-Skipped",
+      "spec_requirement": 16,
+      "name": "RequiredRetries=0 skips the policy entirely; otherwise-failing config is forwarded",
+      "interceptor_config": {
+        "RequiredRetries": 0
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 60,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-RequiredRetries-One-Allowed",
+      "spec_requirement": 16,
+      "name": "RequiredRetries=1: schedule_to_close=60s allows N=1 (1*30 + 1 = 31 <= 60) where N=2 would not (63 > 60)",
+      "interceptor_config": {
+        "RequiredRetries": 1
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 60,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-RequiredRetries-Three-Violation",
+      "spec_requirement": 16,
+      "name": "RequiredRetries=3: previously-allowed 70s/30s/no-heartbeat now violates (3*30 + 1 + 2 + 4 = 97 > 70)",
+      "interceptor_config": {
+        "RequiredRetries": 3
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 70,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["timeouts_permit_retries"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
       "id": "TC-LocalActivity-StartToClose-Violation",
       "spec_requirement": 19,
       "name": "Local activity start-to-close >= 10 seconds fails",
@@ -321,7 +447,7 @@
         "type": "schedule_activity",
         "activity_kind": "local",
         "activity_options": {
-          "schedule_to_close_seconds": 60,
+          "schedule_to_close_seconds": 200,
           "start_to_close_seconds": 30,
           "heartbeat_seconds": null,
           "retry_policy": null

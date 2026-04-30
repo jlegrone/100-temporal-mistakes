@@ -92,7 +92,8 @@ class TestEvaluatePolicies:
         )
         assert all(v.policy != POLICY_MAX_ATTEMPTS for v in violations)
 
-    def test_timeouts_permit_retries_violation(self) -> None:
+    def test_timeouts_permit_retries_violation_no_heartbeat(self) -> None:
+        # detect=30, intervals=1+2=3, 2*30+3=63 > 60 → violation.
         violations = _evaluate_policies(
             schedule_to_close=timedelta(seconds=60),
             start_to_close=timedelta(seconds=30),
@@ -102,7 +103,8 @@ class TestEvaluatePolicies:
         )
         assert [v.policy for v in violations] == [POLICY_TIMEOUTS_PERMIT_RETRIES]
 
-    def test_timeouts_permit_retries_skipped_with_heartbeat(self) -> None:
+    def test_timeouts_permit_retries_allowed_with_heartbeat(self) -> None:
+        # detect=10, intervals=1+2=3, 2*10+3=23 ≤ 60 → ok.
         violations = _evaluate_policies(
             schedule_to_close=timedelta(seconds=60),
             start_to_close=timedelta(seconds=30),
@@ -112,7 +114,26 @@ class TestEvaluatePolicies:
         )
         assert violations == []
 
-    def test_timeouts_permit_retries_adequate_ratio(self) -> None:
+    def test_timeouts_permit_retries_violation_heartbeat_with_long_interval(
+        self,
+    ) -> None:
+        # detect=10, intervals=5+10=15, 2*10+15=35 > 11 → violation.
+        from temporalio.common import RetryPolicy
+
+        violations = _evaluate_policies(
+            schedule_to_close=timedelta(seconds=11),
+            start_to_close=timedelta(seconds=11),
+            heartbeat=timedelta(seconds=10),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=5),
+                backoff_coefficient=2.0,
+            ),
+            is_local=False,
+        )
+        assert [v.policy for v in violations] == [POLICY_TIMEOUTS_PERMIT_RETRIES]
+
+    def test_timeouts_permit_retries_allowed_at_boundary(self) -> None:
+        # 2*30+1+2=63 ≤ 70 → ok at default required_retries=2.
         violations = _evaluate_policies(
             schedule_to_close=timedelta(seconds=70),
             start_to_close=timedelta(seconds=30),
@@ -122,9 +143,50 @@ class TestEvaluatePolicies:
         )
         assert violations == []
 
-    def test_local_activity_start_to_close_violation_too_long(self) -> None:
+    def test_timeouts_permit_retries_skipped_when_zero(self) -> None:
         violations = _evaluate_policies(
             schedule_to_close=timedelta(seconds=60),
+            start_to_close=timedelta(seconds=30),
+            heartbeat=None,
+            retry_policy=None,
+            is_local=False,
+            required_retries=0,
+        )
+        assert violations == []
+
+    def test_timeouts_permit_retries_n_one_allows_n_two_boundary(self) -> None:
+        # detect=30, interval(1)=1, 1*30+1=31 ≤ 60 → ok at N=1.
+        violations = _evaluate_policies(
+            schedule_to_close=timedelta(seconds=60),
+            start_to_close=timedelta(seconds=30),
+            heartbeat=None,
+            retry_policy=None,
+            is_local=False,
+            required_retries=1,
+        )
+        assert violations == []
+
+    def test_timeouts_permit_retries_max_interval_clamps(self) -> None:
+        # detect=5, intervals=1+2=3 (capped at max_interval=2s), 2*5+3=13 ≤ 30.
+        from temporalio.common import RetryPolicy
+
+        violations = _evaluate_policies(
+            schedule_to_close=timedelta(seconds=30),
+            start_to_close=timedelta(seconds=10),
+            heartbeat=timedelta(seconds=5),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=1),
+                backoff_coefficient=10.0,
+                maximum_interval=timedelta(seconds=2),
+            ),
+            is_local=False,
+        )
+        assert violations == []
+
+    def test_local_activity_start_to_close_violation_too_long(self) -> None:
+        # schedule=200 isolates from timeouts_permit_retries (2*30+3=63 ≤ 200).
+        violations = _evaluate_policies(
+            schedule_to_close=timedelta(seconds=200),
             start_to_close=timedelta(seconds=30),
             heartbeat=None,
             retry_policy=None,
@@ -235,7 +297,7 @@ class MaxAttemptsTwoWorkflow:
 
 @workflow.defn
 class TimeoutsPermitRetriesWorkflow:
-    """schedule_to_close < 2.1x start_to_close with no heartbeat → violation."""
+    """schedule_to_close=60s, start_to_close=30s, no heartbeat → 2*30+1+2=63 > 60."""
 
     @workflow.run
     async def run(self) -> dict[str, Any]:
@@ -252,12 +314,14 @@ class TimeoutsPermitRetriesWorkflow:
 
 @workflow.defn
 class LocalActivityTooLongWorkflow:
+    """schedule_to_close=200s isolates from timeouts_permit_retries (2*30+3=63 ≤ 200)."""
+
     @workflow.run
     async def run(self) -> dict[str, Any]:
         try:
             await workflow.execute_local_activity(
                 noop_activity,
-                schedule_to_close_timeout=timedelta(seconds=60),
+                schedule_to_close_timeout=timedelta(seconds=200),
                 start_to_close_timeout=timedelta(seconds=30),
             )
         except ApplicationError as exc:
