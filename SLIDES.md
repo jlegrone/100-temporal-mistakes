@@ -24,12 +24,19 @@ theme:
 
 # Part One: Activities
 
-Need to be robust to:
+Activities are how Temporal workers interact with the outside world.
+
+Activities have to deal with:
 - Downstream service errors
 - Worker crashes & hangs
 - Temporal server disruptions
 
-Should also:
+## Temporal's shared responsibility model for activities:
+
+Temporal server provides an "at most once" execution semantic and retries activities by default.
+
+It's on us to:
+- Implement idempotency
 - Not amplify bad requests
 - Gracefully handle cancelation
 
