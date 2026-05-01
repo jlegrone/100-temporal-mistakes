@@ -211,7 +211,7 @@ func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 
 	// Retryable from here. Honor the server's Retry-After hint when
 	// present; fall back to an aggressive policy floor for 429.
-	delay := parseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+	delay := ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
 	if delay == 0 && resp.StatusCode == http.StatusTooManyRequests {
 		delay = GetNextRetryDelay(ctx, 3)
 	}
@@ -220,11 +220,12 @@ func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 	})
 }
 
-// parseRetryAfter interprets the value of an HTTP Retry-After header per
+// ParseRetryAfter interprets the value of an HTTP Retry-After header per
 // RFC 7231 §7.1.3, accepting either a non-negative integer of seconds or an
-// HTTP-date. It returns 0 for empty, malformed, or past-dated values; the
-// caller should then fall back to its default backoff.
-func parseRetryAfter(value string, now time.Time) time.Duration {
+// HTTP-date. Pass time.Now() as now (an explicit clock keeps the parse
+// pure for testing). It returns 0 for empty, malformed, or past-dated
+// values; the caller should then fall back to its default backoff.
+func ParseRetryAfter(value string, now time.Time) time.Duration {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return 0

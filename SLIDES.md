@@ -88,7 +88,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 ## Activities: Avoid Overloading Services With Retries
 
-<!-- Updated code example that also increases the next retry backoff time when external service returns a resource overloaded error (HTTP 429) using the activityhelpers.GetNextRetryDelay function with a minimum backoff coefficient of 3, so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
+<!-- Updated code example for HTTP 429: prefer the server's Retry-After hint (RFC 7231 §7.1.3 -- delta-seconds or HTTP-date) when present, and fall back to activityhelpers.GetNextRetryDelay with a minimum backoff coefficient of 3 so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     // ... build and send the HTTP request
@@ -97,8 +97,12 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
     case http.StatusBadRequest:
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
     case http.StatusTooManyRequests:
-        // Increase the retry delay
-        delay := activityhelpers.GetNextRetryDelay(ctx, 3)
+        // Honor the server's hint when present; otherwise back off
+        // more aggressively than the policy's default.
+        delay := activityhelpers.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+        if delay == 0 {
+            delay = activityhelpers.GetNextRetryDelay(ctx, 3)
+        }
         return nil, temporal.NewApplicationErrorWithOptions(resp.Status, "http_429",
             temporal.ApplicationErrorOptions{NextRetryDelay: delay})
     }

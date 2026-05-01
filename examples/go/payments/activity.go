@@ -41,13 +41,14 @@ func NewWorker(endpoint string) *Worker {
 	return &Worker{endpoint: endpoint}
 }
 
-// ChargePayment posts a charge to the payments API. Status codes are mapped to
-// retry behavior:
+// ChargePayment posts a charge to the payments API. Status-code-to-retry
+// classification is delegated to [activityhelpers.HTTPResponseError]:
 //
-//   - 2xx: success
-//   - 400: non-retryable application error (bad request will not succeed on retry)
-//   - 429: retryable, but with a 1.5x backoff multiplier on the next retry delay
-//   - other: retryable using the default backoff policy
+//   - 2xx, 3xx: success
+//   - 4xx (400, 401, 403, 404, ...): non-retryable
+//   - 408, 425, 429, 5xx, unknown: retryable; honors the server's
+//     Retry-After header when present and applies a 3x backoff floor
+//     for 429 when it isn't
 //
 // The Idempotency-Key header is derived from the workflow + activity identity
 // so retries are coalesced by the upstream service.

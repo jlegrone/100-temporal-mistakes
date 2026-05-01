@@ -90,7 +90,7 @@ func TestParseRetryAfter(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, parseRetryAfter(tc.value, now))
+			assert.Equal(t, tc.want, ParseRetryAfter(tc.value, now))
 		})
 	}
 }
