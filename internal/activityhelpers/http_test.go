@@ -10,7 +10,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
@@ -68,6 +70,99 @@ func TestHTTPResponseError_IncludesBodySnippet(t *testing.T) {
 	err := HTTPResponseError(context.Background(), resp)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing currency field")
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	cases := map[string]struct {
+		value string
+		want  time.Duration
+	}{
+		"empty":                       {value: "", want: 0},
+		"whitespace":                  {value: "   ", want: 0},
+		"zero seconds":                {value: "0", want: 0},
+		"thirty seconds":              {value: "30", want: 30 * time.Second},
+		"large seconds":               {value: "3600", want: time.Hour},
+		"http-date in future":         {value: now.Add(45 * time.Second).UTC().Format(http.TimeFormat), want: 45 * time.Second},
+		"http-date in past":           {value: now.Add(-time.Minute).UTC().Format(http.TimeFormat), want: 0},
+		"malformed":                   {value: "tomorrow", want: 0},
+		"negative integer is invalid": {value: "-5", want: 0},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, parseRetryAfter(tc.value, now))
+		})
+	}
+}
+
+func TestHTTPResponseError_RetryAfterHeader(t *testing.T) {
+	cases := map[string]struct {
+		status       int
+		retryAfter   string
+		wantDelayMin time.Duration
+		wantDelayMax time.Duration
+	}{
+		"429 honors integer Retry-After": {
+			status:       http.StatusTooManyRequests,
+			retryAfter:   "45",
+			wantDelayMin: 45 * time.Second,
+			wantDelayMax: 45 * time.Second,
+		},
+		"503 honors integer Retry-After": {
+			status:       http.StatusServiceUnavailable,
+			retryAfter:   "10",
+			wantDelayMin: 10 * time.Second,
+			wantDelayMax: 10 * time.Second,
+		},
+		"408 honors integer Retry-After": {
+			status:       http.StatusRequestTimeout,
+			retryAfter:   "5",
+			wantDelayMin: 5 * time.Second,
+			wantDelayMax: 5 * time.Second,
+		},
+		"500 with HTTP-date in future": {
+			status:       http.StatusInternalServerError,
+			retryAfter:   time.Now().UTC().Add(20 * time.Second).Format(http.TimeFormat),
+			wantDelayMin: 18 * time.Second, // allow ~2s slack for test timing
+			wantDelayMax: 20 * time.Second,
+		},
+		"503 without Retry-After leaves delay unset": {
+			status:       http.StatusServiceUnavailable,
+			retryAfter:   "",
+			wantDelayMin: 0,
+			wantDelayMax: 0,
+		},
+		"429 without Retry-After falls back outside activity ctx (delay=0)": {
+			// GetNextRetryDelay returns 0 outside an activity context, so
+			// the test asserts we still emit a retryable ApplicationError.
+			status:       http.StatusTooManyRequests,
+			retryAfter:   "",
+			wantDelayMin: 0,
+			wantDelayMax: 0,
+		},
+		"429 ignores malformed Retry-After (falls back)": {
+			status:       http.StatusTooManyRequests,
+			retryAfter:   "not-a-thing",
+			wantDelayMin: 0,
+			wantDelayMax: 0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			resp := newResponse(tc.status, "")
+			if tc.retryAfter != "" {
+				resp.Header.Set("Retry-After", tc.retryAfter)
+			}
+			err := HTTPResponseError(context.Background(), resp)
+			require.Error(t, err)
+			var appErr *temporal.ApplicationError
+			require.True(t, errors.As(err, &appErr), "expected ApplicationError, got %T: %v", err, err)
+			assert.False(t, appErr.NonRetryable(), "must remain retryable")
+			delay := appErr.NextRetryDelay()
+			assert.GreaterOrEqual(t, delay, tc.wantDelayMin, "delay below floor")
+			assert.LessOrEqual(t, delay, tc.wantDelayMax, "delay above ceiling")
+		})
+	}
 }
 
 // timeoutError implements net.Error and reports Timeout() == true. It lets us

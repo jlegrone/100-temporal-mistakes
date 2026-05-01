@@ -9,7 +9,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"go.temporal.io/sdk/temporal"
 )
@@ -153,14 +155,18 @@ func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 //
 // Mapping:
 //   - 2xx, 3xx: nil
-//   - 408 Request Timeout, 425 Too Early: retryable application error
-//   - 429 Too Many Requests: retryable, with the next retry delay computed
-//     using a minimum backoff coefficient of 3 (set via
-//     [temporal.ApplicationErrorOptions.NextRetryDelay]) so that the caller
-//     backs off more aggressively than the policy's default coefficient.
 //   - 4xx codes listed in the non-retryable case below: non-retryable
 //     application error (the request is malformed or rejected on its merits)
-//   - 5xx and any unrecognized status: retryable application error
+//   - 408, 425, 429, 5xx, and any unrecognized status: retryable application
+//     error
+//
+// On retryable responses, the server's Retry-After header (RFC 7231 §7.1.3),
+// if present in either delta-seconds or HTTP-date form, sets
+// [temporal.ApplicationErrorOptions.NextRetryDelay] so the activity respects
+// the upstream's hint. When the header is absent, 429 falls back to a
+// minimum 3x backoff coefficient via [GetNextRetryDelay] so callers back off
+// more aggressively than the policy's default; other retryable codes fall
+// back to the policy's natural delay.
 //
 // Error types are derived from [http.StatusText] with whitespace removed (e.g.,
 // "BadRequest", "TooManyRequests", "InternalServerError"). Codes without a
@@ -174,15 +180,6 @@ func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 	errType := httpErrorType(resp.StatusCode)
 
 	switch resp.StatusCode {
-	case http.StatusTooManyRequests:
-		// Back off more aggressively than the typical 2x backoff coefficient.
-		return temporal.NewApplicationErrorWithOptions(msg, errType, temporal.ApplicationErrorOptions{
-			NextRetryDelay: GetNextRetryDelay(ctx, 3),
-		})
-
-	case http.StatusRequestTimeout, http.StatusTooEarly:
-		return temporal.NewApplicationError(msg, errType)
-
 	case http.StatusBadRequest,
 		http.StatusUnauthorized,
 		http.StatusPaymentRequired,
@@ -212,7 +209,35 @@ func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 		return temporal.NewNonRetryableApplicationError(msg, errType, nil)
 	}
 
-	return temporal.NewApplicationError(msg, errType)
+	// Retryable from here. Honor the server's Retry-After hint when
+	// present; fall back to an aggressive policy floor for 429.
+	delay := parseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+	if delay == 0 && resp.StatusCode == http.StatusTooManyRequests {
+		delay = GetNextRetryDelay(ctx, 3)
+	}
+	return temporal.NewApplicationErrorWithOptions(msg, errType, temporal.ApplicationErrorOptions{
+		NextRetryDelay: delay,
+	})
+}
+
+// parseRetryAfter interprets the value of an HTTP Retry-After header per
+// RFC 7231 §7.1.3, accepting either a non-negative integer of seconds or an
+// HTTP-date. It returns 0 for empty, malformed, or past-dated values; the
+// caller should then fall back to its default backoff.
+func parseRetryAfter(value string, now time.Time) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	if secs, err := strconv.ParseUint(value, 10, 32); err == nil {
+		return time.Duration(secs) * time.Second
+	}
+	if t, err := http.ParseTime(value); err == nil {
+		if d := t.Sub(now); d > 0 {
+			return d
+		}
+	}
+	return 0
 }
 
 func httpErrorType(status int) string {
