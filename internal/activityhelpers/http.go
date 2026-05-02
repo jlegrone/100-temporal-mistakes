@@ -60,7 +60,7 @@ func classifyHTTPTransportError(err error) error {
 	// the same hostname will keep failing the same way. Transient DNS
 	// failures (SERVFAIL, etc.) keep IsNotFound=false and stay retryable.
 	var dnsErr *net.DNSError
-	nonRetryable := false
+	var nonRetryable bool
 	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
 		details.Reason = "dns-not-found"
 		nonRetryable = true
@@ -171,6 +171,9 @@ func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 // Error types are derived from [http.StatusText] with whitespace removed (e.g.,
 // "BadRequest", "TooManyRequests", "InternalServerError"). Codes without a
 // known reason phrase fall back to "HTTP<code>".
+//
+// TODO: Move this to errormapperinterceptor/httperrormapper/mapper.go
+// TODO: Also add a grpcerrormapper package based on https://github.com/grpc/proposal/blob/master/A6-client-retries.md
 func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		return nil

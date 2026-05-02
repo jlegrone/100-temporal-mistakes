@@ -104,7 +104,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 
 <!-- We'll start out with a common example; this is an activity that's responsible for charging a customer through a payments API.
 
-And you can see there are a couple places where we might return an error.
+And you can see there are already a few places where we might return an error.
 -->
 
 ---
@@ -114,23 +114,23 @@ And you can see there are a couple places where we might return an error.
 <!-- Updated code example that inspects http status code and returns non-retryable TemporalApplicationError for bad requests (HTTP 400) (use switch statement for HTTP status so more cases can easily be added in the future) -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
-    httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
+    // Send the request ...
 
-    resp, err := w.httpClient.Do(httpReq)
-    if err != nil {
-        return nil, err
-    }
-
-    // 
-    switch resp.StatusCode {
+    switch httpResp.StatusCode {
+    case http.StatusOK:
+        // Decode the response and return ...
     case http.StatusBadRequest:
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
+    default:
+        return nil, fmt.Errorf("unexpected http status: %s", resp.StatusCode)
     }
-
-    // Decode the HTTP response and return
-    // ...
 }
 ```
+
+<!-- The first thing we can do is customize the kinds of errors that we bubble up from the activity. For example here there are HTTP status codes which might be returned by the API that we know mean the request should not be retried.
+
+Instead of 
+-->
 
 ---
 
