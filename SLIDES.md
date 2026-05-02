@@ -139,9 +139,11 @@ Instead of
 <!-- Updated code example for HTTP 429: prefer the server's Retry-After hint (RFC 7231 §7.1.3 -- delta-seconds or HTTP-date) when present, and fall back to activityhelpers.GetNextRetryDelay with a minimum backoff coefficient of 3 so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
-    // ... build and send the HTTP request
+    // Send the request ...
 
-    switch resp.StatusCode {
+    switch httpResp.StatusCode {
+    case http.StatusOK:
+        // Decode the response and return ...
     case http.StatusBadRequest:
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
     case http.StatusTooManyRequests:
@@ -153,10 +155,9 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
         }
         return nil, temporal.NewApplicationErrorWithOptions(resp.Status, "http_429",
             temporal.ApplicationErrorOptions{NextRetryDelay: delay})
+    default:
+        return nil, fmt.Errorf("unexpected http status: %s", resp.StatusCode)
     }
-
-    // Decode the HTTP response and return
-    // ...
 }
 ```
 
