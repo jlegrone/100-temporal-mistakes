@@ -172,8 +172,7 @@ func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 // "BadRequest", "TooManyRequests", "InternalServerError"). Codes without a
 // known reason phrase fall back to "HTTP<code>".
 //
-// TODO: Move this to errormapperinterceptor/httperrormapper/mapper.go
-// TODO: Also add a grpcerrormapper package based on https://github.com/grpc/proposal/blob/master/A6-client-retries.md
+// TODO(jlegrone): Move this to errormapperinterceptor/httperrormapper/mapper.go
 func HTTPResponseError(ctx context.Context, resp *http.Response) error {
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		return nil
