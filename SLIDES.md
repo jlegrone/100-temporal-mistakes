@@ -18,7 +18,30 @@ theme:
 
 # Introduction
 
-<!-- QR code linking to slides in markdown format for those who want to follow along with code examples -->
+<!-- TODO: Make this sentence sound less smarmy. -->
+A field guide to the bugs you'll write before you write them.
+
+A working catalog of failure modes drawn from production Temporal codebases — what breaks, why it breaks, and the smallest change that makes it stop.
+
+What we'll cover
+- Activities: Errors, retries, idempotency, timeouts, worker disruption
+- Workflows: Limitations, determinism, change versioning
+- Recommendations to simplify working with Temporal day to day
+
+Follow Along:
+<!-- QR code linking to jacob.work/100TM (slides in markdown format for those who want to follow along with code examples) -->
+
+<!-- Speaker notes:
+A few years ago I got looped into a project at work to help a team launch a new product called Datadog Oncall (and I promise this is not an ad). But the reason I was looped in was because they were planning to build it on top of Temporal. At Datadog we always want to maintain a high standard of availability and so on for our services, but this had an even higher bar to meet than usual because we wanted be confident in allowing any core engineering team at Datadog to be able to route their own pages through this system despite the potential circular runtime dependencies that you can imagine might make life difficult.
+
+Now I've always enjoyed thinking about all the things that can theoretically go wrong in distributed systems. But suddenly I was fielding all kinds of questions from this new product team about activity execution semantics and retry policies and change versioning and parent close policies and so on, because the team was being so incredibly thorough. And as we were having these conversations, I was wishing that I had some way of capturing these tidbits in a way that could be digestible and simple to follow for anyone else using Temporal at our company.
+
+So that is how 100 Temporal Mistakes was born, and my hope in preparing this talk is that I could shed light on some fo the less obvious things that can go wrong, and also provide practical guidance that you can apply every day when developing Temporal backed applications.
+
+Please note that the advice I'm giving is extremely picky. You certainly don't need to follow all of it, and some may not make sense at all depending on how you're using Temporal. That said, please feel free to roast me in the Q&A if you disagree with anything I say.
+
+Also by the way for anyone who hasn't done the math yet, 100 mistakes in 35 minutes gives us about 20 seconds per mistake. So I'm just going to do a highlights tour, but you can find more content at the link on the slide.
+ -->
 
 ---
 
@@ -31,20 +54,34 @@ Activities have to deal with:
 - Worker crashes & hangs
 - Temporal server disruptions
 
+<!-- Part One is all about activities. And I'm starting here because, let's face it, workflows are a bit more glamorous with their determinism and durability and signals and so on, but I think there's a lot of subtlety about how we need to design activities and the policy around them that is often glossed over when starting out with Temporal.
+
+So activities have a lot of responsibility. They're the main window through which workflows are able to interact with the outside world. That means they also have to put up with all sorts of system disruptions that our workflow code can happily sleep through until it's time to be woken up again. -->
+
+---
+
 ## Temporal's shared responsibility model for activities:
 
-Temporal server provides an "at most once" execution semantic and retries activities by default.
+Temporal server provides an "at least once" execution semantic and retries activities by default.
 
 It's on us to:
 - Implement idempotency
-- Not amplify bad requests
 - Gracefully handle cancelation
+- Not amplify bad requests
+
+<!--
+The biggest way Temporal makes this easier for us, is by retrying activities by default. Specifically Temporal gives us an "at least once" execution semantic for every activity.
+
+And that's really convenient, but Temporal can't magically ensure that our activities don't have undefined behavior if you run them more than once, or that they detect and handle cancelation, or that when there's a downstream service outage our retry policies don't conjure up a storm of execution attempts that only make matters worse.
+
+So let's dive into how to write reliable, well-behaved activities.
+-->
 
 ---
 
 ## Activities: Handling Downstream Service Errors
 
-<!-- Code for simple example activity that calls a generic payments API and returns the result (modeled after Stripe) -->
+<!-- TODO: Update the example code to check for a 200 response and return the result, otherwise error. Make sure it doesn't go to long, but I want to expand the  -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
     httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
@@ -54,10 +91,17 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
         return nil, err
     }
 
-    // Decode the HTTP response and return
-    // ...
+    switch resp.StatusCode {
+    case http.StatusOK:
+        // Decode the response and return
+        // ...
+    default:
+        return nil, fmt.Errorf("unexpected http status: %s", resp.StatusCode)
+    }
 }
 ```
+
+<!-- We'll start out with a common example, an activity that's responsible for charging a customer through a payments API. -->
 
 ---
 

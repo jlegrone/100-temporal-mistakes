@@ -72,6 +72,10 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 		return nil, err
 	}
 
+	if resp.StatusCode == http.StatusOK {
+
+	}
+
 	var out ChargePaymentResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		// A type mismatch between the JSON value and the Go field is a
