@@ -81,27 +81,31 @@ So let's dive into how to write reliable, well-behaved activities.
 
 ## Activities: Handling Downstream Service Errors
 
-<!-- TODO: Update the example code to check for a 200 response and return the result, otherwise error. Make sure it doesn't go to long, but I want to expand the  -->
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
-    httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
+func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+    httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
 
-    resp, err := w.httpClient.Do(httpReq)
+    httpResp, err := w.httpClient.Do(httpReq)
     if err != nil {
         return nil, err
     }
 
-    switch resp.StatusCode {
+    switch httpResp.StatusCode {
     case http.StatusOK:
         // Decode the response and return
-        // ...
+        var resp ChargeResponse
+	    err = json.NewDecoder(httpResp.Body).Decode(&resp)
+	    return &resp, err
     default:
         return nil, fmt.Errorf("unexpected http status: %s", resp.StatusCode)
     }
 }
 ```
 
-<!-- We'll start out with a common example, an activity that's responsible for charging a customer through a payments API. -->
+<!-- We'll start out with a common example; this is an activity that's responsible for charging a customer through a payments API.
+
+And you can see there are a couple places where we might return an error.
+-->
 
 ---
 
@@ -109,8 +113,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 <!-- Updated code example that inspects http status code and returns non-retryable TemporalApplicationError for bad requests (HTTP 400) (use switch statement for HTTP status so more cases can easily be added in the future) -->
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
-    httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
+func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+    httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
 
     resp, err := w.httpClient.Do(httpReq)
     if err != nil {
@@ -134,7 +138,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*
 
 <!-- Updated code example for HTTP 429: prefer the server's Retry-After hint (RFC 7231 §7.1.3 -- delta-seconds or HTTP-date) when present, and fall back to activityhelpers.GetNextRetryDelay with a minimum backoff coefficient of 3 so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
+func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     // ... build and send the HTTP request
 
     switch resp.StatusCode {
@@ -277,8 +281,8 @@ Three techniques to achieve idempotency:
 
 <!-- Back to the previous payment code example. Update the code to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and add it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargePaymentRequest) (*ChargePaymentResponse, error) {
-    httpReq := newPaymentReq(req) // POST api.example.com/v1/payments/charge
+func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+    httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
     httpReq.Header.Set("Idempotency-Key", getIdempotencyToken(ctx))
 
     // ... send the HTTP request & handle errors
