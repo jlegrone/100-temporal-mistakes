@@ -557,13 +557,15 @@ When choosing a value for Heartbeat or StartToClose timeout, the question to ans
 2. Always set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
 3. Always set either **Heartbeat** or **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
 4. Activities that perform cleanup on cancelation MUST send heartbeats.
-5. Prefer unlimited attempts with `ScheduleToClose` as the bound.
+5. Prefer unlimited attempts with **ScheduleToClose** as the bound.
 6. Respect error conventions from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior.
 
 ** Consider implementing and/or enforcing these policies in an interceptor.
 
 <!--
 There are plenty more mistakes to make around activities that we can't cover here, but the good news is that I think almost all of them can be avoided by following this smallish set of guidelines.
+
+Number 1: ...
 
 Granted not all of these are easy to follow. And you'll probably be hard pressed to get a coding assistant to always come up with perfectly congruous timeouts and retry policies or always translate status codes from an HTTP response into Temporal application errors.
 
@@ -575,8 +577,8 @@ That's why I've also been working on a specification for a Temporal worker inter
 # Part Two: Workflows
 
 Need to be robust to:
-- Workflow code changing across deployments
 - Server-imposed history & payload limits
+- Workflow code changing across deployments
 - Signals arriving in unpredictable order
 - Cancelation requests at any point in execution
 
@@ -586,19 +588,19 @@ Must also:
 
 <!--
 That brings us to part two: workflows.
- -->
+
+Workflows definitely come with their own challenges. We're going to cover a few of these today, including workflow limitations, determinism, and versioning code changes.
+-->
 
 ---
 
 ## Workflows: Living Within Server Limits
 
-<!-- No code example -- just the limits. Numbers sourced from src/overflowing-*.md. -->
-
 Server-imposed limits to be aware of:
-- **Individual payload size**: ~4MB per workflow/activity input or output, signal, or update (inherited from the Temporal server's gRPC message limit).
-- **Workflow history bytes**: 50MB (sum of all events in the workflow). Results in termination.
-- **Workflow history length**: 50,000 events. Results in termination.
-- **Workflow task timeout**: 10 seconds (per workflow task -- not the workflow execution timeout). Results in failed workflow task (retried).
+- **Individual payload size**: ~2MB per workflow/activity input or output, signal, or update.
+- **Workflow history bytes**: 50MB (<10MB recommended). Results in termination.
+- **Workflow history length**: 50k events (<10k recommended). Results in termination.
+- **Workflow task timeout**: 10s default (120s max configurable). Results in failed workflow task (retried).
 - **Workflow lock contention**: No hard limit, but aim for no more than ~1 workflow state change per second.
 
 Mitigations:
@@ -606,14 +608,22 @@ Mitigations:
 - Avoid passing large payloads from activities to workflows, or use [external payload storage](https://docs.temporal.io/external-storage).
 
 <!--
-There are several dimensions in which workflows are limited. There are good reasons for all of them, but we still need to be aware that the limits exist. Typically if you're running into one of these limits, it means you need to start using `ContinueAsNew` or enable external payload storage.
+There are several dimensions in which workflows are limited.
+
+The first is that individual payload sizes peristed in workflow history can't go past around 2MB. This is a limitation that is inherited from the Temporal gRPC API.
+
+Limits on the workflow history include total length, which needs to stay under 50,000 events (though it's recommended to stick to less than 10,000), and the total workflow history size must be less than 50 MB (recommended less than 10MB). These limits exist to ensure that workflow histories can be replayed quickly whenever the workflow needs to be loaded into memory on a worker.
+
+Temporal also enforces a workflow task timeout of 10 seconds by default, which is how long the workflow function has to return the next command. This should almost never need to be changed unless you are using external payload storage.
+
+And the last limitation is workflow lock contention, which you can run into if your workflow deals with a high throughput of incoming signals or executes activities with high parallelism.
+
+Typically if you're running into one of these limits, it means you need to start using `ContinueAsNew` or enable external payload storage.
 -->
 
 ---
 
 ## Workflows: Keeping Code Deterministic
-
-<!-- No code example here -- just orient the audience to the categories of non-determinism they'll need to watch out for. Sourced from src/terms/non-determinism.md. -->
 
 Common sources of non-determinism in workflow code:
 - Network calls (HTTP, DB queries, gRPC) -- re-execute on every replay and may return different results
