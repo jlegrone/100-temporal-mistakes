@@ -417,12 +417,12 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJ
 
     // Poll for final status
     for {
+        activity.RecordHeartbeat(ctx)
         j, err := jobs.Get(ctx, req.Name)
         if err != nil { return nil, err }
         if status := getJobStatus(j); status.IsTerminal() {
             return &RunJobResponse{Status: status}, nil
         }
-        activity.RecordHeartbeat(ctx)
         time.Sleep(15 * time.Second)
     }
 }
@@ -489,23 +489,28 @@ Note that I still kept the already exists check in the new `StartKubernetesJob` 
 
 Choosing between StartToClose and Heartbeat timeouts
 
-<!-- New workflow code example, this time invoking our (longer running) AwaitKubernetesJob activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
-    // Start the job
+    // Execute the StartKubernetesJob activity
     // ...
 
     // Wait for the job to complete
     return workflowhelpers.AwaitActivity(
         workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-            StartToCloseTimeout:    30 * time.Second,
+            StartToCloseTimeout:    time.Hour,
             ScheduleToCloseTimeout: time.Hour,
         }),
         w.AwaitKubernetesJob,
-        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+        AwaitJobRequest{Name: req.Name, Namespace: req.Namespace},
     )
 }
 ```
+
+<!--
+In the workflow that invokes our activities to create and wait for completion of the Kubernetes job, we need to choose some timeout values. Here we went with a 1 hour StartToClose and ScheduleToClose timeout because we wanted to allow the Kubernetes job to run for up to an hour, and the activity itself shouldn't be timed out as long as it's still polling the job status in that for loop.
+
+The only problem here is that if the worker crashes or terminates unexpectedly, then it will never report a final result or error for the activity. And since the ScheduleToClose timeout is the same duration as StartToClose timeout, Temporal won't retry the activity on our behalf either.
+-->
 
 <!-- Speaker note: Our previous activity example was expected to always complete in under 30s. But that's not the case for all activities. A short start to close timeout made sense for the payments use case, but what about waiting for a k8s job that could run for much longer? Setting too short a value could mean that some activities never complete, no matter how many retry attempts are made.
 
@@ -519,7 +524,7 @@ So we can try increasing the start to close timeout, but now this also means tha
 <!-- Updated code example: Change the start to close timeout to 5m. -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
-    // Start the job
+    // Run the StartKubernetesJob activity
     // ...
 
     // Wait for the job to complete
@@ -530,7 +535,7 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
             ScheduleToCloseTimeout: time.Hour,
         }),
         w.AwaitKubernetesJob,
-        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+        AwaitJobRequest{Name: req.Name, Namespace: req.Namespace},
     )
 }
 ```
@@ -557,7 +562,7 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
             ScheduleToCloseTimeout: time.Hour,
         }),
         w.AwaitKubernetesJob,
-        AwaitKubernetesJobRequest{Name: req.Name, Namespace: req.Namespace},
+        AwaitJobRequest{Name: req.Name, Namespace: req.Namespace},
     )
 }
 ```
