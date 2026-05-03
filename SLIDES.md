@@ -686,8 +686,8 @@ But beyond just making sure we use change versions when modifying workflows, we 
 
      sel.Select(ctx)
      if err != nil {
-+        refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
-+        switch refundVersion {
++        delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
++        switch delayVersion {
 +        case 1:
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        }
@@ -719,7 +719,7 @@ The reason this matters is that we want ALL workflow executions started after th
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-+    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
++    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
 
      // Charge payment and start fulfilment ...
 
@@ -733,7 +733,7 @@ The reason this matters is that we want ALL workflow executions started after th
 
      sel.Select(ctx)
      if err != nil {
-+        switch refundVersion {
++        switch delayVersion {
 +        case 1:
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        }
@@ -751,33 +751,27 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 
 ## Workflows: Evaluate Change Versions Up Front (continued)
 
-<!-- Speaker note: Subsequent changes bump the patch's max version. v2 enriches the refund request with the failure reason so support tooling can triage the refund. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
+<!-- Speaker note: Subsequent changes bump the patch's max version. v2 cancels the in-flight shipment before issuing the refund so the package doesn't show up after the customer was refunded. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
--    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
-+    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 2)
+-    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
++    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
 
      // Charge payment and start fulfilment ...
 
-     sel := workflow.NewNamedSelector(ctx, "shipment")
-     sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
-         c.Receive(ctx, &shipmentResponse)
-     })
-     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
-         err = workflow.ErrDeadlineExceeded
-     })
+     // Create selector ...
 
      sel.Select(ctx)
      if err != nil {
-         switch refundVersion {
+         switch delayVersion {
          case 1:
              workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        case 2:
-+            // Include the failure reason so support can triage the refund.
-+            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, RefundRequest{
-+                OrderID: refundRequest.OrderID,
-+                Reason:  err.Error(),
-+            })
++            // Cancel the in-flight shipment before issuing the refund.
++            if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
++                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
++            }
++            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          }
          return nil, err
      }
@@ -795,12 +789,12 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 ```bash
 # Find the earliest workflow that did not hit either patch branch
 temporal workflow list \
-  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion NOT IN ("add-refund-payment-1", "add-refund-payment-2")' \
+  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion NOT IN ("handle-shipment-delay-1", "handle-shipment-delay-2")' \
   --order-by 'StartTime ASC' --limit 1
 
 # Find the earliest workflow that took version 1 of the patch.
 temporal workflow list \
-  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("add-refund-payment-1")' \
+  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("handle-shipment-delay-1")' \
   --order-by 'StartTime ASC' --limit 1
 
 # Download workflow history to a test fixture path.
@@ -839,7 +833,7 @@ More techniques: https://temporal.io/resources/on-demand/replay-safety-at-datado
 # Use `date` on Linux
 CUTOFF=$(gdate -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S.%3NZ)
 temporal workflow count \
-  --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('add-refund-payment-2') AND StartTime < '$CUTOFF'"
+  --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('handle-shipment-delay-2') AND StartTime < '$CUTOFF'"
 ```
 
 ---
@@ -851,28 +845,28 @@ explicit error if a stale v0/v1 history ever shows up. -->
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
--    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 2)
+-    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
 +    // Bump min supported version to 2 so v2 histories continue to replay,
 +    // and any leftover v0/v1 history fails loudly instead of silently diverging.
-+    workflow.GetVersion(ctx, "add-refund-payment", 2, 2)
++    workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
 
      // ... charge payment, ship item, select on shipment / deadline / cancelation
 
      sel.Select(ctx)
      if err != nil {
--        switch refundVersion {
+-        switch delayVersion {
 -        case 1:
 -            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 -        case 2:
--            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, RefundRequest{
--                OrderID: refundRequest.OrderID,
--                Reason:  err.Error(),
--            })
+-            if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
+-                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
+-            }
+-            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 -        }
-+        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, RefundRequest{
-+            OrderID: refundRequest.OrderID,
-+            Reason:  err.Error(),
-+        })
++        if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
++            workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
++        }
++        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          return nil, err
      }
 
