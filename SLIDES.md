@@ -85,17 +85,17 @@ So let's dive into how to write reliable, well-behaved activities.
 func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
 
-    httpResp, err := w.httpClient.Do(httpReq)
+    resp, err := w.httpClient.Do(httpReq)
     if err != nil {
         return nil, err
     }
 
-    switch httpResp.StatusCode {
+    switch resp.StatusCode {
     case http.StatusOK:
         // Decode the response and return
-        var resp ChargeResponse
-	    err = json.NewDecoder(httpResp.Body).Decode(&resp)
-	    return &resp, err
+        var cr ChargeResponse
+	    err = json.NewDecoder(resp.Body).Decode(&cr)
+	    return &cr, err
     default:
         return nil, fmt.Errorf("unexpected http status: %s", resp.StatusCode)
     }
@@ -104,21 +104,19 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 
 <!-- We'll start out with a common example; this is an activity that's responsible for charging a customer through a payments API.
 
-And you can see there are already a few places where we might return an error.
+And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of failure conditions that shouldn't result in the activity being retried.
 -->
 
 ---
 
 ## Activities: Avoid Amplifying Invalid Requests
 
-<!-- Updated code example that inspects http status code and returns non-retryable TemporalApplicationError for bad requests (HTTP 400) (use switch statement for HTTP status so more cases can easily be added in the future) -->
 ```go
 func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     // Send the request ...
 
-    switch httpResp.StatusCode {
-    case http.StatusOK:
-        // Decode the response and return ...
+    switch resp.StatusCode {
+    case http.StatusOK: /* ... */
     case http.StatusBadRequest:
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
     default:
@@ -127,9 +125,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 }
 ```
 
-<!-- The first thing we can do is customize the kinds of errors that we bubble up from the activity. For example here there are HTTP status codes which might be returned by the API that we know mean the request should not be retried.
-
-Instead of 
+<!--
+One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Assuming that retrying won't change the shape of the request being sent, we should probably update our activity to translate this into a non-retryable error so that the activity fails fast.
 -->
 
 ---
@@ -141,17 +138,15 @@ Instead of
 func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     // Send the request ...
 
-    switch httpResp.StatusCode {
-    case http.StatusOK:
-        // Decode the response and return ...
-    case http.StatusBadRequest:
-        return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
+    switch resp.StatusCode {
+    case http.StatusOK: /* ... */
+    case http.StatusBadRequest: /* ... */
     case http.StatusTooManyRequests:
         // Honor the server's hint when present; otherwise back off
         // more aggressively than the policy's default.
         delay := activityhelpers.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
         if delay == 0 {
-            delay = activityhelpers.GetNextRetryDelay(ctx, 3)
+            delay = activityhelpers.GetNextRetryDelay(ctx) * 2
         }
         return nil, temporal.NewApplicationErrorWithOptions(resp.Status, "http_429",
             temporal.ApplicationErrorOptions{NextRetryDelay: delay})
@@ -160,6 +155,11 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
     }
 }
 ```
+
+<!-- It's also possible that there is a problem with the downstream API service provider or we are approaching a rate limit. In that case an error might be retryable, but we should increase our backoff time before the next retry to avoid making the problem worse.
+
+So now our activity checks for the TooManyRequests HTTP status and calculates a next retry delay based on the `Retry-After` HTTP response header if it has been set. Otherwise we can just increase the next retry delay be a factor of 2.
+-->
 
 ---
 
@@ -173,6 +173,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Minute,
+        RetryPolicy: { /* ... */ },
     })
     resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
 
@@ -180,18 +181,23 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 }
 ```
 
+<!-- Switching contexts to the workflow code that is invoking our ChargePayment activity, we need to think about what timeouts and retry policy makes sense for what the activity does.
+
+In this case we've started with a 30 second Start To Close timeout because we're not doing any computation in the activity and we expect the payments API to respond fairly quickly.
+
+We've also set a 1 minute Schedule To Close timeout, which should be plenty of time to do a few retries if the activity fails quickly.
+
+But we also need to consider the worst case: what if our worker, or the payments API, are down for an extended period of time? Would it be preferable for our workflow to observe that the activity has timed out after 1 minute, or is it better to allow more time for an outage to be resolved and for the activity to complete successfully?
+-->
+
 <!-- Speaker note: Temporal is great at retrying activities, but it's still important to think carefully about how we configure timeouts and retry policies in order to survive worst case system outages. For example here I'm invoking my activity with a schedule to close timeout that doesn't give much room for the activity to be retried if the worker or downstream API are temporarily unavailble. -->
 
 ---
 
 ## Activities: Weathering System Outages (continued)
 
-<!-- Update the schedule to close timeout to 1h in the code example. Include code comment saying "allow retrying for up to 1 hour".
+<!-- Update the schedule to close timeout to 1h in the code example. Include code comment saying "allow retrying for up to 1 hour". -->
 
-Speaker note: So the first timeout mistake to avoid is a schedule to close timeout that's too short. Pick a value based on how long you want to retry in the face of a serious system outage.
-
-Speaker note: ScheduleToClose doesn't always need to be large. Long values (hours) make sense when the workflow should weather an extended outage and the caller is OK waiting, or is notified asynchronously. Short values (seconds to minutes) make sense when the workflow has a graceful degradation path, when reporting an error quickly is preferable to retrying through an outage, or when an upstream caller is waiting synchronously.
--->
 <!-- TODO: make this a diff against the previous slide -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
@@ -200,12 +206,23 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Hour, // allow retrying for up to 1 hour
+        RetryPolicy: { /* ... */ },
     })
 
     resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
     // ...
 }
 ```
+
+<!-- In this case, let's say we want to be able to recover after outages lasting up to about an hour.
+
+We can allow this by updating the ScheduleToClose timeout to an hour, which means there's a much larger window for incidents to be resolved through activity retries without the workflow ever straying from its happy path. And because we're categorizing the errors returned from the activity function as retryable vs. not, we also don't need to worry so much about the tradeoff between failing fast and having more time for system recovery.
+
+So now we're ready to go, right?
+-->
+
+<!-- Speaker note: ScheduleToClose doesn't always need to be large. Long values (hours) make sense when the workflow should weather an extended outage and the caller is OK waiting, or is notified asynchronously. Short values (seconds to minutes) make sense when the workflow has a graceful degradation path, when reporting an error quickly is preferable to retrying through an outage, or when an upstream caller is waiting synchronously.
+-->
 
 ---
 
@@ -223,13 +240,15 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
             MaximumAttempts:    3,
             InitialInterval:    time.Second,
             BackoffCoefficient: 2,
-            MaximumInterval:    30 * time.Second,
+            MaximumInterval:    100 * time.Second,
         },
     })
 
     // ... execute the ChargePayment activity
 }
 ```
+
+<!-- Well, sort of. It turns out we were really thorough and also specified a retry policy. And it turns out that timeouts aren't the only way to limit the amount of time we can retry. -->
 
 <!-- Speaker note: Another way an activity's retry behavior can be unexpectedly limited is by setting MaxAttempts. For example now if this activity quickly returns an error, we would exhaust all of our retries in less than 10 seconds, even though our intent was to survive outages of up to 1 hour.
 
