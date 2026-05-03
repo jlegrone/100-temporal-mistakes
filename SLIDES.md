@@ -645,14 +645,23 @@ The Temporal team has done an admirable job making determinsm easier to implemen
 
 ## Workflows: Versioning Code Changes
 
-<!-- Speaker notes:
-- Versioning is required for *any* change to workflow code that would result in a different workflow history when it runs against an existing execution.
-- Common changes that trigger this:
-  - Adding, removing, or reordering activities, child workflows, signals, or timers -- anything that changes the recorded command sequence
-  - Changing activity arguments or activity options
-  - Adding or changing a `workflow.SideEffect`
-  - Rejecting an update
+Change versioning is used to gate new behavior in workflow functions in order to maintain backwards compatability with workflows started on earlier versions of the worker.
+
+Change version lifecycle:
+1. Add new behavior, gated with version check
+2. Wait for workflows started on previous version of the worker to complete
+3. Remove the old behavior and the version check
+
+<!--
+Versioning is required for *any* change to workflow code that would result in a different workflow history when it runs against an existing execution.
+
+Common changes that need to be versioned include adding, removing, or reordering activities, child workflows, or timers.
 -->
+
+---
+
+## Workflows: Versioning Code Changes
+
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
      // ... generate a charge request for the item & customer
