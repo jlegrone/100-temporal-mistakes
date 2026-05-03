@@ -510,35 +510,9 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
 In the workflow that invokes our activities to create and wait for completion of the Kubernetes job, we need to choose some timeout values. Here we went with a 1 hour StartToClose and ScheduleToClose timeout because we wanted to allow the Kubernetes job to run for up to an hour, and the activity itself shouldn't be timed out as long as it's still polling the job status in that for loop.
 
 The only problem here is that if the worker crashes or terminates unexpectedly, then it will never report a final result or error for the activity. And since the ScheduleToClose timeout is the same duration as StartToClose timeout, Temporal won't retry the activity on our behalf either.
+
+We could decrease the StartToClose timeout and allow the activity to time out and be retried. But that forces a tradeoff between how quickly Temporal retries after a worker failure and how often we are doing unnecessary retries (which in some cases, could mean repeating expensive work).
 -->
-
-<!-- Speaker note: Our previous activity example was expected to always complete in under 30s. But that's not the case for all activities. A short start to close timeout made sense for the payments use case, but what about waiting for a k8s job that could run for much longer? Setting too short a value could mean that some activities never complete, no matter how many retry attempts are made.
-
-So we can try increasing the start to close timeout, but now this also means that if the worker crashes or becomes unresponsive, we'd have to wait much longer before Temporal retries the activity.
--->
-
----
-
-## Activities: Handling Worker Disruptions (continued)
-
-<!-- Updated code example: Change the start to close timeout to 5m. -->
-```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
-    // Run the StartKubernetesJob activity
-    // ...
-
-    // Wait for the job to complete
-    return workflowhelpers.AwaitActivity(
-        workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-            // Allow the activity to poll the job status for up to five minutes before timing out.
-            StartToCloseTimeout:    5 * time.Minute,
-            ScheduleToCloseTimeout: time.Hour,
-        }),
-        w.AwaitKubernetesJob,
-        AwaitJobRequest{Name: req.Name, Namespace: req.Namespace},
-    )
-}
-```
 
 ---
 
@@ -551,7 +525,7 @@ Speaker notes:
  -->
 ```go
 func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
-    // Start the job
+    // Execute the StartKubernetesJob activity
     // ...
 
     // Wait for the job to complete
@@ -567,16 +541,22 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
 }
 ```
 
+<!--
+The more elegant solution is to swap out the StartToClose timeout for a Heartbeat timeout.
+
+This allows our activity to run for as long as it needs to, up to the ScheduleToClose timeout, without being stopped and retried, as long as it keeps reporting back to the Temporal server via heartbeat messages. If the worker fails to send heartbeats, then Temporal can also retry the activity.
+-->
+
 ---
 
 ## Activities: A Grand Unified Theory
 
-- Activities SHOULD be idempotent. Temporal can re-execute an activity at least once during failover or retry, so any side effect needs to be safe to repeat (or naturally idempotent, like a read).
-- ALWAYS set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
-- ALWAYS set EITHER **Heartbeat** OR **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
+- Activities SHOULD be idempotent. Temporal can re-execute an activity at least once during failover or retry, so any side effect needs to be safe to repeat.
+- Always set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
+- Always set either **Heartbeat** or **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
 - Activities that perform cleanup on cancelation MUST send heartbeats.
-- PREFER unlimited attempts with `ScheduleToClose` as the bound. Reserve `MaxAttempts` for cases where each attempt has external cost -- account lockouts, alert fatigue, dispute thresholds.
-- Respect standard error codes from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior as needed.
+- Prefer unlimited attempts with `ScheduleToClose` as the bound.
+- Respect standard error codes from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior.
 
 ** Consider implementing and/or enforcing these policies in an interceptor.
 <!-- TODO: Add QR code linking to interceptor example from 100-temporal-mistakes repo. -->
