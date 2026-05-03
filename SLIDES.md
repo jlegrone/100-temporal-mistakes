@@ -248,21 +248,25 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 }
 ```
 
-<!-- Well, sort of. It turns out we were really thorough and also specified a retry policy. And it turns out that timeouts aren't the only way to limit the amount of time we can retry. -->
-
-<!-- Speaker note: Another way an activity's retry behavior can be unexpectedly limited is by setting MaxAttempts. For example now if this activity quickly returns an error, we would exhaust all of our retries in less than 10 seconds, even though our intent was to survive outages of up to 1 hour.
-
-Speaker note: For reference, the default activity retry policy uses exponential backoff with a 2.0 backoff coefficient, a 1-second initial interval, a 100-second maximum interval, and unlimited attempts. Source: https://docs.temporal.io/encyclopedia/retry-policies. Workflows have no default retry policy.
--->
+<!-- Well, sort of. It turns out we were really thorough and also specified a retry policy. The problem here is that because we only allow a maximum of 3 attempts, in practice we exhaust our retries really quickly. -->
 
 ---
 
 ## Activities: Weathering System Outages (continued)
 
-<!-- Comment out the MaxAttempts field in the code example. Include code comment saying "allow unlimited attempts until the ScheduleToClose timeout is reached".
+<!-- TODO: Inline image src/.assets/retry_simulator_max_attempts.png -->
 
-Speaker note: I think a much simpler mental model is to allow unlimited attempts, and only use retry policy to tune the backoff behavior like initial interval and maximum backoff duration as needed.
--->
+[docs.temporal.io/develop/activity-retry-simulator](https://docs.temporal.io/develop/activity-retry-simulator)
+
+<!-- To inpect the behavior of your timeout and retry policy config, Temporal actually provides a nice little simulator which is helpful since there's some math involved.
+
+If we plug in the policy from the previous slide, we can see that the activity could actually be marked as failed after only 6 seconds! Obviously this is way off our target of surviving outages up to 1 hour. -->
+
+---
+
+## Activities: Weathering System Outages (continued)
+
+<!-- Comment out the MaxAttempts field in the code example. Include code comment saying "allow unlimited attempts until the ScheduleToClose timeout is reached". -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... generate a charge request for the item & customer
@@ -274,7 +278,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
             // MaximumAttempts: 0, // allow unlimited attempts until the ScheduleToClose timeout is reached
             InitialInterval:    time.Second,
             BackoffCoefficient: 2,
-            MaximumInterval:    30 * time.Second,
+            MaximumInterval:    100 * time.Second,
         },
     })
 
@@ -282,11 +286,58 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 }
 ```
 
+<!--
+Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our schedule to close timeout.
+
+But I think a much simpler mental model is to skip setting maximum attempts at all, so that you automatically get as many retries as fit within your schedule to close timeout.
+
+Note that if you need to you can still use retry policies to fine tune the initial and maximum retry intervals as needed such that you don't retry too frequently before the timeout is reached.
+
+But for these additional properties of retry policies, I think Temporal already sets pretty good defaults for most use cases. And those are what we're looking at here: The first retry happens 1 second after the initial activity failure, and the interval doubles from there until it caps off at 100 seconds between each attempt.
+-->
+
+---
+
+## Activities: Weathering System Outages (continued)
+
+```go
+func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+    // ... generate a charge request for the item & customer
+
+    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+        StartToCloseTimeout:    30 * time.Second,
+        ScheduleToCloseTimeout: time.Hour,
+    })
+
+    // ... execute the ChargePayment activity
+}
+```
+
+<!--
+So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
+
+Just to be clear: I'm not saying you should never specify retry policy or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
+-->
+
 ---
 
 ## Activities: Implementing Idempotency
 
-Three techniques to achieve idempotency:
+> Idempotence is the property of certain operations in mathematics and computer science whereby they can be applied multiple times without changing the result beyond the initial application.
+
+[wikipedia.org/wiki/Idempotence](https://en.wikipedia.org/wiki/Idempotence)
+
+<!--
+A term that gets thrown around a lot when talking about activities is idempotency. This just means that if you run an operation more than once with the same input, you should get the same result.
+
+It turns out this is a really important property for activities to have, because they're getting retried all the time. And we really don't want to do something like charging a customer 20 times for the same purchase just because there was a temporary system outage.
+-->
+
+---
+
+## Activities: Implementing Idempotency
+
+Common techniques to achieve idempotency:
 - Passing idempotency key to external APIs
     - Derive a key from the Workflow ID and activity ID. Pass this to downstream systems (like Stripe) to ignore duplicate requests.
 - Applying database constraints
@@ -294,6 +345,30 @@ Three techniques to achieve idempotency:
 - Using naturally idempotent operations
     - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
     - May help to decompose into multiple activities.
+
+<!-- 
+Unfortunately implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
+
+In our activities, we still might need to come up with a stable identifier that remains the same across all attempts in order to deduplicate requests to downstream services or resources that the activity creates.
+
+Sometimes making an activity idempotent is really hard, until you split it up into multiple activities that are each invoked separately in the workflow.
+-->
+
+---
+
+## Activities: Implementing Idempotency
+
+Common techniques to achieve idempotency:
+- Passing idempotency key to external APIs
+    - Derive a key from the Workflow ID and activity ID. Pass this to downstream systems (like Stripe) to ignore duplicate requests.
+- Applying database constraints
+    - Use `INSERT ... ON CONFLICT` or conditional writes to ensure records aren't created twice.
+- Using naturally idempotent operations
+    - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
+    - May help to decompose into multiple activities.
+- ~~Setting `MaxAttempts: 1` in retry policy~~
+
+<!-- I also want to note that, just in case you're thinking that it's ok to not have idempotent behavior if you set MaxAttempts to 1 in your retry policy, you should be aware that Temporal does not guarantee exactly once execution for activities. This has to do with the way server replication and failover works, so it's probably ok if you're self-hosting a single Temporal cluster but even that could change. -->
 
 ---
 
@@ -315,7 +390,13 @@ func getIdempotencyToken(ctx context.Context) string {
 }
 ```
 
-<!-- Speaker note: if you are lucky enough to be using an API that directly supports idempotency keys, whether in the form of a header or a client side request identifier, then you can also compute one based on the workflow and activity IDs. -->
+<!--
+In our payment example from earlier, the activity is calling an API that supports the `Idempotency-Key` HTTP header.
+
+So here I've add a function to generate an opaque string based on the workflow ID and activity ID, which will be the same across every activity attempt, while still being unique in case the same workflow scheduled multiple payment activities.
+
+And then we can just pass that along to the payments API!
+-->
 
 ---
 
@@ -323,11 +404,9 @@ func getIdempotencyToken(ctx context.Context) string {
 
 <!-- TODO(jlegrone): rehearse the transition from the payments example to this k8s example so the use-case shift lands smoothly during the talk. -->
 
-<!-- Speaker note: This activity is currently not idempotent because if the second API call fails, then when it's retried it will fail attempting to create a job with the same name instead of attaching to the existing one. -->
-
 <!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
 ```go
-func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
     jobs := w.client.BatchV1().Jobs(req.Namespace)
     // Create the job
     if _, err := jobs.Create(ctx, &batchv1.Job{
@@ -341,7 +420,7 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
         j, err := jobs.Get(ctx, req.Name)
         if err != nil { return nil, err }
         if status := getJobStatus(j); status.IsTerminal() {
-            return &RunKubernetesJobResponse{Status: status}, nil
+            return &RunJobResponse{Status: status}, nil
         }
         activity.RecordHeartbeat(ctx)
         time.Sleep(15 * time.Second)
@@ -349,13 +428,18 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
 }
 ```
 
+<!-- In the real world, we also tend to have activities that perform multiple operations and interact with systems that don't have nice primitives for idempotency. Like in this new example, where our activity is responsible for creating a Kubernetes job, and then waiting for it to complete before reporting the final job status.
+
+The problem here is that if the activity fails or the worker is redeployed during the for loop, then on the next attempt the activity will fail at creating a job with the same name instead of skipping creation and getting the status of the existing job. No matter how many times the activity is retried, it would keep hitting that same error.
+-->
+
 ---
 
 ## Activities: Natural Idempotency (continued)
 
 <!-- Updated code example, now ignoring an already exists error for the job. -->
 ```diff
- func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
      jobs := w.client.BatchV1().Jobs(req.Namespace)
 -    // Create the job
 +    // Create the job if it doesn't exist
@@ -371,12 +455,14 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunKubernetesJobReque
  }
 ```
 
+<!-- So the smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it if not. -->
+
 ---
 
 ## Activities: Natural Idempotency (continued)
 <!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
 ```go
-func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobRequest) error {
+func (w *Worker) StartKubernetesJob(ctx context.Context, req StartJobRequest) error {
     jobs := w.client.BatchV1().Jobs(req.Namespace)
     // Create the job if it doesn't exist
     _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
@@ -386,18 +472,15 @@ func (w *Worker) StartKubernetesJob(ctx context.Context, req StartKubernetesJobR
     return nil
 }
 
-func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitKubernetesJobRequest) (*AwaitKubernetesJobResponse, error) {
+func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*AwaitJobResponse, error) {
     // Poll for final status
     // ...
 }
 ```
 
-<!-- Speaker note: Now the workflow needs to call both activities, one after the other, but it doesn't matter how many times either of them is retried and we get more visibility into what's going on through the workflow history.
+<!-- Splitting responsibilities across two separate activities is probably an even cleaner approach though, because now we can set independent timeouts and retry policies for each step of creating the job, and then waiting for it to complete. We also automatically get more visibility into what's going on in the workflow history.
 
-Speaker note (likely audience question -- "should activities be small? what about lots of activities?"):
-- Fine-grained activities are usually a win: more visibility in workflow history, smaller retry scope, easier to make idempotent.
-- A worker can register many activity types with no per-type runtime cost; the only direct cost of more activities is in workflow history (each invocation adds events).
-- The tradeoff comes back in the next section -- workflow history size limits.
+Note that I still kept the already exists check in the new `StartKubernetesJob` activity though. Even though it's not likely, a network partition or a poorly timed worker crash could still mean that the activity is retried even after the Create API call succeeds. But reducing the scope of what the activity does still makes reasoning about idempotency a bit simpler.
 -->
 
 ---
@@ -408,7 +491,7 @@ Choosing between StartToClose and Heartbeat timeouts
 
 <!-- New workflow code example, this time invoking our (longer running) AwaitKubernetesJob activity. Set a 30s start to close timeout and a 1h schedule to close timeout. -->
 ```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
     // Start the job
     // ...
 
@@ -435,7 +518,7 @@ So we can try increasing the start to close timeout, but now this also means tha
 
 <!-- Updated code example: Change the start to close timeout to 5m. -->
 ```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
     // Start the job
     // ...
 
@@ -462,7 +545,7 @@ Speaker notes:
 - Replacing a start to close timeout with heartbeat timeout avoids the tradeoff between retrying quickly when the worker fails, and allowing your longest-running tasks to complete. Now the activity can run as long as it needs to, up to the schedule to close timeout, but is retried quickly if the worker becomes unresponsive.
  -->
 ```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunKubernetesJobRequest) (*RunKubernetesJobResponse, error) {
+func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
     // Start the job
     // ...
 
