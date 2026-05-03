@@ -545,20 +545,30 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
 The more elegant solution is to swap out the StartToClose timeout for a Heartbeat timeout.
 
 This allows our activity to run for as long as it needs to, up to the ScheduleToClose timeout, without being stopped and retried, as long as it keeps reporting back to the Temporal server via heartbeat messages. If the worker fails to send heartbeats, then Temporal can also retry the activity.
+
+When choosing a value for Heartbeat or StartToClose timeout, the question to answer is how long you can wait for the activity's retry policy to kick in if the worker fails. My default is to use 30s, because that's about how long I reasonably want to be stuck staring at a workflow in the Temporal UI waiting to see if the activity is still in progress or the worker has become unresponsive.
 -->
 
 ---
 
 ## Activities: A Grand Unified Theory
 
-- Activities should be idempotent.
-- Always set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
-- Always set either **Heartbeat** or **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
-- Activities that perform cleanup on cancelation MUST send heartbeats.
-- Prefer unlimited attempts with `ScheduleToClose` as the bound.
-- Respect error conventions from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior.
+1. Activities should be idempotent.
+2. Always set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
+3. Always set either **Heartbeat** or **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
+4. Activities that perform cleanup on cancelation MUST send heartbeats.
+5. Prefer unlimited attempts with `ScheduleToClose` as the bound.
+6. Respect error conventions from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior.
 
 ** Consider implementing and/or enforcing these policies in an interceptor.
+
+<!--
+There are plenty more mistakes to make around activities that we can't cover here, but the good news is that I think almost all of them can be avoided by following this smallish set of guidelines.
+
+Granted not all of these are easy to follow. And you'll probably be hard pressed to get a coding assistant to always come up with perfectly congruous timeouts and retry policies or always translate status codes from an HTTP response into Temporal application errors.
+
+That's why I've also been working on a specification for a Temporal worker interceptor that enforces good timeout and retry policies, and gRPC and HTTP middleware for translating common errors codes into Temporal errors with appropriate retry behavior. You can find Go and Python reference implementations of this spec in the 100-temporal-mistakes repo.
+-->
 
 ---
 
