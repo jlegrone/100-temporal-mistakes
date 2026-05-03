@@ -663,9 +663,9 @@ Change version lifecycle:
 3. Remove the old behavior and the version check
 
 <!--
-Another really common challenge with workflows is shipping new versions of the code. Almost any change to an existing workflow function needs to be gated with a change version check -- this is called a patch in most SDKs.
+Another really common challenge with workflows is shipping new versions of the code. Almost any new behavior added to an existing workflow function needs to be gated with a change version check -- this is called a patch in most SDKs.
 
-But beyond just making sure we use change versions when modifying workflow code, we should also be cleaning up change version checks in our codebase so that all of those logic branches don't accrue over time.
+But beyond just making sure we use change versions when modifying workflows, we should also be cleaning up change version checks in our codebase so that all of those logic branches don't accrue over time.
 -->
 
 ---
@@ -674,26 +674,38 @@ But beyond just making sure we use change versions when modifying workflow code,
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-     // ... generate a charge request for the item & customer
+     // ... charge payment
 
-+    if req.RequiresInventoryReservation {
-+        v := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
+     sel := workflow.NewNamedSelector(ctx, "shipment")
+     sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
+         c.Receive(ctx, &shipmentResponse)
+     })
+     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+         err = workflow.ErrDeadlineExceeded
+     })
+
+     sel.Select(ctx)
+     if err != nil {
++        v := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
 +        if v == 1 {
-+            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-+                return nil, err
-+            }
++            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        }
-+    }
+         return nil, err
+     }
 
-     return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+     return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
 
 <!--
-So let's look at an example workflow code change. We're back in the PurchaseItem workflow, and the goal is to execute a refund child workflow if the shipment is never received.
+So let's look at an example workflow code change. We're back in the PurchaseItem workflow, and the goal is to add some logic that executes a refund child workflow if the shipment isn't received on time.
+
+This is a well formed change version check, and deploying the change as-is would not cause any problems. But there are two subtle issues at play.
+
+First, the change version is being evaluated inside of a conditional branch means that not all workflow executions will actually evaluate it. Right now, only workflows that don't receive the shipment processed signal within 12 hours will register the change version.
 -->
 
-<!-- Speaker notes: GetVersion is reached only inside a conditional branch some workflows never enter. The TemporalChangeVersion search attribute is never set on those executions, so a list-workflow query filtering by version keeps returning unversioned workflows indefinitely. 
+<!-- Speaker notes: GetVersion is reached only when shipment fails. Workflows that complete successfully never evaluate the patch, so the TemporalChangeVersion search attribute is never set on those executions and a list-workflow query filtering by version keeps returning unversioned workflows indefinitely.
 
 Workflows that never take this branch will NEVER set the TemporalChangeVersion search attribute; you can't tell from a list query whether they're safe to clean up.
 -->
@@ -705,20 +717,28 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 <!-- Speaker note: The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-+    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
++    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
 
-     // ... generate a charge request for the item & customer
+     // ... charge payment
 
-+    switch inventoryResVersion {
-+    case 1:
-+        if req.RequiresInventoryReservation {
-+            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-+                return nil, err
-+            }
+     sel := workflow.NewNamedSelector(ctx, "shipment")
+     sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
+         c.Receive(ctx, &shipmentResponse)
+     })
+     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+         err = workflow.ErrDeadlineExceeded
+     })
+
+     sel.Select(ctx)
+     if err != nil {
++        switch refundVersion {
++        case 1:
++            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        }
-+    }
+         return nil, err
+     }
 
-     return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+     return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
 
@@ -726,27 +746,38 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 
 ## Workflows: Evaluate Change Versions Up Front (continued)
 
-<!-- Speaker note: Subsequent changes bump the patch's max version. The decision of whether to reserve inventory now moves into the activity, so the workflow always calls it on the new code path. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
+<!-- Speaker note: Subsequent changes bump the patch's max version. v2 enriches the refund request with the failure reason so support tooling can triage the refund. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
--    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 1)
-+    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 2)
+-    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
++    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 2)
 
-     // ... generate a charge request for the item & customer
+     // ... charge payment
 
-     switch inventoryResVersion {
-     case 1:
-         if req.RequiresInventoryReservation {
-             // ... await ReserveInventory activity
+     sel := workflow.NewNamedSelector(ctx, "shipment")
+     sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
+         c.Receive(ctx, &shipmentResponse)
+     })
+     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+         err = workflow.ErrDeadlineExceeded
+     })
+
+     sel.Select(ctx)
+     if err != nil {
+         switch refundVersion {
+         case 1:
+             workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
++        case 2:
++            // Include the failure reason so support can triage the refund.
++            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, RefundRequest{
++                OrderID: refundRequest.OrderID,
++                Reason:  err.Error(),
++            })
          }
-+    case 2:
-+        // The activity now decides internally whether to reserve.
-+        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-+            return nil, err
-+        }
+         return nil, err
      }
 
-     return workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+     return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
 
@@ -759,12 +790,12 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
 ```bash
 # Find the earliest workflow that did not hit either patch branch
 temporal workflow list \
-  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion NOT IN ("add-reserve-inventory-1", "add-reserve-inventory-2")' \
+  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion NOT IN ("add-refund-payment-1", "add-refund-payment-2")' \
   --order-by 'StartTime ASC' --limit 1
 
 # Find the earliest workflow that took version 1 of the patch.
 temporal workflow list \
-  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("add-reserve-inventory-1")' \
+  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("add-refund-payment-1")' \
   --order-by 'StartTime ASC' --limit 1
 
 # Download workflow history to a test fixture path.
@@ -803,7 +834,7 @@ More techniques: https://temporal.io/resources/on-demand/replay-safety-at-datado
 # Use `date` on Linux
 CUTOFF=$(gdate -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S.%3NZ)
 temporal workflow count \
-  --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('add-reserve-inventory-2') AND StartTime < '$CUTOFF'"
+  --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('add-refund-payment-2') AND StartTime < '$CUTOFF'"
 ```
 
 ---
@@ -815,26 +846,32 @@ explicit error if a stale v0/v1 history ever shows up. -->
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
--    inventoryResVersion := workflow.GetVersion(ctx, "add-reserve-inventory", workflow.DefaultVersion, 2)
+-    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 2)
 +    // Bump min supported version to 2 so v2 histories continue to replay,
 +    // and any leftover v0/v1 history fails loudly instead of silently diverging.
-+    workflow.GetVersion(ctx, "add-reserve-inventory", 2, 2)
++    workflow.GetVersion(ctx, "add-refund-payment", 2, 2)
 
--    switch inventoryResVersion {
--    case 1:
--        if req.RequiresInventoryReservation {
--            if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
--                return nil, err
--            }
+     // ... charge payment, ship item, select on shipment / deadline / cancelation
+
+     sel.Select(ctx)
+     if err != nil {
+-        switch refundVersion {
+-        case 1:
+-            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+-        case 2:
+-            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, RefundRequest{
+-                OrderID: refundRequest.OrderID,
+-                Reason:  err.Error(),
+-            })
 -        }
--    case 2:
--        // The activity decides internally whether to reserve.
--        if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
--            return nil, err
--        }
-+    if err := workflowhelpers.AwaitActivity(ctx, w.ReserveInventory, reserveRequest); err != nil {
-+        return nil, err
++        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, RefundRequest{
++            OrderID: refundRequest.OrderID,
++            Reason:  err.Error(),
++        })
+         return nil, err
      }
+
+     return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
 
@@ -842,19 +879,18 @@ explicit error if a stale v0/v1 history ever shows up. -->
 
 ## Workflows: Designing for Cancelation
 
-<!-- Speaker notes: A Selector fans in shipping, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
+<!-- Speaker notes: An external fulfillment system signals the workflow once the shipment is processed. A Selector fans in that signal, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 
 But this naive version uses the parent's (possibly canceled) ctx, the default ParentClosePolicy, and doesn't wait for the child to be scheduled before returning. Each of those is a bug we'll fix on the next slide. -->
 
-<!-- TODO: Rework this example to wait for a signal that the shipment has completed instead of running an activity. That sets up the cancelation deadlock bug. -->
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
     // ... reserve inventory and charge payment
 
-    shipFuture := workflow.ExecuteActivity(ctx, w.ShipItem, shipRequest)
     sel := workflow.NewNamedSelector(ctx, "shipment")
-
-    sel.AddFuture(shipFuture, func(f workflow.Future) { err = f.Get(ctx, &shipmentResponse) })
+    sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
+        c.Receive(ctx, &shipmentResponse)
+    })
     sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
         err = workflow.ErrDeadlineExceeded
     })
