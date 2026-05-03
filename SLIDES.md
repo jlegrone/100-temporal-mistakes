@@ -32,11 +32,11 @@ Follow Along:
 <!-- QR code linking to jacob.work/100TM (slides in markdown format for those who want to follow along with code examples) -->
 
 <!-- Speaker notes:
-A few years ago I got looped into a project at work to help a team launch a new product called Datadog Oncall (and I promise this is not an ad). But the reason I was looped in was because they were planning to build it on top of Temporal. At Datadog we always want to maintain a high standard of availability and so on for our services, but this had an even higher bar to meet than usual because we wanted be confident in allowing any core engineering team at Datadog to be able to route their own pages through this system despite the potential circular runtime dependencies that you can imagine might make life difficult.
+A few years ago I got looped into a project at work to help a team launch a new product called Datadog Oncall (and I promise this is not an ad). But the reason I was looped in was because they were planning to build it on top of Temporal. At Datadog we always want to maintain a high standard of availability and so on for our services, but this had an even higher bar to meet than usual because we wanted be confident in allowing any core engineering team at Datadog to be able to route their own pages through this system despite the potential circular runtime dependencies that you can imagine making life difficult.
 
 Now I've always enjoyed thinking about all the things that can theoretically go wrong in distributed systems. But suddenly I was fielding all kinds of questions from this new product team about activity execution semantics and retry policies and change versioning and parent close policies and so on, because the team was being so incredibly thorough. And as we were having these conversations, I was wishing that I had some way of capturing these tidbits in a way that could be digestible and simple to follow for anyone else using Temporal at our company.
 
-So that is how 100 Temporal Mistakes was born, and my hope in preparing this talk is that I could shed light on some fo the less obvious things that can go wrong, and also provide practical guidance that you can apply every day when developing Temporal backed applications.
+So that is how 100 Temporal Mistakes was born, and my hope in preparing this talk is that I could shed light on some of the less obvious things that can go wrong, and also provide practical guidance that you can apply every day when developing Temporal backed applications.
 
 Please note that the advice I'm giving is extremely picky. You certainly don't need to follow all of it, and some may not make sense at all depending on how you're using Temporal. That said, please feel free to roast me in the Q&A if you disagree with anything I say.
 
@@ -72,7 +72,7 @@ It's on us to:
 <!--
 The biggest way Temporal makes this easier for us, is by retrying activities by default. Specifically Temporal gives us an "at least once" execution semantic for every activity.
 
-And that's really convenient, but Temporal can't magically ensure that our activities don't have undefined behavior if you run them more than once, or that they detect and handle cancelation, or that when there's a downstream service outage our retry policies don't conjure up a storm of execution attempts that only make matters worse.
+And that's really convenient, but Temporal can't magically ensure that our activities don't have undefined behavior if you run them more than once, or that they detect and handle cancelation, or that when there's a downstream service outage our retry policies don't conjure up a storm of attempts that only make matters worse.
 
 So let's dive into how to write reliable, well-behaved activities.
 -->
@@ -181,7 +181,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 }
 ```
 
-<!-- Switching contexts to the workflow code that is invoking our ChargePayment activity, we need to think about what timeouts and retry policy makes sense for what the activity does.
+<!-- If we switch contexts to the workflow code that is invoking our ChargePayment activity, we need to think about what timeouts and retry policy makes sense for what the activity does.
 
 In this case we've started with a 30 second Start To Close timeout because we're not doing any computation in the activity and we expect the payments API to respond fairly quickly.
 
@@ -260,7 +260,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 <!-- To inpect the behavior of your timeout and retry policy config, Temporal actually provides a nice little simulator which is helpful since there's some math involved.
 
-If we plug in the policy from the previous slide, we can see that the activity could actually be marked as failed after only 6 seconds! Obviously this is way off our target of surviving outages up to 1 hour. -->
+If we plug in the policy from the previous slide, we can confirm that the activity could actually be marked as failed after only 6 seconds! Obviously this is way off our target of surviving outages up to 1 hour. -->
 
 ---
 
@@ -287,13 +287,13 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 ```
 
 <!--
-Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our schedule to close timeout.
+Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our desired schedule to close timeout.
 
 But I think a much simpler mental model is to skip setting maximum attempts at all, so that you automatically get as many retries as fit within your schedule to close timeout.
 
 Note that if you need to you can still use retry policies to fine tune the initial and maximum retry intervals as needed such that you don't retry too frequently before the timeout is reached.
 
-But for these additional properties of retry policies, I think Temporal already sets pretty good defaults for most use cases. And those are what we're looking at here: The first retry happens 1 second after the initial activity failure, and the interval doubles from there until it caps off at 100 seconds between each attempt.
+But for these additional properties of retry policies, I think Temporal already sets pretty good defaults for most use cases. And those are what we're looking at here: by default, the first retry happens 1 second after the first activity failure, and the interval doubles from there until it caps off at 100 seconds between each attempt.
 -->
 
 ---
@@ -316,7 +316,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 <!--
 So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
 
-Just to be clear: I'm not saying you should never specify retry policy or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
+Just to be clear though: I'm not saying you should never specify retry policy or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
 -->
 
 ---
@@ -349,7 +349,7 @@ Common techniques to achieve idempotency:
 <!-- 
 Unfortunately implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
 
-In our activities, we still might need to come up with a stable identifier that remains the same across all attempts in order to deduplicate requests to downstream services or resources that the activity creates.
+In our activities, we still might need to come up with a stable identifier that remains the same across all attempts in order to deduplicate requests to downstream services or resources that the activity creates. ** TODO fix
 
 Sometimes making an activity idempotent is really hard, until you split it up into multiple activities that are each invoked separately in the workflow.
 -->
