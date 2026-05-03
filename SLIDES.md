@@ -674,7 +674,7 @@ But beyond just making sure we use change versions when modifying workflows, we 
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-     // ... charge payment
+     // Charge payment ...
 
      sel := workflow.NewNamedSelector(ctx, "shipment")
      sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
@@ -703,23 +703,24 @@ So let's look at an example workflow code change. We're back in the PurchaseItem
 This is a well formed change version check, and deploying the change as-is would not cause any problems. But there are two subtle issues at play.
 
 First, the change version is being evaluated inside of a conditional branch means that not all workflow executions will actually evaluate it. Right now, only workflows that don't receive the shipment processed signal within 12 hours will register the change version.
+
+Second, the change version is being evaluated late in the workflow's execution; in this case we know that the workflow will be running for at least 12 hours before it registers the change version.
+
+The reason this matters is that we want ALL workflow executions started after the new version of the worker is deployed to register the same set of change versions so that we can automate checks to verify that removal of the change version is safe in the future.
 -->
 
 <!-- Speaker notes: GetVersion is reached only when shipment fails. Workflows that complete successfully never evaluate the patch, so the TemporalChangeVersion search attribute is never set on those executions and a list-workflow query filtering by version keeps returning unversioned workflows indefinitely.
-
-Workflows that never take this branch will NEVER set the TemporalChangeVersion search attribute; you can't tell from a list query whether they're safe to clean up.
 -->
 
 ---
 
 ## Workflows: Evaluate Change Versions Up Front
 
-<!-- Speaker note: The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 +    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
 
-     // ... charge payment
+     // Charge payment ...
 
      sel := workflow.NewNamedSelector(ctx, "shipment")
      sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
@@ -741,6 +742,9 @@ Workflows that never take this branch will NEVER set the TemporalChangeVersion s
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
+<!--
+The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken.
+-->
 
 ---
 
