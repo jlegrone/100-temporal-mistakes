@@ -74,6 +74,9 @@ type Options struct {
 
 // New returns a [interceptor.WorkerInterceptor] that rewrites activity
 // errors per opts.
+//
+// TODO(jlegrone): convert this to a WorkerPlugin once the API stabilizes
+// (currently in go.temporal.io/sdk/internal#WorkerPlugin).
 func New(opts Options) interceptor.WorkerInterceptor {
 	return &errorMapperInterceptor{opts: opts}
 }

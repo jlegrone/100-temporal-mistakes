@@ -141,6 +141,9 @@ type ViolationDetails struct {
 
 // New returns a worker interceptor implementing the
 // Activity Policy Interceptor spec.
+//
+// TODO(jlegrone): convert this to a WorkerPlugin once the API stabilizes
+// (currently in go.temporal.io/sdk/internal#WorkerPlugin).
 func New(opts Options) interceptor.WorkerInterceptor {
 	return &activityPolicyInterceptor{opts: opts}
 }
