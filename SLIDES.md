@@ -689,6 +689,10 @@ But beyond just making sure we use change versions when modifying workflow code,
  }
 ```
 
+<!--
+So let's look at an example workflow code change. We're back in the PurchaseItem workflow, and the goal is to execute a refund child workflow if the shipment is never received.
+-->
+
 <!-- Speaker notes: GetVersion is reached only inside a conditional branch some workflows never enter. The TemporalChangeVersion search attribute is never set on those executions, so a list-workflow query filtering by version keeps returning unversioned workflows indefinitely. 
 
 Workflows that never take this branch will NEVER set the TemporalChangeVersion search attribute; you can't tell from a list query whether they're safe to clean up.
