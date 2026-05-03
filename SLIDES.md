@@ -674,7 +674,7 @@ But beyond just making sure we use change versions when modifying workflows, we 
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-     // Charge payment ...
+     // Charge payment and start fulfilment ...
 
      sel := workflow.NewNamedSelector(ctx, "shipment")
      sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
@@ -686,8 +686,9 @@ But beyond just making sure we use change versions when modifying workflows, we 
 
      sel.Select(ctx)
      if err != nil {
-+        v := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
-+        if v == 1 {
++        refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
++        switch refundVersion {
++        case 1:
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        }
          return nil, err
@@ -720,7 +721,7 @@ The reason this matters is that we want ALL workflow executions started after th
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 +    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
 
-     // Charge payment ...
+     // Charge payment and start fulfilment ...
 
      sel := workflow.NewNamedSelector(ctx, "shipment")
      sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
@@ -743,7 +744,7 @@ The reason this matters is that we want ALL workflow executions started after th
  }
 ```
 <!--
-The fix is to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the branch it gates is never taken.
+The fix is simple, we just need to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the code branch it's used in is never evaluated.
 -->
 
 ---
@@ -756,7 +757,7 @@ The fix is to hoist the version check to the top of the workflow so every execut
 -    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 1)
 +    refundVersion := workflow.GetVersion(ctx, "add-refund-payment", workflow.DefaultVersion, 2)
 
-     // ... charge payment
+     // Charge payment and start fulfilment ...
 
      sel := workflow.NewNamedSelector(ctx, "shipment")
      sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
