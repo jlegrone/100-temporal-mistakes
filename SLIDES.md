@@ -551,15 +551,14 @@ This allows our activity to run for as long as it needs to, up to the ScheduleTo
 
 ## Activities: A Grand Unified Theory
 
-- Activities SHOULD be idempotent. Temporal can re-execute an activity at least once during failover or retry, so any side effect needs to be safe to repeat.
+- Activities should be idempotent.
 - Always set a **ScheduleToClose** timeout. Base the value on how long the activity should continue retrying during a worst case outage.
 - Always set either **Heartbeat** or **StartToClose** timeout. Use **StartToClose** timeout only when the activity is guaranteed to not run past that duration and it is acceptable to wait the whole duration before a retry. 
 - Activities that perform cleanup on cancelation MUST send heartbeats.
 - Prefer unlimited attempts with `ScheduleToClose` as the bound.
-- Respect standard error codes from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior.
+- Respect error conventions from downstream services. Translate these into `TemporalApplicationError` to skip retry or adjust backoff behavior.
 
 ** Consider implementing and/or enforcing these policies in an interceptor.
-<!-- TODO: Add QR code linking to interceptor example from 100-temporal-mistakes repo. -->
 
 ---
 
