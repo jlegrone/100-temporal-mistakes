@@ -580,9 +580,13 @@ Need to be robust to:
 - Signals arriving in unpredictable order
 - Cancelation requests at any point in execution
 
-Should also:
+Must also:
 - Stay deterministic across replays
 - Yield quickly to the workflow task event loop
+
+<!--
+That brings us to part two: workflows.
+ -->
 
 ---
 
@@ -595,10 +599,15 @@ Server-imposed limits to be aware of:
 - **Workflow history bytes**: 50MB (sum of all events in the workflow). Results in termination.
 - **Workflow history length**: 50,000 events. Results in termination.
 - **Workflow task timeout**: 10 seconds (per workflow task -- not the workflow execution timeout). Results in failed workflow task (retried).
+- **Workflow lock contention**: No hard limit, but aim for no more than ~1 workflow state change per second.
 
 Mitigations:
 - Use **ContinueAsNew** to start a fresh execution with reset history. Check `GetContinueAsNewSuggested()` to know when the server is recommending it.
-- Avoid passing large payloads from activities to workflows, or use external payload storage.
+- Avoid passing large payloads from activities to workflows, or use [external payload storage](https://docs.temporal.io/external-storage).
+
+<!--
+There are several dimensions in which workflows are limited. There are good reasons for all of them, but we still need to be aware that the limits exist. Typically if you're running into one of these limits, it means you need to start using `ContinueAsNew` or enable external payload storage.
+-->
 
 ---
 
@@ -615,6 +624,10 @@ Common sources of non-determinism in workflow code:
 - Goroutines spawned outside `workflow.Go` -- the SDK doesn't record their scheduling, and they often race with the workflow function for shared state
 - Variable references from outside the workflow function scope
 
+<!--
+Another thing to be aware of, which I won't cover much here, is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying old workflow histories.
+-->
+
 ---
 
 ## Workflows: Keeping Code Deterministic (continued)
@@ -623,6 +636,10 @@ Tools to catch non-determinism:
 - **Go**: [`workflowcheck`](https://github.com/temporalio/sdk-go/tree/master/contrib/tools/workflowcheck) -- opt-in static analyzer that flags non-deterministic calls in workflow code.
 - **Python**: [Workflow sandbox](https://docs.temporal.io/develop/python/python-sdk-sandbox) -- enabled by default; restricts imports and module access at runtime.
 - **TypeScript**: V8 isolate sandboxing is built-in -- workflow code runs in a separate V8 context with no Node.js APIs.
+
+<!--
+The Temporal team has done an admirable job making determinsm easier to implement by providing static analysis tools or deeply integrating with language runtimes. Check what is available for your language, make sure you've opted in to every check you can as early as possible, and don't let a coding assistant run rampant adding exceptions to determinism rules because it deems them too pesky.
+-->
 
 ---
 
