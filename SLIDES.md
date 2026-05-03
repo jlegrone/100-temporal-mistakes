@@ -612,7 +612,7 @@ There are several dimensions in which workflows are limited.
 
 The first is that individual payload sizes peristed in workflow history can't go past around 2MB. This is a limitation that is inherited from the Temporal gRPC API.
 
-Limits on the workflow history include total length, which needs to stay under 50,000 events (though it's recommended to stick to less than 10,000), and the total workflow history size must be less than 50 MB (recommended less than 10MB). These limits exist to ensure that workflow histories can be replayed quickly whenever the workflow needs to be loaded into memory on a worker.
+Limits on the workflow history include total length, which is recommended to stay under 10,000 events, and the total workflow history size should be less than 10 MB. These limits exist to ensure that workflow histories can be replayed quickly whenever the workflow needs to be loaded into memory on a worker.
 
 Temporal also enforces a workflow task timeout of 10 seconds by default, which is how long the workflow function has to return the next command. This should almost never need to be changed unless you are using external payload storage.
 
@@ -635,7 +635,7 @@ Common sources of non-determinism in workflow code:
 - Variable references from outside the workflow function scope
 
 <!--
-Another thing to be aware of, which I won't cover much here, is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying old workflow histories.
+Another thing to be aware of, which I won't cover much here, is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying workflow histories.
 -->
 
 ---
@@ -648,7 +648,7 @@ Tools to catch non-determinism:
 - **TypeScript**: V8 isolate sandboxing is built-in -- workflow code runs in a separate V8 context with no Node.js APIs.
 
 <!--
-The Temporal team has done an admirable job making determinsm easier to implement by providing static analysis tools or deeply integrating with language runtimes. Check what is available for your language, make sure you've opted in to every check you can as early as possible, and don't let a coding assistant run rampant adding exceptions to determinism rules because it deems them too pesky.
+The Temporal team has done a great job making determinsm easier to implement by providing static analysis tools and by deeply integrating with language runtimes. I recommend checking out what tooling is available for your language, and don't let a coding assistant run rampant adding exceptions to determinism rules because it deems them too pesky.
 -->
 
 ---
