@@ -635,7 +635,7 @@ Common sources of non-determinism in workflow code:
 - Variable references from outside the workflow function scope
 
 <!--
-Another thing to be aware of, which I won't cover much here, is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying workflow histories.
+Another thing to be aware of is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying workflow histories.
 -->
 
 ---
@@ -663,9 +663,9 @@ Change version lifecycle:
 3. Remove the old behavior and the version check
 
 <!--
-Versioning is required for *any* change to workflow code that would result in a different workflow history when it runs against an existing execution.
+Another really common challenge with workflows is shipping new versions of the code. Almost any change to an existing workflow function needs to be gated with a change version check -- this is called a patch in most SDKs.
 
-Common changes that need to be versioned include adding, removing, or reordering activities, child workflows, or timers.
+But beyond just making sure we use change versions when modifying workflow code, we should also be cleaning up change version checks in our codebase so that all of those logic branches don't accrue over time.
 -->
 
 ---
