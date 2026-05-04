@@ -344,7 +344,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 ## Activities: Weathering System Outages (continued)
 
-<!-- TODO: Inline image src/.assets/retry_simulator_max_attempts.png -->
+![Retry simulator showing max attempts exhausted](src/.assets/retry_simulator_max_attempts.png)
 
 [docs.temporal.io/develop/activity-retry-simulator](https://docs.temporal.io/develop/activity-retry-simulator)
 
