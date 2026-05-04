@@ -993,9 +993,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 ## Workflows: Use Timers, Not Timeouts
 
-> [!TIP]
-> When a workflow execution timeout fires, Temporal *terminates* the workflow -- it does not *cancel* it. No deferred functions run, no cancelation handlers fire. If you need a chance to compensate, build the deadline yourself with an internal timer.
-
 ```go
 // Reserve at least 1 minute for compensation before the hard timeout.
 softTimeout, err := getSoftTimeout(ctx, time.Minute)
@@ -1005,12 +1002,11 @@ if err != nil {
 // ... race the soft timeout against child completion and ctx.Done()
 ```
 
+When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached.
+
 ---
 
 ## Workflows: Cap Workflow Lifetime With ContinueAsNew
-
-> [!TIP]
-> Long-running workflows accumulate history events, lengthening replay time and eventually hitting the 50k event limit. Cap lifetime by completing or calling **ContinueAsNew** within 24 hours.
 
 ```go
 if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
@@ -1018,9 +1014,9 @@ if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
 }
 ```
 
-Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control.
+Any workflow expected to run for more than 24 hours should implement Continue-As-New, and use both ContinueAsNewSuggested and workflow execution time as triggers for it.
 
-Source: `src/not_using_continue_as_new/`
+<!-- Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control. -->
 
 ---
 
