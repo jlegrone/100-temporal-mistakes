@@ -1005,8 +1005,6 @@ if err != nil {
 // ... race the soft timeout against child completion and ctx.Done()
 ```
 
-Source: `src/assuming_workflow_timeouts_allow_graceful_cleanup/`
-
 ---
 
 ## Workflows: Cap Workflow Lifetime With ContinueAsNew
