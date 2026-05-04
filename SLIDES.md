@@ -1121,6 +1121,7 @@ Workflow functions:
 - SHOULD fan out large batches of work to child workflows.
 
 Temporal workers:
+- MUST be configured with a BuildID
 - SHOULD have a replay testing harness.
 - SHOULD be onboarded to worker versioning and pinned workflows.
 - SHOULD enable external payload storage if activity responses are ~1MB or larger.
