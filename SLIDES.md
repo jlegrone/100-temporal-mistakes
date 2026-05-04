@@ -993,16 +993,34 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 ## Workflows: Use Timers, Not Timeouts
 
-```go
-// Reserve at least 1 minute for compensation before the hard timeout.
-softTimeout, err := getSoftTimeout(ctx, time.Minute)
-if err != nil {
-    return err
-}
-// ... race the soft timeout against child completion and ctx.Done()
+```diff
+ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
++    // Reserve at least 1 minute for compensation before the hard timeout.
++    softTimeout, err := getSoftTimeout(ctx, time.Minute)
++    if err != nil {
++        return nil, err
++    }
+
+     // ...
+
+-    sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
++    sel.AddFuture(softTimeout, func(f workflow.Future) {
+         err = workflow.ErrDeadlineExceeded
+     })
+
+    // ...
+ }
+
++func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
++    timeout := workflow.GetInfo(ctx).WorkflowRunTimeout
++    if timeout <= padding {
++        return nil, errTimeoutTooSmall(padding) // non-retryable application error
++    }
++    return workflow.NewTimer(ctx, timeout - padding), nil
++}
 ```
 
-When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached.
+<!-- When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached. -->
 
 ---
 
