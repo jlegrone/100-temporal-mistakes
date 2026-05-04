@@ -751,7 +751,6 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 
 ## Workflows: Evaluate Change Versions Up Front (continued)
 
-<!-- Speaker note: Subsequent changes bump the patch's max version. v2 cancels the in-flight shipment before issuing the refund so the package doesn't show up after the customer was refunded. In-flight workflows that started under v1 keep following `case 1`; new workflows take `case 2`. Once all `case 1` executions have closed, you can remove that branch but keep the GetVersion call (and bump the min compatible version) so replayed v1 histories still resolve. -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
@@ -780,11 +779,17 @@ The fix is simple, we just need to hoist the version check to the top of the wor
  }
 ```
 
+<!--
+If we need to make more changes then we can bump the change id's max version.
+
+In this case, version 2 now cancels the in-flight shipment before issuing the refund so the package doesn't get shipped after the customer has been refunded.
+
+After this latest change is deployed, any in-flight workflows that started with v1 continue evaluating the first case on replay, while new workflows take case 2. Once all workflow executions following case 1 have completed, we can remove the first case statement.
+-->
+
 ---
 
 ## Workflows: Verifying Replay Safety
-
-<!-- Speaker note: Capture a representative history for each patch branch. Use the TemporalChangeVersion search attribute to bucket existing executions, and pick the earliest one in each bucket so the fixture exercises the most history. -->
 
 ```bash
 # Find the earliest workflow that did not hit either patch branch
@@ -801,6 +806,16 @@ temporal workflow list \
 temporal workflow show --workflow-id <ID> --output json \
   > testdata/purchase_item_history_<PATCH_VERSION>.json
 ```
+
+<!--
+By the way, before shipping any workflow code change, it's a good idea to test replaying some existing workflow histories against the new version of your code.
+
+Any time you evaluate a change version, Temporal automatically adds a TemporalChangeVersion search attribute with that change id and maximum supported version number. This is why it's important to evaluate change versions first thing when the workflow starts, because otherwise it can be hard to distinguish old from new workflows (at least not without lots of complicated filters based on workflow start time or worker build ids).
+
+What I'm showing here is a quick way to find the earliest workflow execution that ran on the version of our code that didn't have the handle-shipment-delay change version, and a second command to find the earliest workflow that took the version 1 branch.
+
+And then in the third command, we're grabbing the workflow history and saving to a JSON file to replay in a unit test.
+--> 
 
 ---
 
@@ -820,7 +835,15 @@ func TestReplayWorkflowHistory(t *testing.T) {
 
 ** Check the code coverage for the version branches in your workflow! If they aren't covered, then the replay test is not validating your change.
 
-More techniques: https://temporal.io/resources/on-demand/replay-safety-at-datadog
+Find more techniques at [temporal.io/resources/on-demand/replay-safety-at-datadog](https://temporal.io/resources/on-demand/replay-safety-at-datadog)
+
+<!--
+And this is what that unit test might look like. We can run this locally or in CI, and if the new code's command sequence diverges from either workflow history, then the test fails and we can be alerted before shipping the new workflow code to production.
+
+I definitely recommend setting a test harness for workflow replay, because it can also be a super powerful way to debug workflows locally when things go wrong.
+
+If you're interested in more techniques to ensure replay safety for workflow code changes, then please check out the talk from my colleague Jing Yi a couple years ago titled Replay Safety at Datadog.
+-->
 
 ---
 
@@ -829,9 +852,16 @@ More techniques: https://temporal.io/resources/on-demand/replay-safety-at-datado
 <!-- Speaker note: Once every running workflow has either completed or evaluated v2, the v0 and v1 branches can be deleted. Wait until this count returns 0 -- the 5-minute cutoff avoids false positives for workflows that have been started but have not yet persisted the search attribute. -->
 
 ```bash
+#!/bin/sh
 # Returns 0 when no in-flight workflow can still be on v0 or v1.
-# Use `date` on Linux
+
+# Get a timestamp for 5 minutes ago, in order to avoid counting workflow
+# executions that have been scheduled but haven't been picked up by a worker yet.
+# (use `date` on Linux)
 CUTOFF=$(gdate -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S.%3NZ)
+
+# Count how many workflows are still running with a handle-shipment-delay change
+# version less than 2.
 temporal workflow count \
   --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('handle-shipment-delay-2') AND StartTime < '$CUTOFF'"
 ```
