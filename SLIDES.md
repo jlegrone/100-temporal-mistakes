@@ -43,6 +43,16 @@ Please note that the advice I'm giving is extremely picky. You certainly don't n
 Also by the way for anyone who hasn't done the math yet, 100 mistakes in 35 minutes gives us about 20 seconds per mistake. So I'm just going to do a highlights tour, but you can find more content at the link on the slide.
  -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 # Part One: Activities
@@ -57,6 +67,16 @@ Activities have to deal with:
 <!-- Part One is all about activities. And I'm starting here because, let's face it, workflows are a bit more glamorous with their determinism and durability and signals and so on, but I think there's a lot of subtlety about how we need to design activities and the policy around them that is often glossed over when starting out with Temporal.
 
 So activities have a lot of responsibility. They're the main window through which workflows are able to interact with the outside world. That means they also have to put up with all sorts of system disruptions that our workflow code can happily sleep through until it's time to be woken up again. -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -76,6 +96,16 @@ And that's really convenient, but Temporal can't magically ensure that our activ
 
 So let's dive into how to write reliable, well-behaved activities.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -107,6 +137,16 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of failure conditions that shouldn't result in the activity being retried.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Avoid Amplifying Invalid Requests
@@ -128,6 +168,16 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 <!--
 One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Assuming that retrying won't change the shape of the request being sent, we should probably update our activity to translate this into a non-retryable error so that the activity fails fast.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -161,6 +211,16 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 So now our activity checks for the TooManyRequests HTTP status and calculates a next retry delay based on the `Retry-After` HTTP response header if it has been set. Otherwise we can just increase the next retry delay be a factor of 2.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Weathering System Outages
@@ -191,6 +251,16 @@ But we also need to consider the worst case: what if our worker, or the payments
 -->
 
 <!-- Speaker note: Temporal is great at retrying activities, but it's still important to think carefully about how we configure timeouts and retry policies in order to survive worst case system outages. For example here I'm invoking my activity with a schedule to close timeout that doesn't give much room for the activity to be retried if the worker or downstream API are temporarily unavailble. -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -224,6 +294,16 @@ So now we're ready to go, right?
 <!-- Speaker note: ScheduleToClose doesn't always need to be large. Long values (hours) make sense when the workflow should weather an extended outage and the caller is OK waiting, or is notified asynchronously. Short values (seconds to minutes) make sense when the workflow has a graceful degradation path, when reporting an error quickly is preferable to retrying through an outage, or when an upstream caller is waiting synchronously.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Weathering System Outages (continued)
@@ -250,6 +330,16 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
 <!-- Well, sort of. It turns out we were really thorough and also specified a retry policy. The problem here is that because we only allow a maximum of 3 attempts, in practice we exhaust our retries really quickly. -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Weathering System Outages (continued)
@@ -261,6 +351,16 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 <!-- To inpect the behavior of your timeout and retry policy config, Temporal actually provides a nice little simulator which is helpful since there's some math involved.
 
 If we plug in the policy from the previous slide, we can confirm that the activity could actually be marked as failed after only 6 seconds! Obviously this is way off our target of surviving outages up to 1 hour. -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -296,6 +396,16 @@ Note that if you need to you can still use retry policies to fine tune the initi
 But for these additional properties of retry policies, I think Temporal already sets pretty good defaults for most use cases. And those are what we're looking at here: by default, the first retry happens 1 second after the first activity failure, and the interval doubles from there until it caps off at 100 seconds between each attempt.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Weathering System Outages (continued)
@@ -319,6 +429,16 @@ So the last tweak we'll make to the activity options is simply to remove the ret
 Just to be clear though: I'm not saying you should never specify retry policy or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Implementing Idempotency
@@ -332,6 +452,16 @@ A term that gets thrown around a lot when talking about activities is idempotenc
 
 It turns out this is a really important property for activities to have, because they're getting retried all the time. And we really don't want to do something like charging a customer 20 times for the same purchase just because there was a temporary system outage.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -354,6 +484,16 @@ In our activities, we still might need to come up with a stable identifier that 
 Sometimes making an activity idempotent is really hard, until you split it up into multiple activities that are each invoked separately in the workflow.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Implementing Idempotency
@@ -369,6 +509,16 @@ Common techniques to achieve idempotency:
 - ~~Setting `MaxAttempts: 1` in retry policy~~
 
 <!-- I also want to note that, just in case you're thinking that it's ok to not have idempotent behavior if you set MaxAttempts to 1 in your retry policy, you should be aware that Temporal does not guarantee exactly once execution for activities. This has to do with the way server replication and failover works, so it's probably ok if you're self-hosting a single Temporal cluster but even that could change. -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -397,6 +547,16 @@ So here I've add a function to generate an opaque string based on the workflow I
 
 And then we can just pass that along to the payments API!
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -433,6 +593,16 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJ
 The problem here is that if the activity fails or the worker is redeployed during the for loop, then on the next attempt the activity will fail at creating a job with the same name instead of skipping creation and getting the status of the existing job. No matter how many times the activity is retried, it would keep hitting that same error.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: Natural Idempotency (continued)
@@ -456,6 +626,16 @@ The problem here is that if the activity fails or the worker is redeployed durin
 ```
 
 <!-- So the smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it if not. -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -482,6 +662,16 @@ func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*
 
 Note that I still kept the already exists check in the new `StartKubernetesJob` activity though. Even though it's not likely, a network partition or a poorly timed worker crash could still mean that the activity is retried even after the Create API call succeeds. But reducing the scope of what the activity does still makes reasoning about idempotency a bit simpler.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -513,6 +703,16 @@ The only problem here is that if the worker crashes or terminates unexpectedly, 
 
 We could decrease the StartToClose timeout and allow the activity to time out and be retried. But that forces a tradeoff between how quickly Temporal retries after a worker failure and how often we are doing unnecessary retries (which in some cases, could mean repeating expensive work).
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -549,6 +749,16 @@ This allows our activity to run for as long as it needs to, up to the ScheduleTo
 When choosing a value for Heartbeat or StartToClose timeout, the question to answer is how long you can wait for the activity's retry policy to kick in if the worker fails. My default is to use 30s, because that's about how long I reasonably want to be stuck staring at a workflow in the Temporal UI waiting to see if the activity is still in progress or the worker has become unresponsive.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Activities: A Grand Unified Theory
@@ -572,6 +782,16 @@ Granted not all of these are easy to follow. And you'll probably be hard pressed
 That's why I've also been working on a specification for a Temporal worker interceptor that enforces good timeout and retry policies, and gRPC and HTTP middleware for translating common errors codes into Temporal errors with appropriate retry behavior. You can find Go and Python reference implementations of this spec in the 100-temporal-mistakes repo.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 # Part Two: Workflows
@@ -591,6 +811,16 @@ That brings us to part two: workflows.
 
 Workflows definitely come with their own challenges. We're going to cover a few of these today, including workflow limitations, determinism, and versioning code changes.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -621,6 +851,16 @@ And the last limitation is workflow lock contention, which you can run into if y
 Typically if you're running into one of these limits, it means you need to start using `ContinueAsNew` or enable external payload storage.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Keeping Code Deterministic
@@ -638,6 +878,16 @@ Common sources of non-determinism in workflow code:
 Another thing to be aware of is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying workflow histories.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Keeping Code Deterministic (continued)
@@ -650,6 +900,16 @@ Tools to catch non-determinism:
 <!--
 The Temporal team has done a great job making determinsm easier to implement by providing static analysis tools and by deeply integrating with language runtimes. I recommend checking out what tooling is available for your language, and don't let a coding assistant run rampant adding exceptions to determinism rules because it deems them too pesky.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -667,6 +927,16 @@ Another really common challenge with workflows is shipping new versions of the c
 
 But beyond just making sure we use change versions when modifying workflows, we should also be cleaning up change version checks in our codebase so that all of those logic branches don't accrue over time.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -713,6 +983,16 @@ The reason this matters is that we want ALL workflow executions started after th
 <!-- Speaker notes: GetVersion is reached only when shipment fails. Workflows that complete successfully never evaluate the patch, so the TemporalChangeVersion search attribute is never set on those executions and a list-workflow query filtering by version keeps returning unversioned workflows indefinitely.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Evaluate Change Versions Up Front
@@ -746,6 +1026,16 @@ The reason this matters is that we want ALL workflow executions started after th
 <!--
 The fix is simple, we just need to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the code branch it's used in is never evaluated.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -785,6 +1075,16 @@ If we need to make more changes then we can bump the change id's max version.
 In this case, version 2 now cancels the in-flight shipment before issuing the refund so the package doesn't get shipped after the customer has been refunded.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Verifying Replay Safety
@@ -815,6 +1115,16 @@ What I'm showing here is a quick way to find the earliest workflow execution tha
 And then in the third command, we're grabbing the workflow history and saving to a JSON file to replay in a unit test.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Verifying Replay Safety (continued)
@@ -843,6 +1153,16 @@ Having a replay test harness also makes it pretty easy to compute code coverage 
 If you're interested in more techniques to ensure replay safety for workflow code changes, then please check out the talk from my colleague Jing Yi a couple years ago titled Replay Safety at Datadog.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Cleaning Up Change Versions
@@ -870,6 +1190,16 @@ To verify this is safe, we can run a query like this to check if there are still
 
 Note that you'd need to do this once per namespace or Temporal cluster if you have multiple deployments of your worker.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -914,6 +1244,16 @@ After we've checked that it is safe to do so, we can clean up the old code branc
 Note that it is always safest to do this in two phases; first bumping the min supported version to match the max version, and a later deployment to remove the change version evaluation entirely. The reasons for this have to do with your ability to roll back to the previous version of the code, but it's kind of complicated.
 -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Returning Before Child Workflows Complete
@@ -946,6 +1286,16 @@ When we execute the RefundPayment child workflow, we're not actually waiting for
 
 This is actually what was intended; the Purchase workflow should return as soon as it detects the shipment error, while the refund child workflow is meant to complete asynchronously.
 -->
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -989,6 +1339,16 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 +}
 ```
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Use Timers, Not Timeouts
@@ -1022,6 +1382,16 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 <!-- When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached. -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Cap Workflow Lifetime With ContinueAsNew
@@ -1052,6 +1422,16 @@ Any workflow expected to run for more than 24 hours should implement Continue-As
 
 <!-- Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control. -->
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Drain Signals Before Completing
@@ -1074,6 +1454,16 @@ Apply the drained signals to your state -- don't just read and discard them. Mak
 
 Source: `src/not_draining_signals_before_completing_workflow/`
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workflows: Fan Out Large Batches to Child Workflows
@@ -1084,6 +1474,16 @@ Source: `src/not_draining_signals_before_completing_workflow/`
 Activities scheduled concurrently compete for the workflow lock, and large histories push against the 50k event limit. Split work into size-limited batches and handle each batch in a separate child workflow. Nest as needed -- batches of batches -- to create a tree with concurrency control at each level.
 
 Source: `src/naive-batch-processing-implementation.md`
+
+
+
+
+
+
+
+
+
+
 
 ---
 
@@ -1096,6 +1496,16 @@ Source: `src/naive-batch-processing-implementation.md`
 
 Reference: https://docs.temporal.io/worker-versioning
 
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Workers: External Payload Storage for Large Payloads
@@ -1107,6 +1517,16 @@ Trim inputs and outputs to the minimum the caller needs. Store large data in an 
 
 Reference: https://docs.temporal.io/external-storage  
 Source: `src/overflowing-maximum-individual-payload-size.md`
+
+
+
+
+
+
+
+
+
+
 
 ---
 
