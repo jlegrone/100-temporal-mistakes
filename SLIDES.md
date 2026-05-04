@@ -783,8 +783,6 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 If we need to make more changes then we can bump the change id's max version.
 
 In this case, version 2 now cancels the in-flight shipment before issuing the refund so the package doesn't get shipped after the customer has been refunded.
-
-After this latest change is deployed, any in-flight workflows that started with v1 continue evaluating the first case on replay, while new workflows take case 2. Once all workflow executions following case 1 have completed, we can remove the first case statement.
 -->
 
 ---
@@ -815,13 +813,11 @@ Any time you evaluate a change version, Temporal automatically adds a TemporalCh
 What I'm showing here is a quick way to find the earliest workflow execution that ran on the version of our code that didn't have the handle-shipment-delay change version, and a second command to find the earliest workflow that took the version 1 branch.
 
 And then in the third command, we're grabbing the workflow history and saving to a JSON file to replay in a unit test.
---> 
+-->
 
 ---
 
 ## Workflows: Verifying Replay Safety (continued)
-
-<!-- Speaker note: Run replay tests in CI against the captured fixtures. If the new code's command sequence diverges from any recorded history, the test fails before the change reaches production. Pair this with `workflowcheck` static analysis to catch the obvious sources of non-determinism. -->
 
 ```go
 func TestReplayWorkflowHistory(t *testing.T) {
@@ -842,15 +838,16 @@ And this is what that unit test might look like. We can run this locally or in C
 
 I definitely recommend setting a test harness for workflow replay, because it can also be a super powerful way to debug workflows locally when things go wrong.
 
+Having a replay test harness also makes it pretty easy to compute code coverage for your workflow and visualize it in an IDE just by running that specific test; you should be doing this to ensure that the replay test is actually exercising the parts of the workflow function that you updated.
+
 If you're interested in more techniques to ensure replay safety for workflow code changes, then please check out the talk from my colleague Jing Yi a couple years ago titled Replay Safety at Datadog.
 -->
 
 ---
 
-## Workflows: Cleaning Up Patches
+## Workflows: Cleaning Up Change Versions
 
-<!-- Speaker note: Once every running workflow has either completed or evaluated v2, the v0 and v1 branches can be deleted. Wait until this count returns 0 -- the 5-minute cutoff avoids false positives for workflows that have been started but have not yet persisted the search attribute. -->
-
+TODO: Fix formatting of the long query string since it overflows past the width of my slides.
 ```bash
 #!/bin/sh
 # Returns 0 when no in-flight workflow can still be on v0 or v1.
@@ -866,19 +863,26 @@ temporal workflow count \
   --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('handle-shipment-delay-2') AND StartTime < '$CUTOFF'"
 ```
 
+<!--
+Now after we've deployed a workflow code change, it's time to wait for the old workflows to complete and then clean up the old change version branches in our code.
+
+To verify this is safe, we can run a query like this to check if there are still any workflows running that were started with an earlier change version.
+
+Note that you'd need to do this once per namespace or Temporal cluster if you have multiple deployments of your worker.
+-->
+
 ---
 
-## Workflows: Cleaning Up Patches (continued)
+## Workflows: Cleaning Up Change Versions (continued)
 
-<!-- Speaker note: With the count at 0, it's safe to delete the v0 and v1 branches. Bumping the min supported version to 2 keeps the GetVersion call (so existing v2 histories still replay) while making replay fail with an
-explicit error if a stale v0/v1 history ever shows up. -->
-
+<!-- TODO: wordsmith the code comment, it's really unclear -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
-+    // Bump min supported version to 2 so v2 histories continue to replay,
-+    // and any leftover v0/v1 history fails loudly instead of silently diverging.
-+    workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
++    // Bump min supported version to 2 so that if we need to roll this deployment back,
++    // the previous version continues evaluating the version 2 branch for workflows that
++    // started on the latest version.
++    _ = workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
 
      // ... charge payment, ship item, select on shipment / deadline / cancelation
 
@@ -903,6 +907,12 @@ explicit error if a stale v0/v1 history ever shows up. -->
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
+
+<!--
+After we've checked that it is safe to do so, we can clean up the old code branches.
+
+Note that it is always safest to do this in two phases; first bumping the min supported version to match the max version, and a later deployment to remove the change version evaluation entirely. The reasons for this have to do with your ability to roll back to the previous version of the code, but it's kind of complicated.
+-->
 
 ---
 
@@ -935,6 +945,8 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
     return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
 }
 ```
+
+There is another subtle issue with the workflow code we've just been looking at.
 
 ---
 
@@ -975,7 +987,7 @@ func (w *Worker) startDisconnectedRefundWorkflow(ctx workflow.Context, req Refun
 
 ---
 
-## Workflows: Use Internal Timers for Compensation
+## Workflows: Use Timers, Not Timeouts
 
 > [!TIP]
 > When a workflow execution timeout fires, Temporal *terminates* the workflow -- it does not *cancel* it. No deferred functions run, no cancelation handlers fire. If you need a chance to compensate, build the deadline yourself with an internal timer.
