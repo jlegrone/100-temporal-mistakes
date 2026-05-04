@@ -875,16 +875,16 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 
 ## Workflows: Cleaning Up Change Versions (continued)
 
-<!-- TODO: wordsmith the code comment, it's really unclear -->
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
-+    // Bump min supported version to 2 so that if we need to roll this deployment back,
-+    // the previous version continues evaluating the version 2 branch for workflows that
-+    // started on the latest version.
++    // TODO: Remove this after verifying the deployment is healthy in all environments
++    //       and that we will not need to roll back to the previous worker version.
 +    _ = workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
 
-     // ... charge payment, ship item, select on shipment / deadline / cancelation
+     // Charge payment and start fulfilment ...
+
+     // Create selector ...
 
      sel.Select(ctx)
      if err != nil {
@@ -916,7 +916,7 @@ Note that it is always safest to do this in two phases; first bumping the min su
 
 ---
 
-## Workflows: Designing for Cancelation
+## Workflows: Returning Before Child Workflows Complete
 
 <!-- Speaker notes: An external fulfillment system signals the workflow once the shipment is processed. A Selector fans in that signal, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 
@@ -924,16 +924,9 @@ But this naive version uses the parent's (possibly canceled) ctx, the default Pa
 
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... reserve inventory and charge payment
+    // Charge payment and start fulfilment ...
 
-    sel := workflow.NewNamedSelector(ctx, "shipment")
-    sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
-        c.Receive(ctx, &shipmentResponse)
-    })
-    sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
-        err = workflow.ErrDeadlineExceeded
-    })
-    sel.AddReceive(ctx.Done(), func(c workflow.ReceiveChannel, more bool) { err = ctx.Err() })
+    // Create selector ...
 
     sel.Select(ctx)
     if err != nil {
@@ -946,7 +939,13 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 }
 ```
 
+<!--
 There is another subtle issue with the workflow code we've just been looking at.
+
+When we execute the RefundPayment child workflow, we're not actually waiting for it to complete before returning from our workflow function.
+
+This is actually what was intended; the Purchase workflow should return as soon as it detects the shipment error, while the refund child workflow is meant to complete asynchronously.
+-->
 
 ---
 
