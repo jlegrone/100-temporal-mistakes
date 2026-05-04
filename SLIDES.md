@@ -1027,8 +1027,24 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 ## Workflows: Cap Workflow Lifetime With ContinueAsNew
 
 ```go
-if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
-    return workflow.NewContinueAsNewError(ctx, MyWorkflow, state)
+func SubscriptionWorkflow(ctx workflow.Context, state SubscriptionState) error {
+    var workflowAgedOut bool
+
+    sel := workflow.NewSelector(ctx)
+    sel.AddFuture(workflow.NewTimer(ctx, 24*time.Hour), func(f workflow.Future) {
+        workflowAgedOut = true
+    })
+    // Add additional branches to selector ...
+
+    for sel.HasPending() {
+        sel.Select(ctx)
+
+        if workflow.GetInfo(ctx).GetContinueAsNewSuggested() || workflowAgedOut {
+            return workflow.NewContinueAsNewError(ctx, SubscriptionWorkflow, state)
+        }
+
+        // ...
+    }
 }
 ```
 
