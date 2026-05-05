@@ -267,20 +267,20 @@ But we also need to consider the worst case: what if our worker, or the payments
 
 <!-- Update the schedule to close timeout to 1h in the code example. Include code comment saying "allow retrying for up to 1 hour". -->
 
-<!-- TODO: make this a diff against the previous slide -->
-```go
-func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-    // ... generate a charge request for the item & customer
+```diff
+ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+     // ... generate a charge request for the item & customer
 
-    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-        StartToCloseTimeout:    30 * time.Second,
-        ScheduleToCloseTimeout: time.Hour, // allow retrying for up to 1 hour
-        RetryPolicy: { /* ... */ },
-    })
+     ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+         StartToCloseTimeout:    30 * time.Second,
+-        ScheduleToCloseTimeout: time.Minute,
++        ScheduleToCloseTimeout: time.Hour, // allow retrying for up to 1 hour
+         RetryPolicy: { /* ... */ },
+     })
 
-    resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
-    // ...
-}
+     resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+     // ...
+ }
 ```
 
 <!-- In this case, let's say we want to be able to recover after outages lasting up to about an hour.
@@ -560,8 +560,6 @@ And then we can just pass that along to the payments API!
 ---
 
 ## Activities: Natural Idempotency
-
-<!-- TODO(jlegrone): rehearse the transition from the payments example to this k8s example so the use-case shift lands smoothly during the talk. -->
 
 <!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
 ```go
@@ -1164,20 +1162,21 @@ If you're interested in more techniques to ensure replay safety for workflow cod
 
 ## Workflows: Cleaning Up Change Versions
 
-<!-- TODO(jlegrone): Fix formatting of the long query string since it overflows past the width of my slides. -->
 ```bash
 #!/bin/sh
 # Returns 0 when no in-flight workflow can still be on v0 or v1.
 
-# Get a timestamp for 5 minutes ago, in order to avoid counting workflow
-# executions that have been scheduled but haven't been picked up by a worker yet.
-# (use `date` on Linux)
+# Timestamp for 5 minutes ago, to avoid counting workflows that have been
+# scheduled but haven't yet been picked up by a worker. (use `date` on Linux)
 CUTOFF=$(gdate -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S.%3NZ)
 
-# Count how many workflows are still running with a handle-shipment-delay change
-# version less than 2.
-temporal workflow count \
-  --query "WorkflowType='PurchaseItem' AND ExecutionStatus='Running' AND TemporalChangeVersion NOT IN ('handle-shipment-delay-2') AND StartTime < '$CUTOFF'"
+# Count workflows still running on a handle-shipment-delay version < 2.
+QUERY="WorkflowType='PurchaseItem'"
+QUERY+=" AND ExecutionStatus='Running'"
+QUERY+=" AND TemporalChangeVersion NOT IN ('handle-shipment-delay-2')"
+QUERY+=" AND StartTime < '$CUTOFF'"
+
+temporal workflow count --query "$QUERY"
 ```
 
 <!--
@@ -1438,5 +1437,3 @@ Temporal workers:
 - SHOULD have a replay testing harness.
 - SHOULD be onboarded to worker versioning and pinned workflows.
 - SHOULD enable external payload storage if activity responses are ~1MB or larger.
-
-1. OR use child workflows with ParentClosePolicy of RequestCancel and Signal sentinel pattern.
