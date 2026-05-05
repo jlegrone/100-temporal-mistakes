@@ -1412,6 +1412,12 @@ func SubscriptionWorkflow(ctx workflow.Context, state SubscriptionState) error {
         // ...
     }
 }
+
+func continueAsNewSuggested(ctx workflow.Context) bool {
+    info := workflow.GetInfo(ctx)
+    return info.GetContinueAsNewSuggested() ||
+        workflow.Now(ctx).After(info.WorkflowStartTime + 24*time.Hour - time.Second)
+}
 ```
 
 Any workflow expected to run for more than 24 hours should implement Continue-As-New, and use both ContinueAsNewSuggested and workflow execution time as triggers for it.

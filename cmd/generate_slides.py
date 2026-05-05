@@ -95,6 +95,7 @@ class Slide:
     content: list[ContentItem] = field(default_factory=list)
     code_blocks: list[CodeBlock] = field(default_factory=list)
     images: list[ImageRef] = field(default_factory=list)
+    image_before_content: bool = False  # True if first image appeared before any content
     speaker_notes: list[str] = field(default_factory=list)
     is_part_header: bool = False  # # Part headings
 
@@ -200,6 +201,8 @@ def _parse_slide_block(block: str) -> Slide:
         img_match = re.match(r"!\[(.*?)\]\((.+?)\)\s*$", stripped)
         if img_match:
             ref = ImageRef(alt=img_match.group(1), path=img_match.group(2))
+            if not slide.images and not slide.content:
+                slide.image_before_content = True
             slide.images.append(ref)
             pending_caption_for = ref
             continue
@@ -684,10 +687,33 @@ def _render_content_slide(
         )
 
     content_top = 1.5
+    content_bottom = content_top  # updated by branches below
     items = slide_data.content
     has_items = bool(items)
     has_code = bool(slide_data.code_blocks)
     has_image = bool(slide_data.images and Path(slide_data.images[0].path).exists())
+
+    # If the markdown placed the image before any content, render it first.
+    if has_image and slide_data.image_before_content and not has_code:
+        img_path = Path(slide_data.images[0].path)
+        try:
+            from PIL import Image as _PILImage
+            with _PILImage.open(img_path) as im:
+                aspect = im.width / im.height if im.height else 1.0
+        except Exception:
+            aspect = 1.0
+        # Reserve up to 4.5" of height for the image; leave room for text below.
+        reserved_for_text = 1.5 if has_items else 0.0
+        max_img_h = 7.5 - content_top - reserved_for_text - 0.2
+        img_h = min(4.5, max_img_h)
+        img_w = min(12.0, img_h * aspect)
+        img_left = 0.6 + (12.0 - img_w) / 2
+        slide.shapes.add_picture(
+            str(img_path), Inches(img_left), Inches(content_top), width=Inches(img_w),
+        )
+        content_top += img_h + 0.2
+        content_bottom = content_top
+        has_image = False  # consumed
 
     if has_items and has_code:
         # Content on top, code below.  Estimate prose space using the same
@@ -700,6 +726,7 @@ def _render_content_slide(
         code_top = content_top + items_height + 0.15
         remaining = 7.5 - code_top - 0.2
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, code_top, 12.0, remaining, carbon_images)
+        content_bottom = code_top + remaining
     elif has_items:
         # Estimate visual lines per item. Calibrated: 12" wide @ 22pt fits ~70 chars
         # in the body font, so each pt scales the chars/line ratio inversely.
@@ -742,13 +769,27 @@ def _render_content_slide(
             slide, items, meta, 0.6, content_top, 12.0, box_h,
             font_size=font_size,
         )
+        content_bottom = content_top + box_h
     elif has_code:
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, content_top, 12.0, 5.8, carbon_images)
+        content_bottom = content_top + 5.8
 
     if has_image:
         img_path = Path(slide_data.images[0].path)
+        # Position the image after any text content so they don't overlap.
+        img_top = content_bottom + (0.2 if has_items or has_code else 0.0)
+        # Pick a width that fits within the remaining vertical room.
+        try:
+            from PIL import Image
+            with Image.open(img_path) as im:
+                aspect = im.width / im.height if im.height else 1.0
+        except Exception:
+            aspect = 1.0
+        avail_h = max(0.5, 7.5 - img_top - 0.2)
+        img_w = min(12.0, avail_h * aspect)
+        img_left = 0.6 + (12.0 - img_w) / 2
         slide.shapes.add_picture(
-            str(img_path), Inches(0.6), Inches(content_top), width=Inches(12.0),
+            str(img_path), Inches(img_left), Inches(img_top), width=Inches(img_w),
         )
 
     _set_speaker_notes(slide, slide_data.speaker_notes)
