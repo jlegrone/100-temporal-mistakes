@@ -29,26 +29,16 @@ Follow Along:
 [Follow along: jacob.work/100TM](https://jacob.work/100TM)
 
 <!-- Speaker notes:
-The way this talk came to be is that a few years ago I got looped into a project at work to help launch a new product called Datadog Oncall (and I promise this is not an ad). But the reason the team came to me was because they were planning to build it on top of Temporal. At Datadog we always want to maintain a high standard of availability and so on for our services, but this had an even higher bar to meet than usual because we wanted be confident in allowing any core engineering team at Datadog to be able to route their own pages through this system despite the potential circular runtime dependencies that you can imagine making life difficult.
+The way this talk came to be is that a few years ago I got looped into a project at work to help launch a new product called Datadog Oncall (and I promise this is not an ad). But the reason the team came to me was because they were planning to build it on top of Temporal. At Datadog we always want to maintain a high standard of operational excellence for our services, but this had an even higher bar to meet than usual because we wanted be confident in allowing any core engineering team within Datadog to be able to route their own pages through this system despite it also running on top of Datadog infrastructure.
 
-Now I've always enjoyed thinking about all the things that can theoretically go wrong in distributed systems. But suddenly I was fielding all kinds of questions from this new product team about activity execution semantics and retry policies and change versioning and parent close policies and so on, because the team was being so incredibly thorough. And as we were having these conversations, I was wishing that I had some way of capturing these tidbits in a way that could be digestible and simple to follow for anyone else using Temporal at our company.
+So I've always enjoyed thinking about all the things that can theoretically go wrong in distributed systems. But suddenly I was fielding all kinds of questions from this new product team about activity execution semantics and change versioning and parent close policies and so on, because they were being so incredibly thorough. And as we were having these conversations, I was wishing that I had some way of capturing our insights in a way that could be digestible and simple to follow for anyone else using Temporal at our company.
 
 So that is how 100 Temporal Mistakes was born, and my hope in preparing this talk is that I could shed light on some of the less obvious things that can go wrong, and also provide practical guidance that you can apply every day when developing Temporal backed applications.
 
-Please note that the advice I'm giving is extremely picky. You certainly don't need to follow all of it, and some may not make sense at all depending on how you're using Temporal. That said, please feel free to roast me in the Q&A if you disagree with anything I say.
+Please note that I don't mean for this to be overly prescriptive. You certainly don't need to follow all of it, and some may not make sense at all depending on how you're using Temporal.
 
 Also by the way for anyone who hasn't done the math yet, 100 mistakes in 35 minutes gives us about 20 seconds per mistake. So I'm just going to do a highlights tour, but you can find more content at the link on the slide.
  -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
