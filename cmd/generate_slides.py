@@ -321,8 +321,10 @@ _CARBON_PARAMS = {
 
 
 def _carbon_cache_key(code: str, language: str) -> str:
-    """Deterministic hash for a code block to use as a cache key."""
-    h = hashlib.sha256(f"{language}\n{code}".encode()).hexdigest()[:16]
+    """Deterministic hash for a code block to use as a cache key.
+    Includes carbon style params so changing fs/width busts the cache."""
+    style = f"{_CARBON_PARAMS.get('fs', '')}|{_CARBON_PARAMS.get('width', '')}|{_CARBON_PARAMS.get('fm', '')}"
+    h = hashlib.sha256(f"{style}\n{language}\n{code}".encode()).hexdigest()[:16]
     return h
 
 

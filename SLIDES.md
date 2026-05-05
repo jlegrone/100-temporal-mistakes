@@ -52,19 +52,9 @@ Activities must deal with:
 - Worker crashes & hangs
 - Temporal server disruptions
 
-<!-- Part One is all about activities. And I'm starting here because, let's face it, workflows are a bit more glamorous with their determinism and durability and signals and so on, but I think there's a lot of subtlety about how we need to design activities and the policy around them that is often glossed over when starting out with Temporal.
+<!-- Part One is all about activities. And I'm starting here because, let's face it, workflows are a bit more glamorous with their determinism and durability and signals, but I think there's a lot of subtlety about how we need to design activities and the policy around them that can be glossed over when starting out with Temporal.
 
-So activities have a lot of responsibility. They're the main window through which workflows are able to interact with the outside world. That means they also have to put up with all sorts of system disruptions that our workflow code can happily sleep through until it's time to be woken up again. -->
-
-
-
-
-
-
-
-
-
-
+Activities have a lot of responsibility. They're the main window through which workflows are able to interact with the outside world. That means they also have to put up with all sorts of system disruptions that our workflow code can happily sleep through until it's time to be woken up again. -->
 
 ---
 
@@ -85,16 +75,6 @@ And that's really convenient, but Temporal can't magically ensure that our activ
 
 So let's dive into how to write reliable, well-behaved activities.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -126,16 +106,6 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of failure conditions that shouldn't result in the activity being retried.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Avoid Amplifying Invalid Requests
@@ -157,16 +127,6 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 <!--
 One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Assuming that retrying won't change the shape of the request being sent, we should probably update our activity to translate this into a non-retryable error so that the activity fails fast.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -200,16 +160,6 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 So now our activity checks for the TooManyRequests HTTP status and calculates a next retry delay based on the `Retry-After` HTTP response header if it has been set. Otherwise we can just increase the next retry delay be a factor of 2.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Weathering System Outages
@@ -238,18 +188,6 @@ We've also set a 1 minute Schedule To Close timeout, which should be plenty of t
 
 But we also need to consider the worst case: what if our worker, or the payments API, are down for an extended period of time? Would it be preferable for our workflow to observe that the activity has timed out after 1 minute, or is it better to allow more time for an outage to be resolved and for the activity to complete successfully?
 -->
-
-<!-- Speaker note: Temporal is great at retrying activities, but it's still important to think carefully about how we configure timeouts and retry policies in order to survive worst case system outages. For example here I'm invoking my activity with a schedule to close timeout that doesn't give much room for the activity to be retried if the worker or downstream API are temporarily unavailble. -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -319,16 +257,6 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*Purch
 
 <!-- Well, sort of. It turns out we were really thorough and also specified a retry policy. The problem here is that because we only allow a maximum of 3 attempts, in practice we exhaust our retries really quickly. -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Weathering System Outages (continued)
@@ -337,19 +265,9 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*Purch
 
 [docs.temporal.io/develop/activity-retry-simulator](https://docs.temporal.io/develop/activity-retry-simulator)
 
-<!-- To inpect the behavior of your timeout and retry policy config, Temporal actually provides a nice little simulator which is helpful since there's some math involved.
+<!-- As a quick aside, Temporal actually provides a nice little simulator to inpect the behavior of your timeout and retry policy configuration which is helpful since there's some math involved.
 
 If we plug in the policy from the previous slide, we can confirm that the activity could actually be marked as failed after only 6 seconds! Obviously this is way off our target of surviving outages up to 1 hour. -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -415,18 +333,8 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*Purch
 <!--
 So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
 
-Just to be clear though: I'm not saying you should never specify retry policy or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
+Just to be clear though: I'm not saying you should never specify max attempts or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -442,16 +350,6 @@ A term that gets thrown around a lot when talking about activities is idempotenc
 It turns out this is a really important property for activities to have, because they're getting retried all the time. And we really don't want to do something like charging a customer 20 times for the same purchase just because there was a temporary system outage.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Implementing Idempotency
@@ -466,22 +364,8 @@ Common techniques to achieve idempotency:
     - May help to decompose into multiple activities.
 
 <!-- 
-Unfortunately implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
-
-In our activities, we still might need to come up with a stable identifier that remains the same across all attempts in order to deduplicate requests to downstream services or resources that the activity creates. ** TODO fix
-
-Sometimes making an activity idempotent is really hard, until you split it up into multiple activities that are each invoked separately in the workflow.
+Implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -497,17 +381,7 @@ Common techniques to achieve idempotency:
     - May help to decompose into multiple activities.
 - ~~Setting `MaxAttempts: 1` in retry policy~~
 
-<!-- I also want to note that, just in case you're thinking that it's ok to not have idempotent behavior if you set MaxAttempts to 1 in your retry policy, you should be aware that Temporal does not guarantee exactly once execution for activities. This has to do with the way server replication and failover works, so it's probably ok if you're self-hosting a single Temporal cluster but even that could change. -->
-
-
-
-
-
-
-
-
-
-
+<!-- I also want to note that, just in case you're thinking that it's ok to not have idempotent behavior if you set MaxAttempts to 1 in your retry policy, you should be aware that Temporal does not guarantee at most once execution for activities. This has to do with the way server replication and failover works, so it's probably ok if you're self-hosting a single Temporal cluster but even that could change. -->
 
 ---
 
@@ -536,16 +410,6 @@ So here I've add a function to generate an opaque string based on the workflow I
 
 And then we can just pass that along to the payments API!
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -580,16 +444,6 @@ func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJ
 The problem here is that if the activity fails or the worker is redeployed during the for loop, then on the next attempt the activity will fail at creating a job with the same name instead of skipping creation and getting the status of the existing job. No matter how many times the activity is retried, it would keep hitting that same error.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Natural Idempotency (continued)
@@ -612,17 +466,10 @@ The problem here is that if the activity fails or the worker is redeployed durin
  }
 ```
 
-<!-- So the smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it if not. -->
+<!-- So the smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it if not.
 
-
-
-
-
-
-
-
-
-
+So it's possible to keep activities idempotent, even if they perform multiple operations.
+-->
 
 ---
 
@@ -649,16 +496,6 @@ func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*
 
 Note that I still kept the already exists check in the new `StartKubernetesJob` activity though. Even though it's not likely, a network partition or a poorly timed worker crash could still mean that the activity is retried even after the Create API call succeeds. But reducing the scope of what the activity does still makes reasoning about idempotency a bit simpler.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
