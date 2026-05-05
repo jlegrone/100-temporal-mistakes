@@ -1327,9 +1327,7 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
  }
 
  func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
-     ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
-         ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-     })
+     ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
      ctx, _ = workflow.NewDisconnectedContext(ctx)
      fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
      // Block until child workflow start
