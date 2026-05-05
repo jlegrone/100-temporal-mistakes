@@ -57,6 +57,7 @@ Also by the way for anyone who hasn't done the math yet, 100 mistakes in 35 minu
 Activities are how Temporal workers interact with the outside world.
 
 Activities must deal with:
+
 - Downstream service errors
 - Worker crashes & hangs
 - Temporal server disruptions
@@ -82,6 +83,7 @@ So activities have a lot of responsibility. They're the main window through whic
 Temporal server provides an "at least once" execution semantic and retries activities by default.
 
 It's on us to:
+
 - Implement idempotency
 - Gracefully handle cancelation
 - Not amplify bad requests
