@@ -193,7 +193,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
     case http.StatusTooManyRequests:
         // Honor the server's hint when present; otherwise back off
         // more aggressively than the policy's default.
-        delay := activityhelpers.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+        delay := activityhelpers.ParseRetryAfter(
+            resp.Header.Get("Retry-After"), time.Now())
         if delay == 0 {
             delay = activityhelpers.GetNextRetryDelay(ctx) * 2
         }
@@ -374,7 +375,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
         StartToCloseTimeout:    30 * time.Second,
         ScheduleToCloseTimeout: time.Hour,
         RetryPolicy: &temporal.RetryPolicy{
-            // MaximumAttempts: 0, // allow unlimited attempts until the ScheduleToClose timeout is reached
+            // MaximumAttempts: 0, // unlimited; bound by ScheduleToCloseTimeout
             InitialInterval:    time.Second,
             BackoffCoefficient: 2,
             MaximumInterval:    100 * time.Second,
@@ -534,7 +535,8 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 
 func getIdempotencyToken(ctx context.Context) string {
 	info := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
+	key := fmt.Sprintf("%s:%s:%s",
+		info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
 ```
@@ -728,7 +730,7 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
     // Wait for the job to complete
     return workflowhelpers.AwaitActivity(
         workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-            // This activity may run for a long time, so use Heartbeat instead of StartToClose timeout.
+            // Long-running activity: prefer Heartbeat over StartToClose timeout.
             HeartbeatTimeout:       30 * time.Second,
             ScheduleToCloseTimeout: time.Hour,
         }),
@@ -944,23 +946,26 @@ But beyond just making sure we use change versions when modifying workflows, we 
      // Charge payment and start fulfilment ...
 
      sel := workflow.NewNamedSelector(ctx, "shipment")
-     sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
+     sel.AddReceive(
+         workflow.GetSignalChannel(ctx, "shipment-processed"),
+         func(c workflow.ReceiveChannel, more bool) {
          c.Receive(ctx, &shipmentResponse)
      })
      sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
+
          err = workflow.ErrDeadlineExceeded
      })
-
      sel.Select(ctx)
      if err != nil {
-+        delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
++        delayVersion := workflow.GetVersion(ctx,
++            "handle-shipment-delay", workflow.DefaultVersion, 1)
 +        switch delayVersion {
 +        case 1:
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+
 +        }
          return nil, err
      }
-
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
@@ -996,27 +1001,30 @@ The reason this matters is that we want ALL workflow executions started after th
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
-+    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
++    delayVersion := workflow.GetVersion(ctx,
+
++        "handle-shipment-delay", workflow.DefaultVersion, 1)
 
      // Charge payment and start fulfilment ...
-
      sel := workflow.NewNamedSelector(ctx, "shipment")
-     sel.AddReceive(workflow.GetSignalChannel(ctx, "shipment-processed"), func(c workflow.ReceiveChannel, more bool) {
+     sel.AddReceive(
+         workflow.GetSignalChannel(ctx, "shipment-processed"),
+         func(c workflow.ReceiveChannel, more bool) {
          c.Receive(ctx, &shipmentResponse)
      })
+
      sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
          err = workflow.ErrDeadlineExceeded
      })
-
      sel.Select(ctx)
      if err != nil {
 +        switch delayVersion {
 +        case 1:
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+
 +        }
          return nil, err
      }
-
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
@@ -1040,11 +1048,13 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
--    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
-+    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
+-    delayVersion := workflow.GetVersion(ctx,
+-        "handle-shipment-delay", workflow.DefaultVersion, 1)
 
++    delayVersion := workflow.GetVersion(ctx,
+
++        "handle-shipment-delay", workflow.DefaultVersion, 2)
      // ...
-
      sel.Select(ctx)
      if err != nil {
          switch delayVersion {
@@ -1052,14 +1062,18 @@ The fix is simple, we just need to hoist the version check to the top of the wor
              workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        case 2:
 +            // Cancel the in-flight shipment before issuing the refund.
-+            if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
-+                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
++            cancelErr := workflowhelpers.AwaitActivity(
++                ctx, w.CancelShipment, cancelRequest)
++            if cancelErr != nil {
++                workflow.GetLogger(ctx).Warn(
++                    "failed to cancel shipment", "error", cancelErr)
+
 +            }
-+            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
++            workflow.ExecuteChildWorkflow(
++                ctx, w.RefundPayment, refundRequest)
          }
          return nil, err
      }
-
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
@@ -1086,15 +1100,17 @@ In this case, version 2 now cancels the in-flight shipment before issuing the re
 
 ```bash
 # Find the earliest workflow that did not hit either patch branch
-temporal workflow list \
-  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion NOT IN ("handle-shipment-delay-1", "handle-shipment-delay-2")' \
-  --order-by 'StartTime ASC' --limit 1
+LIST_QUERY="WorkflowType='PurchaseItem'"
+LIST_QUERY+=" AND TemporalChangeVersion NOT IN"
+LIST_QUERY+=" ('handle-shipment-delay-1', 'handle-shipment-delay-2')"
+
+temporal workflow list --query "$LIST_QUERY" --order-by 'StartTime ASC' --limit 1
 
 # Find the earliest workflow that took version 1 of the patch.
-temporal workflow list \
-  --query 'WorkflowType="PurchaseItem" AND TemporalChangeVersion IN ("handle-shipment-delay-1")' \
-  --order-by 'StartTime ASC' --limit 1
+LIST_QUERY="WorkflowType='PurchaseItem'"
+LIST_QUERY+=" AND TemporalChangeVersion IN ('handle-shipment-delay-1')"
 
+temporal workflow list --query "$LIST_QUERY" --order-by 'StartTime ASC' --limit 1
 # Download workflow history to a test fixture path.
 temporal workflow show --workflow-id <ID> --output json \
   > testdata/purchase_item_history_<PATCH_VERSION>.json
@@ -1203,29 +1219,37 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
--    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
-+    // TODO: Remove deperecated change version after worker is deployed in all environments.
+-    delayVersion := workflow.GetVersion(ctx,
+-        "handle-shipment-delay", workflow.DefaultVersion, 2)
++    // TODO: drop this once the new worker is rolled out everywhere.
+
 +    _ = workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
 
      // ...
-
      sel.Select(ctx)
      if err != nil {
 -        switch delayVersion {
 -        case 1: /* ... */
 -        case 2:
--            if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
--                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
+-            cancelErr := workflowhelpers.AwaitActivity(
+-                ctx, w.CancelShipment, cancelRequest)
+-            if cancelErr != nil {
+-                workflow.GetLogger(ctx).Warn(
+-                    "failed to cancel shipment", "error", cancelErr)
 -            }
--            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+-            workflow.ExecuteChildWorkflow(
+-                ctx, w.RefundPayment, refundRequest)
 -        }
-+        if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
-+            workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
++        cancelErr := workflowhelpers.AwaitActivity(
+
++            ctx, w.CancelShipment, cancelRequest)
++        if cancelErr != nil {
++            workflow.GetLogger(ctx).Warn(
++                "failed to cancel shipment", "error", cancelErr)
 +        }
 +        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          return nil, err
      }
-
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 ```
@@ -1260,13 +1284,14 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*P
 
     sel.Select(ctx)
     if err != nil {
-        if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
+        cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
+        if cancelErr != nil {
             workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
         }
         workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
         return nil, err
-    }
 
+    }
     return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
 }
 ```
@@ -1307,19 +1332,21 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
      sel.Select(ctx)
      if err != nil {
-         if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
+         cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
+         if cancelErr != nil {
              workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
          }
 -        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
-+        if startErr := executeDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest); startErr != nil {
++        startErr := executeDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest)
++        if startErr != nil {
 +            workflow.GetLogger(ctx).Warn("failed to start refund", "error", startErr)
 +        }
+
          return nil, err
      }
 
      return &PurchaseItemResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
-
 +func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
 +    ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
 +        ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
@@ -1348,27 +1375,24 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
      // ...
-
 +    // Reserve at least 1 minute for compensation before the hard timeout.
 +    softTimeout, err := getSoftTimeout(ctx, time.Minute)
 +    if err != nil {
 +        return nil, err
 +    }
-
 +    sel.AddFuture(softTimeout, func(f workflow.Future) {
 +        // Run compensating actions now! Workflow terminating in 1 minute...
 +    })
-
     // ...
  }
 
-+func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
-+    timeout := workflow.GetInfo(ctx).WorkflowRunTimeout
-+    if timeout <= padding {
-+        return nil, errTimeoutTooSmall(padding) // non-retryable application error
-+    }
-+    return workflow.NewTimer(ctx, timeout - padding), nil
-+}
+ func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
+     timeout := workflow.GetInfo(ctx).WorkflowRunTimeout
+     if timeout <= padding {
+         return nil, errTimeoutTooSmall(padding) // non-retryable application error
+     }
+     return workflow.NewTimer(ctx, timeout - padding), nil
+ }
 ```
 
 <!-- When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached. -->
