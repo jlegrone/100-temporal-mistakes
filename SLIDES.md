@@ -1215,11 +1215,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 <!-- Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control. -->
 
-
-
-
-
-
 ---
 
 ## Workflows: Design Guidelines
@@ -1237,3 +1232,11 @@ Temporal workers:
 - SHOULD have a replay testing harness.
 - SHOULD be onboarded to worker versioning and pinned workflows.
 - SHOULD enable external payload storage if activity responses are ~1MB or larger.
+
+---
+
+## Acknowledgements
+
+- [100 Go Mistakes](https://100go.co) by Teiva Harsanyi
+- Loïc Minaudier (software engineer @Datadog)
+- Participants in the "common Temporal mistakes" birds of a feather (Replay 2025)
