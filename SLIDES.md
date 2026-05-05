@@ -193,8 +193,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
     case http.StatusTooManyRequests:
         // Honor the server's hint when present; otherwise back off
         // more aggressively than the policy's default.
-        delay := activityhelpers.ParseRetryAfter(
-            resp.Header.Get("Retry-After"), time.Now())
+        delay := activityhelpers.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
         if delay == 0 {
             delay = activityhelpers.GetNextRetryDelay(ctx) * 2
         }
@@ -535,8 +534,7 @@ func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeR
 
 func getIdempotencyToken(ctx context.Context) string {
 	info := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%s",
-		info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
+	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
 ```
@@ -1330,15 +1328,15 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
-+func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
-+    ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
-+        ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
-+    })
-+    ctx, _ = workflow.NewDisconnectedContext(ctx)
-+    fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
-+    // Block until child workflow start
-+    return fut.GetChildWorkflowExecution().Get(ctx, nil)
-+}
+ func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
+     ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
+         ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
+     })
+     ctx, _ = workflow.NewDisconnectedContext(ctx)
+     fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
+     // Block until child workflow start
+     return fut.GetChildWorkflowExecution().Get(ctx, nil)
+ }
 ```
 
 
