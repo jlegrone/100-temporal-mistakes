@@ -1207,19 +1207,15 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
-+    // TODO: Remove this after verifying the deployment is rolled out in all environments
-+    //       and no instances of the previous worker version remain.
++    // TODO: Remove deperecated change version after worker is deployed in all environments.
 +    _ = workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
 
-     // Charge payment and start fulfilment ...
-
-     // Create selector ...
+     // ...
 
      sel.Select(ctx)
      if err != nil {
 -        switch delayVersion {
--        case 1:
--            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+-        case 1: /* ... */
 -        case 2:
 -            if cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); cancelErr != nil {
 -                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
