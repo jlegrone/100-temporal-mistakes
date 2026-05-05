@@ -1060,7 +1060,7 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 +            // Cancel the in-flight shipment before issuing the refund.
 +            cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
 +            if cancelErr != nil {
-+                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
++                log.Warn("failed to cancel shipment", "error", cancelErr)
 +            }
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          }
@@ -1222,13 +1222,13 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 -        case 2:
 -            cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
 -            if cancelErr != nil {
--                workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
+-                log.Warn("failed to cancel shipment", "error", cancelErr)
 -            }
 -            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 -        }
 +        cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
 +        if cancelErr != nil {
-+            workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
++            log.Warn("failed to cancel shipment", "error", cancelErr)
 +        }
 +        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          return nil, err
@@ -1269,7 +1269,7 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*Purch
     if err != nil {
         cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
         if cancelErr != nil {
-            workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
+            log.Warn("failed to cancel shipment", "error", cancelErr)
         }
         workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
         return nil, err
@@ -1317,12 +1317,12 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
      if err != nil {
          cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
          if cancelErr != nil {
-             workflow.GetLogger(ctx).Warn("failed to cancel shipment", "error", cancelErr)
+             log.Warn("failed to cancel shipment", "error", cancelErr)
          }
 -        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        startErr := executeDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        if startErr != nil {
-+            workflow.GetLogger(ctx).Warn("failed to start refund", "error", startErr)
++            log.Warn("failed to start refund", "error", startErr)
 +        }
 
          return nil, err
