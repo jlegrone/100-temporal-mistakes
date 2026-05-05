@@ -312,7 +312,7 @@ _CARBON_PARAMS = {
     "ln": "false",
     "fl": "1",
     "fm": "Hack",
-    "fs": "14px",
+    "fs": "18px",
     "lh": "133%",
     "si": "false",
     "es": "2x",
