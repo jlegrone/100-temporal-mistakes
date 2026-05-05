@@ -514,7 +514,7 @@ def _render_title_slide(prs: Presentation, slide_data: Slide, meta: Presentation
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
+    p.alignment = PP_ALIGN.LEFT
     _add_formatted_runs(
         p, slide_data.title or meta.title,
         font_name=theme.font_heading, font_size=44, color=theme.title_color, bold=True,
@@ -527,7 +527,7 @@ def _render_title_slide(prs: Presentation, slide_data: Slide, meta: Presentation
         tf = txBox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT
         _add_formatted_runs(p, subtitle, font_name=theme.font_body, font_size=24, color=theme.text_color)
 
     # Content (paragraphs + bullets in source order)
@@ -569,7 +569,7 @@ def _render_title_slide(prs: Presentation, slide_data: Slide, meta: Presentation
         txBox = _add_textbox(slide, 1.0, 6.7, 11.33, 0.5)
         tf = txBox.text_frame
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT
         run = p.add_run()
         run.text = meta.author
         run.font.name = theme.font_body
@@ -584,35 +584,35 @@ def _render_section_slide(prs: Presentation, slide_data: Slide, meta: Presentati
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _set_slide_bg(slide, theme.accent_color)
 
-    # Title
-    txBox = _add_textbox(slide, 1.0, 1.4, 11.33, 1.2)
+    # Title (left-aligned)
+    txBox = _add_textbox(slide, 0.6, 1.4, 12.13, 1.2)
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.CENTER
+    p.alignment = PP_ALIGN.LEFT
     _add_formatted_runs(p, slide_data.title, font_name=theme.font_heading, font_size=40, color="#FFFFFF", bold=True)
 
     paragraphs = slide_data.paragraphs
     bullets = slide_data.bullets
 
-    # Lead paragraphs (no bullet dots, larger body text), centered under title.
+    # Lead paragraphs (no bullet dots, larger body text), left-aligned under title.
     next_top = 2.8
     if paragraphs:
         para_items = [ContentItem(kind="paragraph", text=t) for t in paragraphs]
         para_height = min(len(paragraphs) * 0.6 + 0.2, 2.2)
         _render_content_box(
-            slide, para_items, meta, 1.0, next_top, 11.33, para_height,
-            color_override="#FFFFFF", align=PP_ALIGN.CENTER, font_size=22,
+            slide, para_items, meta, 0.6, next_top, 12.13, para_height,
+            color_override="#FFFFFF", align=PP_ALIGN.LEFT, font_size=22,
         )
         next_top += para_height + 0.2
 
-    # Bullets in a tight centered group under the lead.
+    # Bullets in a tight left-aligned group under the lead.
     if bullets:
         bullet_items = [ContentItem(kind="bullet", text=t) for t in bullets]
         bullet_height = min(len(bullets) * 0.45 + 0.2, 7.4 - next_top)
         _render_content_box(
-            slide, bullet_items, meta, 2.5, next_top, 8.33, bullet_height,
-            color_override="#FFFFFF", align=PP_ALIGN.CENTER, font_size=20,
+            slide, bullet_items, meta, 1.0, next_top, 11.73, bullet_height,
+            color_override="#FFFFFF", align=PP_ALIGN.LEFT, font_size=20,
         )
 
     _set_speaker_notes(slide, slide_data.speaker_notes)

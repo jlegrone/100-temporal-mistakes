@@ -56,7 +56,7 @@ Also by the way for anyone who hasn't done the math yet, 100 mistakes in 35 minu
 
 Activities are how Temporal workers interact with the outside world.
 
-Activities have to deal with:
+Activities must deal with:
 - Downstream service errors
 - Worker crashes & hangs
 - Temporal server disruptions
