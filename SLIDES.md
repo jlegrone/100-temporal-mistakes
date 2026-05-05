@@ -1253,7 +1253,7 @@ Note that it is always safest to do this in two phases; first bumping the min su
 
 ---
 
-## Workflows: Returning Before Child Workflows Complete
+## Workflows: Disconnected Child Workflows
 
 <!-- Speaker notes: An external fulfillment system signals the workflow once the shipment is processed. A Selector fans in that signal, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 
@@ -1262,7 +1262,6 @@ But this naive version uses the parent's (possibly canceled) ctx, the default Pa
 ```go
 func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
     // ...
-
     sel.Select(ctx)
     if err != nil {
         cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
@@ -1297,7 +1296,7 @@ This is actually what was intended; the Purchase workflow should return as soon 
 
 ---
 
-## Workflows: Returning Before Child Workflows Complete (continued)
+## Workflows: Disconnected Child Workflows (continued)
 
 <!-- Speaker notes: Three changes make the refund actually compensate the customer.
 
@@ -1310,7 +1309,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
      // ...
-
      sel.Select(ctx)
      if err != nil {
          cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
@@ -1328,6 +1326,7 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
+
  func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
      ctx = workflow.WithChildOptions(workflow.ChildWorkflowOptions{
          ParentClosePolicy: enums.PARENT_CLOSE_POLICY_ABANDON,
