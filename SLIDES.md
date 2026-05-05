@@ -1205,8 +1205,8 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
-+    // TODO: Remove this after verifying the deployment is healthy in all environments
-+    //       and that we will not need to roll back to the previous worker version.
++    // TODO: Remove this after verifying the deployment is rolled out in all environments
++    //       and no instances of the previous worker version remain.
 +    _ = workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
 
      // Charge payment and start fulfilment ...
