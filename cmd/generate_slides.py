@@ -723,8 +723,8 @@ def _render_content_slide(
         text_lines = sum(max(1, -(-len(c.text) // cpl)) for c in items)
         items_height = min(7.5 - content_top - 1.5, max(0.6, text_lines * 0.32 + 0.2))
         _render_content_box(slide, items, meta, 0.6, content_top, 12.0, items_height, font_size=text_font)
-        code_top = content_top + items_height + 0.15
-        remaining = 7.5 - code_top - 0.2
+        code_top = content_top + items_height
+        remaining = 7.5 - code_top
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, code_top, 12.0, remaining, carbon_images)
         content_bottom = code_top + remaining
     elif has_items:
@@ -771,8 +771,9 @@ def _render_content_slide(
         )
         content_bottom = content_top + box_h
     elif has_code:
-        _render_code_region(slide, slide_data.code_blocks, meta, 0.6, content_top, 12.0, 5.8, carbon_images)
-        content_bottom = content_top + 5.8
+        code_h = 7.5 - content_top
+        _render_code_region(slide, slide_data.code_blocks, meta, 0.6, content_top, 12.0, code_h, carbon_images)
+        content_bottom = content_top + code_h
 
     if has_image:
         img_path = Path(slide_data.images[0].path)
@@ -885,7 +886,7 @@ def _render_code_images(
     from PIL import Image
 
     current_top = top
-    gap = 0.1
+    gap = 0.0
 
     # Measure all images to calculate proportional sizing
     measurements: list[tuple[CodeBlock, Path, int, int]] = []

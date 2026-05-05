@@ -1045,9 +1045,7 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
 +    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
 
-     // Charge payment and start fulfilment ...
-
-     // Create selector ...
+     // ...
 
      sel.Select(ctx)
      if err != nil {
@@ -1414,110 +1412,9 @@ func continueAsNewSuggested(ctx workflow.Context) bool {
 }
 ```
 
-Any workflow expected to run for more than 24 hours should implement Continue-As-New, and use both ContinueAsNewSuggested and workflow execution time as triggers for it.
+<!-- Any workflow expected to run for more than 24 hours should implement Continue-As-New, and use both ContinueAsNewSuggested and workflow execution time as triggers for it. -->
 
 <!-- Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control. -->
-
-
-
-
-
-
-
-
-
-
-
----
-
-## Workflows: Drain Signals Before Completing
-
-> [!TIP]
-> If a workflow completes or calls ContinueAsNew while signals are buffered in its channel, those signals are silently lost. Drain the channel before returning.
-
-```go
-for {
-    var signal MySignal
-    if ok := signalCh.ReceiveAsync(&signal); !ok {
-        break
-    }
-    state.Apply(signal)
-}
-return workflow.NewContinueAsNewError(ctx, MyWorkflow, state)
-```
-
-Apply the drained signals to your state -- don't just read and discard them. Make sure all completion paths (success, error, ContinueAsNew) include draining.
-
-Source: `src/not_draining_signals_before_completing_workflow/`
-
-
-
-
-
-
-
-
-
-
-
----
-
-## Workflows: Fan Out Large Batches to Child Workflows
-
-> [!TIP]
-> Concentrating all batch work in one workflow causes history overflow and lock contention. Distribute work across child workflows instead.
-
-Activities scheduled concurrently compete for the workflow lock, and large histories push against the 50k event limit. Split work into size-limited batches and handle each batch in a separate child workflow. Nest as needed -- batches of batches -- to create a tree with concurrency control at each level.
-
-Source: `src/naive-batch-processing-implementation.md`
-
-
-
-
-
-
-
-
-
-
-
----
-
-## Workers: Worker Versioning and Pinned Workflows
-
-> [!TIP]
-> Worker versioning with pinned workflows ensures each running workflow replays against the same code version it started on -- removing most of the patching burden as deployments roll forward.
-
-<!-- TODO(jlegrone): backfill from a dedicated mistake entry once one is written; for now, link the official docs. -->
-
-Reference: https://docs.temporal.io/worker-versioning
-
-
-
-
-
-
-
-
-
-
-
----
-
-## Workers: External Payload Storage for Large Payloads
-
-> [!TIP]
-> Individual workflow/activity request/response payloads, signals, and updates cannot exceed 4 MB by default (inherited from the Temporal server's gRPC limit). Use external storage when larger data must flow through workflow code.
-
-Trim inputs and outputs to the minimum the caller needs. Store large data in an external system (database, blob storage, sessions) and pass references (IDs, URLs) instead. When larger payloads are genuinely required, an external storage codec can offload them at the serialization layer.
-
-Reference: https://docs.temporal.io/external-storage  
-Source: `src/overflowing-maximum-individual-payload-size.md`
-
-
-
-
-
 
 
 
