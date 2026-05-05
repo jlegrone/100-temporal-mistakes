@@ -21,7 +21,7 @@ theme:
 
 What we'll cover
 - Activities: Errors, retries, idempotency, timeouts, worker disruption
-- Workflows: Limitations, determinism, change versioning
+- Workflows: Runtime limitations, determinism, change versioning
 - Recommendations to simplify working with Temporal day to day
 
 Follow Along:
@@ -605,18 +605,8 @@ Must also:
 <!--
 That brings us to part two: workflows.
 
-Workflows definitely come with their own challenges. We're going to cover a few of these today, including workflow limitations, determinism, and versioning code changes.
+Workflows definitely come with their own challenges. We're going to cover a few of these today, including runtime limitations, determinism, and versioning code changes.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -634,7 +624,7 @@ Mitigations:
 - Avoid passing large payloads from activities to workflows, or use [external payload storage](https://docs.temporal.io/external-storage).
 
 <!--
-There are several dimensions in which workflows are limited.
+There are several dimensions in which workflows are constrained at runtime.
 
 The first is that individual payload sizes peristed in workflow history can't go past around 2MB. This is a limitation that is inherited from the Temporal gRPC API.
 
@@ -644,18 +634,8 @@ Temporal also enforces a workflow task timeout of 10 seconds by default, which i
 
 And the last limitation is workflow lock contention, which you can run into if your workflow deals with a high throughput of incoming signals or executes activities with high parallelism.
 
-Typically if you're running into one of these limits, it means you need to start using `ContinueAsNew` or enable external payload storage.
+Typically if you're approaching one of these limits, it means you need to start using `ContinueAsNew` or enable external payload storage, or branch out work using child workflows.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -674,16 +654,6 @@ Common sources of non-determinism in workflow code:
 Another thing to be aware of is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying workflow histories.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Workflows: Keeping Code Deterministic (continued)
@@ -694,18 +664,8 @@ Tools to catch non-determinism:
 - **TypeScript**: V8 isolate sandboxing is built-in -- workflow code runs in a separate V8 context with no Node.js APIs.
 
 <!--
-The Temporal team has done a great job making determinsm easier to implement by providing static analysis tools and by deeply integrating with language runtimes. I recommend checking out what tooling is available for your language, and don't let a coding assistant run rampant adding exceptions to determinism rules because it deems them too pesky.
+The Temporal team has done a great job making determinsm easier to implement by providing static analysis tools and by deeply integrating with language runtimes. I recommend checking out what tooling is available for your language, and be careful not to let a coding assistant run rampant adding exceptions to determinism rules just because it deems them pesky.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -721,18 +681,8 @@ Change version lifecycle:
 <!--
 Another really common challenge with workflows is shipping new versions of the code. Almost any new behavior added to an existing workflow function needs to be gated with a change version check -- this is called a patch in most SDKs.
 
-But beyond just making sure we use change versions when modifying workflows, we should also be cleaning up change version checks in our codebase so that all of those logic branches don't accrue over time.
+But beyond just making sure we use change versions when modifying workflows, we should also be cleaning up change versions in our codebase so that all of those logic branches don't accrue over time.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -740,15 +690,8 @@ But beyond just making sure we use change versions when modifying workflows, we 
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
-     // Charge payment and start fulfilment ...
+     // ...
 
-     sel := workflow.NewNamedSelector(ctx, "shipment")
-     sel.AddReceive(
-         workflow.GetSignalChannel(ctx, "shipment-processed"),
-         func(c workflow.ReceiveChannel, more bool) {
-             c.Receive(ctx, &shipmentResponse)
-         },
-     )
      sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
          err = workflow.ErrDeadlineExceeded
      })
@@ -769,7 +712,7 @@ But beyond just making sure we use change versions when modifying workflows, we 
 <!--
 So let's look at an example workflow code change. We're back in the PurchaseItem workflow, and the goal is to add some logic that executes a refund child workflow if the shipment isn't received on time.
 
-This is a well formed change version check, and deploying the change as-is would not cause any problems. But there are two subtle issues at play.
+This is a well formed change version check, and deploying as-is would not cause immediate problems. But there are two subtle issues at play.
 
 First, the change version is being evaluated inside of a conditional branch means that not all workflow executions will actually evaluate it. Right now, only workflows that don't receive the shipment processed signal within 12 hours will register the change version.
 
@@ -799,15 +742,8 @@ The reason this matters is that we want ALL workflow executions started after th
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
 +    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
 
-     // Charge payment and start fulfilment ...
+     // ...
 
-     sel := workflow.NewNamedSelector(ctx, "shipment")
-     sel.AddReceive(
-         workflow.GetSignalChannel(ctx, "shipment-processed"),
-         func(c workflow.ReceiveChannel, more bool) {
-             c.Receive(ctx, &shipmentResponse)
-         },
-     )
      sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
          err = workflow.ErrDeadlineExceeded
      })
@@ -1015,14 +951,8 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
      sel.Select(ctx)
      if err != nil {
 -        switch delayVersion {
--        case 1: /* ... */
+-        case 1: /* Refund only ... */
 -        case 2:
--            cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
--            if cancelErr != nil {
--                log.Warn("failed to cancel shipment", "error", cancelErr)
--            }
--            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
--        }
 +        cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
 +        if cancelErr != nil {
 +            log.Warn("failed to cancel shipment", "error", cancelErr)
@@ -1125,11 +1055,11 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 
+ // Start a child workflow using disconnected context and wait for it to be scheduled.
  func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
      ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
      ctx, _ = workflow.NewDisconnectedContext(ctx)
      fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
-     // Block until child workflow start
      return fut.GetChildWorkflowExecution().Get(ctx, nil)
  }
 ```
@@ -1151,6 +1081,7 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
      // ...
+
 +    // Reserve at least 1 minute for compensation before the hard timeout.
 +    softTimeout, err := getSoftTimeout(ctx, time.Minute)
 +    if err != nil {
@@ -1159,7 +1090,8 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 +    sel.AddFuture(softTimeout, func(f workflow.Future) {
 +        // Run compensating actions now! Workflow terminating in 1 minute...
 +    })
-    // ...
+
+     // ...
  }
 
  func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
