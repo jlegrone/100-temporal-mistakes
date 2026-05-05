@@ -1,4 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "python-pptx",
+#     "pyyaml",
+#     "playwright",
+# ]
+# ///
 """Generate a PowerPoint presentation from SLIDES.md.
 
 SLIDES.md format:
@@ -9,12 +17,10 @@ SLIDES.md format:
   - HTML comments (<!-- ... -->) become speaker notes
 
 Usage:
-    uv run --with python-pptx --with pyyaml --with playwright \
-        generate_slides.py [SLIDES.md] [-o output.pptx]
+    uv run cmd/generate_slides.py [SLIDES.md] [-o output.pptx]
 
     # Skip carbon image generation (use text-based code blocks):
-    uv run --with python-pptx --with pyyaml \
-        generate_slides.py --no-carbon [SLIDES.md] [-o output.pptx]
+    uv run cmd/generate_slides.py --no-carbon [SLIDES.md] [-o output.pptx]
 
 First-time setup for carbon screenshots:
     uv run --with playwright python -m playwright install chromium
@@ -73,11 +79,20 @@ class CodeBlock:
 
 
 @dataclass
+class ImageRef:
+    path: str
+    alt: str = ""
+    caption_text: str = ""
+    caption_url: str = ""
+
+
+@dataclass
 class Slide:
     title: str = ""
     subtitle: str = ""
     bullets: list[str] = field(default_factory=list)
     code_blocks: list[CodeBlock] = field(default_factory=list)
+    images: list[ImageRef] = field(default_factory=list)
     speaker_notes: list[str] = field(default_factory=list)
     is_part_header: bool = False  # # Part headings
 
@@ -111,6 +126,7 @@ def _parse_slide_block(block: str) -> Slide:
     in_code = False
     code_lang = ""
     code_lines: list[str] = []
+    pending_caption_for: ImageRef | None = None
 
     for line in lines:
         stripped = line.strip()
@@ -151,6 +167,24 @@ def _parse_slide_block(block: str) -> Slide:
         if stripped.startswith("- "):
             slide.bullets.append(stripped[2:])
             continue
+
+        # Inline images: ![alt](path)
+        img_match = re.match(r"!\[(.*?)\]\((.+?)\)\s*$", stripped)
+        if img_match:
+            ref = ImageRef(alt=img_match.group(1), path=img_match.group(2))
+            slide.images.append(ref)
+            pending_caption_for = ref
+            continue
+
+        # Caption link immediately following an image: [text](url)
+        if pending_caption_for is not None and stripped:
+            link_match = re.match(r"\[(.+?)\]\((.+?)\)\s*$", stripped)
+            if link_match:
+                pending_caption_for.caption_text = link_match.group(1)
+                pending_caption_for.caption_url = link_match.group(2)
+                pending_caption_for = None
+                continue
+            pending_caption_for = None
 
         # Standalone bold/text lines (like "** Consider implementing...")
         if stripped.startswith("**") or (stripped and not stripped.startswith("#")):
@@ -452,12 +486,17 @@ def _render_title_slide(prs: Presentation, slide_data: Slide, meta: Presentation
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
     _set_slide_bg(slide, theme.background_color)
 
+    # Reserve right column for an image (e.g. follow-along QR).
+    has_image = bool(slide_data.images and Path(slide_data.images[0].path).exists())
+    text_left = 0.6
+    text_width = 8.0 if has_image else 11.33
+
     # Title
-    txBox = _add_textbox(slide, 1.0, 2.2, 11.33, 1.5)
+    txBox = _add_textbox(slide, text_left, 0.6, text_width, 1.2)
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.CENTER
+    p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
     _add_formatted_runs(
         p, slide_data.title or meta.title,
         font_name=theme.font_heading, font_size=44, color=theme.title_color, bold=True,
@@ -466,24 +505,53 @@ def _render_title_slide(prs: Presentation, slide_data: Slide, meta: Presentation
     # Subtitle
     subtitle = slide_data.subtitle or meta.subtitle
     if subtitle:
-        txBox = _add_textbox(slide, 1.0, 3.8, 11.33, 1.0)
+        txBox = _add_textbox(slide, text_left, 1.9, text_width, 1.0)
         tf = txBox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
         _add_formatted_runs(p, subtitle, font_name=theme.font_body, font_size=24, color=theme.text_color)
 
     # Bullets (if the title slide has them)
     if slide_data.bullets:
-        top = 4.8 if subtitle else 3.8
-        _render_bullets_box(slide, slide_data.bullets, meta, 1.5, top, 10.33, 3.0)
+        top = 3.0 if subtitle else 1.9
+        _render_bullets_box(slide, slide_data.bullets, meta, text_left + 0.3, top, text_width - 0.3, 3.5)
+
+    # Right-side image
+    if has_image:
+        img = slide_data.images[0]
+        img_left, img_top, img_h = 9.2, 2.0, 3.5
+        slide.shapes.add_picture(str(Path(img.path)), Inches(img_left), Inches(img_top), height=Inches(img_h))
+        if img.caption_text:
+            cap_top = img_top + img_h + 0.1
+            txBox = _add_textbox(slide, img_left - 0.5, cap_top, 4.5, 0.5)
+            ctf = txBox.text_frame
+            ctf.word_wrap = True
+            cp = ctf.paragraphs[0]
+            cp.alignment = PP_ALIGN.CENTER
+            # Split "Follow along: jacob.work/100TM" into prefix + linked URL.
+            # Anything matching the caption_url's host/path becomes the hyperlink.
+            link_start = img.caption_text.find(img.caption_url.split("//")[-1].rstrip("/"))
+            if img.caption_url and link_start == -1:
+                # Fallback: link the whole caption.
+                link_start = 0
+            prefix = img.caption_text[:link_start] if link_start > 0 else ""
+            link_part = img.caption_text[link_start:] if link_start >= 0 else img.caption_text
+            if prefix:
+                _add_formatted_runs(cp, prefix, font_name=theme.font_body, font_size=14, color=theme.text_color)
+            link_run = cp.add_run()
+            link_run.text = link_part
+            link_run.font.name = theme.font_body
+            link_run.font.size = Pt(14)
+            link_run.font.color.rgb = _hex_to_rgb(theme.accent_color)
+            link_run.hyperlink.address = img.caption_url
 
     # Author
     if meta.author:
-        txBox = _add_textbox(slide, 1.0, 6.0, 11.33, 0.5)
+        txBox = _add_textbox(slide, 1.0, 6.7, 11.33, 0.5)
         tf = txBox.text_frame
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
         run = p.add_run()
         run.text = meta.author
         run.font.name = theme.font_body
@@ -536,6 +604,7 @@ def _render_content_slide(
     content_top = 1.3
     has_bullets = bool(slide_data.bullets)
     has_code = bool(slide_data.code_blocks)
+    has_image = bool(slide_data.images and Path(slide_data.images[0].path).exists())
 
     if has_bullets and has_code:
         # Bullets on top, code below
@@ -548,6 +617,12 @@ def _render_content_slide(
         _render_bullets_box(slide, slide_data.bullets, meta, 0.6, content_top, 12.0, 5.5)
     elif has_code:
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, content_top, 12.0, 5.8, carbon_images)
+
+    if has_image:
+        img_path = Path(slide_data.images[0].path)
+        slide.shapes.add_picture(
+            str(img_path), Inches(0.6), Inches(content_top), width=Inches(12.0),
+        )
 
     _set_speaker_notes(slide, slide_data.speaker_notes)
 
@@ -773,7 +848,7 @@ def generate_pptx(
             _render_title_slide(prs, s, meta)
         elif s.is_part_header:
             _render_section_slide(prs, s, meta)
-        elif not s.bullets and not s.code_blocks and s.title:
+        elif not s.bullets and not s.code_blocks and not s.images and s.title:
             if not s.subtitle and len(s.title) < 60:
                 _render_section_slide(prs, s, meta)
             else:

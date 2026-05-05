@@ -16,12 +16,8 @@ theme:
   code_font: "Courier New"
 ---
 
-# Introduction
-
-<!-- TODO: Make this sentence sound less smarmy. -->
-A field guide to the bugs you'll write before you write them.
-
-A working catalog of failure modes drawn from production Temporal codebases — what breaks, why it breaks, and the smallest change that makes it stop.
+# 100 Temporal Mistakes
+### (...and how to avoid them)
 
 What we'll cover
 - Activities: Errors, retries, idempotency, timeouts, worker disruption
@@ -29,6 +25,8 @@ What we'll cover
 - Recommendations to simplify working with Temporal day to day
 
 Follow Along:
+![Scan to follow along at jacob.work/100TM](src/.assets/100TM_QR.png)
+[Follow along: jacob.work/100TM](https://jacob.work/100TM)
 <!-- QR code linking to jacob.work/100TM (slides in markdown format for those who want to follow along with code examples) -->
 
 <!-- Speaker notes:
