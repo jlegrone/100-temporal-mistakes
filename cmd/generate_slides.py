@@ -87,14 +87,32 @@ class ImageRef:
 
 
 @dataclass
+class ContentItem:
+    kind: str  # "paragraph" | "bullet"
+    text: str
+
+
+@dataclass
 class Slide:
     title: str = ""
     subtitle: str = ""
-    bullets: list[str] = field(default_factory=list)
+    content: list[ContentItem] = field(default_factory=list)
     code_blocks: list[CodeBlock] = field(default_factory=list)
     images: list[ImageRef] = field(default_factory=list)
     speaker_notes: list[str] = field(default_factory=list)
     is_part_header: bool = False  # # Part headings
+
+    @property
+    def bullets(self) -> list[str]:
+        return [c.text for c in self.content if c.kind == "bullet"]
+
+    @property
+    def paragraphs(self) -> list[str]:
+        return [c.text for c in self.content if c.kind == "paragraph"]
+
+    @property
+    def has_content(self) -> bool:
+        return bool(self.content)
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +183,7 @@ def _parse_slide_block(block: str) -> Slide:
 
         # Bullets
         if stripped.startswith("- "):
-            slide.bullets.append(stripped[2:])
+            slide.content.append(ContentItem(kind="bullet", text=stripped[2:]))
             continue
 
         # Inline images: ![alt](path)
@@ -188,9 +206,9 @@ def _parse_slide_block(block: str) -> Slide:
 
         # Standalone bold/text lines (like "** Consider implementing...")
         if stripped.startswith("**") or (stripped and not stripped.startswith("#")):
-            # Treat non-empty, non-heading lines as bullets
+            # Treat non-empty, non-heading lines as paragraphs
             if stripped:
-                slide.bullets.append(stripped)
+                slide.content.append(ContentItem(kind="paragraph", text=stripped))
             continue
 
     return slide
@@ -512,10 +530,10 @@ def _render_title_slide(prs: Presentation, slide_data: Slide, meta: Presentation
         p.alignment = PP_ALIGN.LEFT if has_image else PP_ALIGN.CENTER
         _add_formatted_runs(p, subtitle, font_name=theme.font_body, font_size=24, color=theme.text_color)
 
-    # Bullets (if the title slide has them)
-    if slide_data.bullets:
+    # Content (paragraphs + bullets in source order)
+    if slide_data.content:
         top = 3.0 if subtitle else 1.9
-        _render_bullets_box(slide, slide_data.bullets, meta, text_left + 0.3, top, text_width - 0.3, 3.5)
+        _render_content_box(slide, slide_data.content, meta, text_left + 0.3, top, text_width - 0.3, 3.5)
 
     # Right-side image
     if has_image:
@@ -566,16 +584,36 @@ def _render_section_slide(prs: Presentation, slide_data: Slide, meta: Presentati
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _set_slide_bg(slide, theme.accent_color)
 
-    y = 2.2
-    txBox = _add_textbox(slide, 1.0, y, 11.33, 1.8)
+    # Title
+    txBox = _add_textbox(slide, 1.0, 1.4, 11.33, 1.2)
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.CENTER
     _add_formatted_runs(p, slide_data.title, font_name=theme.font_heading, font_size=40, color="#FFFFFF", bold=True)
 
-    if slide_data.bullets:
-        _render_bullets_box(slide, slide_data.bullets, meta, 1.5, 4.2, 10.33, 3.0, color_override="#FFFFFF")
+    paragraphs = slide_data.paragraphs
+    bullets = slide_data.bullets
+
+    # Lead paragraphs (no bullet dots, larger body text), centered under title.
+    next_top = 2.8
+    if paragraphs:
+        para_items = [ContentItem(kind="paragraph", text=t) for t in paragraphs]
+        para_height = min(len(paragraphs) * 0.6 + 0.2, 2.2)
+        _render_content_box(
+            slide, para_items, meta, 1.0, next_top, 11.33, para_height,
+            color_override="#FFFFFF", align=PP_ALIGN.CENTER, font_size=22,
+        )
+        next_top += para_height + 0.2
+
+    # Bullets in a tight centered group under the lead.
+    if bullets:
+        bullet_items = [ContentItem(kind="bullet", text=t) for t in bullets]
+        bullet_height = min(len(bullets) * 0.45 + 0.2, 7.4 - next_top)
+        _render_content_box(
+            slide, bullet_items, meta, 2.5, next_top, 8.33, bullet_height,
+            color_override="#FFFFFF", align=PP_ALIGN.CENTER, font_size=20,
+        )
 
     _set_speaker_notes(slide, slide_data.speaker_notes)
 
@@ -602,19 +640,20 @@ def _render_content_slide(
         )
 
     content_top = 1.3
-    has_bullets = bool(slide_data.bullets)
+    items = slide_data.content
+    has_items = bool(items)
     has_code = bool(slide_data.code_blocks)
     has_image = bool(slide_data.images and Path(slide_data.images[0].path).exists())
 
-    if has_bullets and has_code:
-        # Bullets on top, code below
-        bullet_height = min(len(slide_data.bullets) * 0.4 + 0.2, 2.5)
-        _render_bullets_box(slide, slide_data.bullets, meta, 0.6, content_top, 12.0, bullet_height)
-        code_top = content_top + bullet_height + 0.15
+    if has_items and has_code:
+        # Content on top, code below
+        items_height = min(len(items) * 0.4 + 0.2, 2.5)
+        _render_content_box(slide, items, meta, 0.6, content_top, 12.0, items_height)
+        code_top = content_top + items_height + 0.15
         remaining = 7.5 - code_top - 0.2
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, code_top, 12.0, remaining, carbon_images)
-    elif has_bullets:
-        _render_bullets_box(slide, slide_data.bullets, meta, 0.6, content_top, 12.0, 5.5)
+    elif has_items:
+        _render_content_box(slide, items, meta, 0.6, content_top, 12.0, 5.5)
     elif has_code:
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, content_top, 12.0, 5.8, carbon_images)
 
@@ -625,6 +664,44 @@ def _render_content_slide(
         )
 
     _set_speaker_notes(slide, slide_data.speaker_notes)
+
+
+def _render_content_box(
+    slide,
+    items: list[ContentItem],
+    meta: PresentationMeta,
+    left: float,
+    top: float,
+    width: float,
+    height: float,
+    *,
+    color_override: str | None = None,
+    align: int | None = None,
+    font_size: int = 18,
+) -> None:
+    theme = meta.theme
+    txBox = _add_textbox(slide, left, top, width, height)
+    tf = txBox.text_frame
+    tf.word_wrap = True
+
+    text_color = color_override or theme.text_color
+    accent = color_override or theme.accent_color
+
+    for i, item in enumerate(items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_after = Pt(6)
+        p.space_before = Pt(2)
+        if align is not None:
+            p.alignment = align
+
+        if item.kind == "bullet":
+            brun = p.add_run()
+            brun.text = "\u2022  "
+            brun.font.name = theme.font_body
+            brun.font.size = Pt(font_size)
+            brun.font.color.rgb = _hex_to_rgb(accent)
+
+        _add_formatted_runs(p, item.text, font_name=theme.font_body, font_size=font_size, color=text_color)
 
 
 def _render_bullets_box(
@@ -638,27 +715,8 @@ def _render_bullets_box(
     *,
     color_override: str | None = None,
 ) -> None:
-    theme = meta.theme
-    txBox = _add_textbox(slide, left, top, width, height)
-    tf = txBox.text_frame
-    tf.word_wrap = True
-
-    text_color = color_override or theme.text_color
-    accent = color_override or theme.accent_color
-
-    for i, bullet in enumerate(bullets):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        p.space_after = Pt(6)
-        p.space_before = Pt(2)
-
-        # Bullet character
-        brun = p.add_run()
-        brun.text = "\u2022  "
-        brun.font.name = theme.font_body
-        brun.font.size = Pt(18)
-        brun.font.color.rgb = _hex_to_rgb(accent)
-
-        _add_formatted_runs(p, bullet, font_name=theme.font_body, font_size=18, color=text_color)
+    items = [ContentItem(kind="bullet", text=b) for b in bullets]
+    _render_content_box(slide, items, meta, left, top, width, height, color_override=color_override)
 
 
 # ---------------------------------------------------------------------------
@@ -848,7 +906,7 @@ def generate_pptx(
             _render_title_slide(prs, s, meta)
         elif s.is_part_header:
             _render_section_slide(prs, s, meta)
-        elif not s.bullets and not s.code_blocks and not s.images and s.title:
+        elif not s.content and not s.code_blocks and not s.images and s.title:
             if not s.subtitle and len(s.title) < 60:
                 _render_section_slide(prs, s, meta)
             else:

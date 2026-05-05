@@ -1,6 +1,6 @@
 ---
 title: "100 Temporal Mistakes"
-subtitle: "And How to Avoid Them"
+subtitle: "...and how to avoid them!"
 author: "Jacob LeGrone"
 theme:
   background_color: "#FFFFFF"
@@ -11,13 +11,13 @@ theme:
   code_text_color: "#D4D4D4"
   diff_add_color: "#10f300"
   diff_remove_color: "#f00000"
-  font_heading: "Arial"
+  font_heading: "Avenir - Book - 60"
+  font_subheading: "Avenir - Medium Oblique - 32"
   font_body: "Arial"
   code_font: "Courier New"
 ---
 
 # 100 Temporal Mistakes
-### (...and how to avoid them)
 
 What we'll cover
 - Activities: Errors, retries, idempotency, timeouts, worker disruption
@@ -27,7 +27,6 @@ What we'll cover
 Follow Along:
 ![Scan to follow along at jacob.work/100TM](src/.assets/100TM_QR.png)
 [Follow along: jacob.work/100TM](https://jacob.work/100TM)
-<!-- QR code linking to jacob.work/100TM (slides in markdown format for those who want to follow along with code examples) -->
 
 <!-- Speaker notes:
 A few years ago I got looped into a project at work to help a team launch a new product called Datadog Oncall (and I promise this is not an ad). But the reason I was looped in was because they were planning to build it on top of Temporal. At Datadog we always want to maintain a high standard of availability and so on for our services, but this had an even higher bar to meet than usual because we wanted be confident in allowing any core engineering team at Datadog to be able to route their own pages through this system despite the potential circular runtime dependencies that you can imagine making life difficult.
