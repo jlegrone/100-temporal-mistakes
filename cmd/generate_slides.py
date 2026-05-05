@@ -19,9 +19,6 @@ SLIDES.md format:
 Usage:
     uv run cmd/generate_slides.py [SLIDES.md] [-o output.pptx]
 
-    # Skip carbon image generation (use text-based code blocks):
-    uv run cmd/generate_slides.py --no-carbon [SLIDES.md] [-o output.pptx]
-
 First-time setup for carbon screenshots:
     uv run --with playwright python -m playwright install chromium
 """
@@ -40,7 +37,6 @@ from urllib.parse import quote, urlencode
 import yaml
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
@@ -622,7 +618,7 @@ def _render_content_slide(
     prs: Presentation,
     slide_data: Slide,
     meta: PresentationMeta,
-    carbon_images: dict[str, Path] | None = None,
+    carbon_images: dict[str, Path],
 ) -> None:
     theme = meta.theme
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -653,7 +649,26 @@ def _render_content_slide(
         remaining = 7.5 - code_top - 0.2
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, code_top, 12.0, remaining, carbon_images)
     elif has_items:
-        _render_content_box(slide, items, meta, 0.6, content_top, 12.0, 5.5)
+        # Adaptive sizing: scale up font and vertically center sparse slides.
+        bullet_count = sum(1 for c in items if c.kind == "bullet")
+        para_count = len(items) - bullet_count
+        # Approximate "line slots" — paragraphs may wrap so weight them more.
+        line_slots = bullet_count + para_count * 1.5
+        if line_slots <= 6:
+            font_size = 28
+        elif line_slots <= 10:
+            font_size = 22
+        else:
+            font_size = 18
+        line_height_in = font_size * 1.4 / 72
+        est_height = max(1.0, len(items) * line_height_in + 0.4)
+        available = 7.5 - content_top - 0.4
+        if est_height < available:
+            content_top = content_top + (available - est_height) / 2
+        _render_content_box(
+            slide, items, meta, 0.6, content_top, 12.0, max(est_height, 1.5),
+            font_size=font_size,
+        )
     elif has_code:
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, content_top, 12.0, 5.8, carbon_images)
 
@@ -720,7 +735,7 @@ def _render_bullets_box(
 
 
 # ---------------------------------------------------------------------------
-# Code rendering (carbon images or text fallback)
+# Code rendering (carbon images)
 # ---------------------------------------------------------------------------
 
 
@@ -732,13 +747,10 @@ def _render_code_region(
     top: float,
     width: float,
     max_height: float,
-    carbon_images: dict[str, Path] | None,
+    carbon_images: dict[str, Path],
 ) -> None:
-    """Render code blocks as carbon images if available, otherwise as styled text."""
-    if carbon_images:
-        _render_code_images(slide, code_blocks, left, top, width, max_height, carbon_images)
-    else:
-        _render_code_text(slide, code_blocks, meta, left, top, width, max_height)
+    """Render code blocks as carbon screenshot images."""
+    _render_code_images(slide, code_blocks, left, top, width, max_height, carbon_images)
 
 
 def _render_code_images(
@@ -799,93 +811,6 @@ def _render_code_images(
         current_top += display_height + gap
 
 
-def _render_code_text(
-    slide,
-    code_blocks: list[CodeBlock],
-    meta: PresentationMeta,
-    left: float,
-    top: float,
-    width: float,
-    max_height: float,
-) -> None:
-    """Render code blocks as styled text (fallback when carbon images not available)."""
-    theme = meta.theme
-    current_top = top
-
-    total_lines = sum(len(cb.code.splitlines()) for cb in code_blocks)
-    if total_lines == 0:
-        return
-
-    for cb in code_blocks:
-        lines = cb.code.splitlines()
-        proportion = len(lines) / total_lines if total_lines > 0 else 1.0
-        block_height = max(0.5, proportion * (max_height - 0.1 * len(code_blocks)))
-        block_height = min(block_height, top + max_height - current_top)
-
-        if block_height <= 0:
-            break
-
-        # Background rectangle
-        bg = slide.shapes.add_shape(
-            MSO_SHAPE.ROUNDED_RECTANGLE,
-            Inches(left), Inches(current_top), Inches(width), Inches(block_height),
-        )
-        bg.fill.solid()
-        bg.fill.fore_color.rgb = _hex_to_rgb(theme.code_bg_color)
-        bg.line.fill.background()
-        bg.adjustments[0] = 0.02
-
-        # Code text
-        txBox = _add_textbox(slide, left + 0.2, current_top + 0.08, width - 0.4, block_height - 0.16)
-        tf = txBox.text_frame
-        tf.word_wrap = False
-
-        is_diff = cb.language == "diff"
-        font_size = _auto_font_size(lines, width - 0.4)
-
-        for j, code_line in enumerate(lines):
-            p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
-            p.alignment = PP_ALIGN.LEFT
-            p.space_before = Pt(0)
-            p.space_after = Pt(0)
-            p.line_spacing = Pt(font_size + 2)
-
-            run = p.add_run()
-            run.font.name = theme.code_font
-            run.font.size = Pt(font_size)
-
-            if is_diff:
-                if code_line.startswith("+"):
-                    run.font.color.rgb = _hex_to_rgb(theme.diff_add_color)
-                elif code_line.startswith("-"):
-                    run.font.color.rgb = _hex_to_rgb(theme.diff_remove_color)
-                else:
-                    run.font.color.rgb = _hex_to_rgb(theme.code_text_color)
-            else:
-                run.font.color.rgb = _hex_to_rgb(theme.code_text_color)
-
-            run.text = code_line
-
-        current_top += block_height + 0.1
-
-
-def _auto_font_size(lines: list[str], width_inches: float) -> int:
-    """Pick a font size that fits the code in the available space."""
-    if not lines:
-        return 11
-    max_chars = max((len(line) for line in lines), default=0)
-    chars_per_inch_at_11 = 13.0
-    available_chars = width_inches * chars_per_inch_at_11
-    if max_chars <= available_chars:
-        if len(lines) <= 12:
-            return 11
-        if len(lines) <= 20:
-            return 10
-        return 9
-    ratio = available_chars / max_chars
-    return max(7, int(11 * ratio))
-
-
 # ---------------------------------------------------------------------------
 # Main generation
 # ---------------------------------------------------------------------------
@@ -895,7 +820,7 @@ def generate_pptx(
     meta: PresentationMeta,
     slides: list[Slide],
     output: Path,
-    carbon_images: dict[str, Path] | None = None,
+    carbon_images: dict[str, Path],
 ) -> None:
     prs = Presentation()
     prs.slide_width = Inches(13.333)
@@ -921,10 +846,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate PPTX from SLIDES.md")
     parser.add_argument("input", nargs="?", default="SLIDES.md", help="Input markdown file")
     parser.add_argument("-o", "--output", default=None, help="Output .pptx path")
-    parser.add_argument(
-        "--no-carbon", action="store_true",
-        help="Skip carbon.now.sh image generation; use text-based code blocks instead",
-    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -937,24 +858,12 @@ def main() -> None:
     meta, slides = parse_slides_md(input_path)
     print(f"Parsed {len(slides)} slides from {input_path}")
 
-    carbon_images: dict[str, Path] | None = None
-    if not args.no_carbon:
-        try:
-            import playwright  # noqa: F401
-        except ImportError:
-            print(
-                "Error: playwright is required for carbon screenshots.\n"
-                "  Install: uv run --with playwright python -m playwright install chromium\n"
-                "  Or use --no-carbon for text-based code blocks.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        cache_dir = input_path.parent / ".slide_images"
-        all_code = collect_all_code_blocks(slides)
-        if all_code:
-            carbon_images = asyncio.run(capture_carbon_images(all_code, cache_dir, meta.theme))
-            print(f"  {len(carbon_images)} code block images ready")
+    cache_dir = input_path.parent / ".slide_images"
+    all_code = collect_all_code_blocks(slides)
+    carbon_images: dict[str, Path] = {}
+    if all_code:
+        carbon_images = asyncio.run(capture_carbon_images(all_code, cache_dir, meta.theme))
+        print(f"  {len(carbon_images)} code block images ready")
 
     generate_pptx(meta, slides, output_path, carbon_images)
     print(f"Generated {output_path}")
