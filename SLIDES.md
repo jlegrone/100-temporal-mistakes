@@ -1136,7 +1136,7 @@ func TestReplayWorkflowHistory(t *testing.T) {
 }
 ```
 
-** Check the code coverage for the version branches in your workflow! If they aren't covered, then the replay test is not validating your change.
+**Check the code coverage for the version branches in your workflow** -- if they aren't covered, the replay test is not validating your change.
 
 Find more techniques at [temporal.io/resources/on-demand/replay-safety-at-datadog](https://temporal.io/resources/on-demand/replay-safety-at-datadog)
 
@@ -1164,7 +1164,7 @@ If you're interested in more techniques to ensure replay safety for workflow cod
 
 ## Workflows: Cleaning Up Change Versions
 
-TODO: Fix formatting of the long query string since it overflows past the width of my slides.
+<!-- TODO(jlegrone): Fix formatting of the long query string since it overflows past the width of my slides. -->
 ```bash
 #!/bin/sh
 # Returns 0 when no in-flight workflow can still be on v0 or v1.
@@ -1352,18 +1352,17 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseItemRequest) (*PurchaseItemResponse, error) {
+     // ...
+
 +    // Reserve at least 1 minute for compensation before the hard timeout.
 +    softTimeout, err := getSoftTimeout(ctx, time.Minute)
 +    if err != nil {
 +        return nil, err
 +    }
 
-     // ...
-
--    sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
 +    sel.AddFuture(softTimeout, func(f workflow.Future) {
-         err = workflow.ErrDeadlineExceeded
-     })
++        // Run compensating actions now! Workflow terminating in 1 minute...
++    })
 
     // ...
  }

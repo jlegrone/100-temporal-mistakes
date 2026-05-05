@@ -145,6 +145,20 @@ def _parse_slide_block(block: str) -> Slide:
     for line in lines:
         stripped = line.strip()
 
+        # Blank line: any pending image-caption association ends.
+        if not stripped and not in_code:
+            pending_caption_for = None
+            continue
+
+        # Strip GitHub-style blockquote prefixes (used for [!TIP] callouts).
+        if stripped.startswith(">"):
+            stripped = stripped[1:].lstrip()
+            # Drop the standalone "[!TIP]" / "[!NOTE]" marker lines outright.
+            if re.fullmatch(r"\[![A-Z]+\]", stripped):
+                continue
+            if not stripped:
+                continue
+
         # Code fence open/close
         if stripped.startswith("```"):
             if in_code:
@@ -458,24 +472,58 @@ def _add_textbox(
     )
 
 
+_INLINE_MD_RE = re.compile(
+    r"(\*\*.*?\*\*|`[^`]+`|~~.*?~~|\[[^\]]+?\]\([^)]+?\)|\*[^*\s][^*]*?\*)"
+)
+
+
 def _add_formatted_runs(
-    paragraph, text: str, *, font_name: str, font_size: int, color: str, bold: bool = False
+    paragraph, text: str, *,
+    font_name: str, font_size: int, color: str, bold: bool = False,
+    code_font: str = "Courier New", link_color: str | None = None,
 ) -> None:
-    """Add runs to a paragraph, parsing inline **bold** and *italic* markers."""
-    parts = re.split(r"(\*\*.*?\*\*|\*[^*]+?\*)", text)
+    """Add runs to a paragraph, parsing inline markdown:
+    **bold**, *italic*, `code`, ~~strike~~, [text](url).
+    """
+    parts = _INLINE_MD_RE.split(text)
     for part in parts:
         if not part:
             continue
         run = paragraph.add_run()
-        if part.startswith("**") and part.endswith("**"):
+
+        # Order matters: handle longer/more-specific markers first.
+        if part.startswith("**") and part.endswith("**") and len(part) >= 4:
             run.text = part[2:-2]
             run.font.bold = True
-        elif part.startswith("*") and part.endswith("*"):
+        elif part.startswith("~~") and part.endswith("~~") and len(part) >= 4:
+            run.text = part[2:-2]
+            # python-pptx doesn't expose strikethrough cleanly; emulate with italic+grey.
+            run.font.italic = True
+        elif part.startswith("`") and part.endswith("`") and len(part) >= 2:
+            run.text = part[1:-1]
+            run.font.name = code_font
+            run.font.size = Pt(max(font_size - 2, 10))
+            run.font.color.rgb = _hex_to_rgb(color)
+            continue
+        elif part.startswith("[") and "](" in part and part.endswith(")"):
+            close = part.index("](")
+            run.text = part[1:close]
+            url = part[close + 2:-1]
+            run.font.color.rgb = _hex_to_rgb(link_color or color)
+            try:
+                run.hyperlink.address = url
+            except Exception:
+                pass
+            run.font.name = font_name
+            run.font.size = Pt(font_size)
+            continue
+        elif part.startswith("*") and part.endswith("*") and len(part) >= 2:
             run.text = part[1:-1]
             run.font.italic = True
         else:
             run.text = part
             run.font.bold = bold
+
         run.font.name = font_name
         run.font.size = Pt(font_size)
         run.font.color.rgb = _hex_to_rgb(color)
@@ -626,7 +674,7 @@ def _render_content_slide(
 
     # Title
     if slide_data.title:
-        txBox = _add_textbox(slide, 0.6, 0.3, 12.0, 0.8)
+        txBox = _add_textbox(slide, 0.6, 0.3, 12.0, 1.0)
         tf = txBox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
@@ -635,38 +683,63 @@ def _render_content_slide(
             font_name=theme.font_heading, font_size=28, color=theme.title_color, bold=True,
         )
 
-    content_top = 1.3
+    content_top = 1.5
     items = slide_data.content
     has_items = bool(items)
     has_code = bool(slide_data.code_blocks)
     has_image = bool(slide_data.images and Path(slide_data.images[0].path).exists())
 
     if has_items and has_code:
-        # Content on top, code below
-        items_height = min(len(items) * 0.4 + 0.2, 2.5)
-        _render_content_box(slide, items, meta, 0.6, content_top, 12.0, items_height)
+        # Content on top, code below.  Estimate prose space using the same
+        # char-wrap heuristic as the items-only branch.
+        text_font = 18
+        cpl = max(20, int(70 * 22 / text_font))
+        text_lines = sum(max(1, -(-len(c.text) // cpl)) for c in items)
+        items_height = min(7.5 - content_top - 1.5, max(0.6, text_lines * 0.32 + 0.2))
+        _render_content_box(slide, items, meta, 0.6, content_top, 12.0, items_height, font_size=text_font)
         code_top = content_top + items_height + 0.15
         remaining = 7.5 - code_top - 0.2
         _render_code_region(slide, slide_data.code_blocks, meta, 0.6, code_top, 12.0, remaining, carbon_images)
     elif has_items:
-        # Adaptive sizing: scale up font and vertically center sparse slides.
-        bullet_count = sum(1 for c in items if c.kind == "bullet")
-        para_count = len(items) - bullet_count
-        # Approximate "line slots" — paragraphs may wrap so weight them more.
-        line_slots = bullet_count + para_count * 1.5
-        if line_slots <= 6:
-            font_size = 28
-        elif line_slots <= 10:
-            font_size = 22
+        # Estimate visual lines per item. Calibrated: 12" wide @ 22pt fits ~70 chars
+        # in the body font, so each pt scales the chars/line ratio inversely.
+        def chars_per_line(font_pt: int) -> int:
+            return max(20, int(70 * 22 / font_pt))
+
+        def visual_lines(it: ContentItem, cpl: int) -> int:
+            return max(1, -(-len(it.text) // cpl))
+
+        # Try font sizes from largest to smallest; pick the largest that fits.
+        candidates = [28, 22, 20, 18]
+        has_paragraph = any(c.kind == "paragraph" for c in items)
+        # Cap paragraphs at 22pt to keep prose readable.
+        if has_paragraph:
+            candidates = [22, 20, 18]
+
+        font_size = candidates[-1]
+        for fs in candidates:
+            cpl = chars_per_line(fs)
+            tl = sum(visual_lines(c, cpl) for c in items)
+            line_h = fs * 1.4 / 72
+            needed = tl * line_h + 0.3
+            available = 7.5 - content_top - 0.3
+            if needed <= available:
+                font_size = fs
+                total_lines = tl
+                est_height = needed
+                break
         else:
-            font_size = 18
-        line_height_in = font_size * 1.4 / 72
-        est_height = max(1.0, len(items) * line_height_in + 0.4)
-        available = 7.5 - content_top - 0.4
-        if est_height < available:
+            cpl = chars_per_line(font_size)
+            total_lines = sum(visual_lines(c, cpl) for c in items)
+            est_height = total_lines * font_size * 1.4 / 72 + 0.3
+
+        available = 7.5 - content_top - 0.3
+        # Re-center only if content uses ≤50% of available area.
+        if est_height < available * 0.5:
             content_top = content_top + (available - est_height) / 2
+        box_h = min(max(est_height, 1.5), 7.5 - content_top - 0.2)
         _render_content_box(
-            slide, items, meta, 0.6, content_top, 12.0, max(est_height, 1.5),
+            slide, items, meta, 0.6, content_top, 12.0, box_h,
             font_size=font_size,
         )
     elif has_code:
@@ -701,6 +774,7 @@ def _render_content_box(
 
     text_color = color_override or theme.text_color
     accent = color_override or theme.accent_color
+    link_color = theme.accent_color
 
     for i, item in enumerate(items):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
@@ -716,7 +790,11 @@ def _render_content_box(
             brun.font.size = Pt(font_size)
             brun.font.color.rgb = _hex_to_rgb(accent)
 
-        _add_formatted_runs(p, item.text, font_name=theme.font_body, font_size=font_size, color=text_color)
+        _add_formatted_runs(
+            p, item.text,
+            font_name=theme.font_body, font_size=font_size, color=text_color,
+            code_font=theme.code_font, link_color=link_color,
+        )
 
 
 def _render_bullets_box(
