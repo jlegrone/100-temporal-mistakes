@@ -1045,10 +1045,7 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
              log.Warn("failed to cancel shipment", "error", cancelErr)
          }
 -        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
-+        startErr := executeDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest)
-+        if startErr != nil {
-+            log.Warn("failed to start refund", "error", startErr)
-+        }
++        executeDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest)
 
          return nil, err
      }
@@ -1056,11 +1053,11 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
  }
 
  // Start a child workflow using disconnected context and wait for it to be scheduled.
- func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) error {
+ func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) {
      ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
      ctx, _ = workflow.NewDisconnectedContext(ctx)
      fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
-     return fut.GetChildWorkflowExecution().Get(ctx, nil)
+     if err := fut.GetChildWorkflowExecution().Get(ctx, nil); err != nil { panic(err) }
  }
 ```
 
