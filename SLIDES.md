@@ -1390,28 +1390,28 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 ## Workflows: Cap Workflow Lifetime With ContinueAsNew
 
-```go
-func SubscriptionWorkflow(ctx workflow.Context, state SubscriptionState) error {
-    // ...
-    sel.AddFuture(workflow.NewTimer(ctx, 24*time.Hour), func(f workflow.Future) {
-        // Noop; just unblock the selector
-    })
+```diff
+ func SubscriptionWorkflow(ctx workflow.Context, state SubscriptionState) error {
+     // ...
++    sel.AddFuture(workflow.NewTimer(ctx, 24*time.Hour), func(f workflow.Future) {
++        // Noop; just unblock the selector
++    })
 
-    for sel.HasPending() {
-        sel.Select(ctx)
-        if continueAsNewSuggested(ctx) {
-            return workflow.NewContinueAsNewError(ctx, SubscriptionWorkflow, state)
-        }
+     for sel.HasPending() {
+         sel.Select(ctx)
++        if continueAsNewSuggested(ctx) {
++            return workflow.NewContinueAsNewError(ctx, SubscriptionWorkflow, state)
++        }
 
-        // ...
-    }
-}
+         // ...
+     }
+ }
 
-func continueAsNewSuggested(ctx workflow.Context) bool {
-    info := workflow.GetInfo(ctx)
-    return info.GetContinueAsNewSuggested() ||
-        workflow.Now(ctx).After(info.WorkflowStartTime + 24*time.Hour - time.Second)
-}
+ func continueAsNewSuggested(ctx workflow.Context) bool {
+     info := workflow.GetInfo(ctx)
+     return info.GetContinueAsNewSuggested() ||
+         workflow.Now(ctx).After(info.WorkflowStartTime + 24*time.Hour - time.Second)
+ }
 ```
 
 <!-- Any workflow expected to run for more than 24 hours should implement Continue-As-New, and use both ContinueAsNewSuggested and workflow execution time as triggers for it. -->
