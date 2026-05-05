@@ -1323,7 +1323,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
          return nil, err
      }
-
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 
