@@ -1394,18 +1394,14 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 ```go
 func SubscriptionWorkflow(ctx workflow.Context, state SubscriptionState) error {
-    var workflowAgedOut bool
-
-    sel := workflow.NewSelector(ctx)
+    // ...
     sel.AddFuture(workflow.NewTimer(ctx, 24*time.Hour), func(f workflow.Future) {
-        workflowAgedOut = true
+        // Noop; just unblock the selector
     })
-    // Add additional branches to selector ...
 
     for sel.HasPending() {
         sel.Select(ctx)
-
-        if workflow.GetInfo(ctx).GetContinueAsNewSuggested() || workflowAgedOut {
+        if continueAsNewSuggested(ctx) {
             return workflow.NewContinueAsNewError(ctx, SubscriptionWorkflow, state)
         }
 
