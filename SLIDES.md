@@ -394,8 +394,8 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 
 func getIdempotencyToken(ctx context.Context) string {
-	info := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%s", info.WorkflowExecution.ID, info.WorkflowExecution.RunID, info.ActivityID)
+	i := activity.GetInfo(ctx)
+	key := fmt.Sprintf("%s:%s:%s", i.WorkflowExecution.ID, i.WorkflowExecution.RunID, i.ActivityID)
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
 ```
