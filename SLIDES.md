@@ -928,7 +928,7 @@ When we execute the RefundPayment child workflow, we're not actually waiting for
 
 This is what was intended; the Purchase workflow is designed to return as soon as it detects the shipment error, while the refund child workflow is meant to complete asynchronously.
 
-TODO: Move each point here into a subsequent slide with a diff adding the relevant line of code to the execDisconnectedChildWorkflow helper.
+TODO: Move each point here into a subsequent slide with a diff adding the relevant line of code to the execDisconnectedChildWorkflow helper. Also split the speaker note for each point out into the relevant slide.
 
 1. But when a parent workflow returns, by default Temporal will terminate any of its child workflows that are still running. We can change this behavior by setting a parent close policy when starting the child workflow.
 
@@ -941,14 +941,6 @@ TODO: Move each point here into a subsequent slide with a diff adding the releva
 
 ## Workflows: Disconnected Child Workflows (continued)
 
-<!-- Speaker notes: Three changes make the refund actually compensate the customer.
-
-1. workflow.NewDisconnectedContext detaches the cleanup from the parent's cancelation, so the refund command can still be issued.
-2. ParentClosePolicy ABANDON keeps the child running after the parent closes, so the refund completes even if the parent returns immediately.
-3. GetChildWorkflowExecution().Get blocks until the server has accepted the start command, so we know the child is durably scheduled before the parent returns.
-
-Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other SDKs have equivalent mechanisms under different names -- the concept of decoupling cleanup from parent cancelation is universal.
--->
 ```diff
  func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
      // ...
@@ -972,16 +964,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
      if err := fut.GetChildWorkflowExecution().Get(ctx, nil); err != nil { panic(err) }
  }
 ```
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -1008,7 +990,10 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
  }
 ```
 
-<!-- When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached. -->
+<!--
+In any workflow that needs to perform compensating actions, like our purchase example that refunds customers when shipment fails, it is also important to ensure that the workflow timeout set by the client when starting the workflow cannot elapse before the compensating action has been executed.
+
+When a workflow execution times out, the result is functionally the same as workflow termination. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow run timeout is reached. -->
 
 ---
 
@@ -1037,9 +1022,11 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
  }
 ```
 
-<!-- Any workflow expected to run for more than 24 hours should implement Continue-As-New, and use both ContinueAsNewSuggested and workflow execution time as triggers for it. -->
+<!--
+Another way timers can be handy is when dealing with long-running workflows. I think of it as a general best practice to implement ContinueAsNew for any workflow which may run for longer than 24 hours, and to trigger ContinueAsNew proactively based on a timer even if no other state transitions are happening in the workflow. If you deploy once per day, then following this advice means you can safely add, deprecate, and remove any change version within one week.
 
-<!-- Trigger ContinueAsNew on event count, elapsed time (24 h caps code age and simplifies versioning), or an explicit signal for operational control. -->
+And as an added bonus, if you onboard to worker versioning then time based continue as new will also ensure that old worker versions do not need to remain active for longer than one day.
+-->
 
 ---
 
@@ -1047,8 +1034,8 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 
 Workflow functions:
 - MUST be deterministic. Use the Temporal SDK for time, randomness, and side effects.
-- MUST evaluate all patches as the first step (at the top of the function).
-- MUST use internal timers rather than execution timeouts if they need to run compensating actions.[1]
+- MUST evaluate all change versions as the first step (at the top of the function).
+- SHOULD use internal timers rather than execution timeouts if they need to run compensating actions.
 - SHOULD be designed to complete or ContinueAsNew within 24 hours or when the server suggests ContinueAsNew.
 - SHOULD drain all signals before completing or ContinueAsNew.
 - SHOULD fan out large batches of work to child workflows.
