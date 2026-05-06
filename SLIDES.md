@@ -81,10 +81,10 @@ So let's dive into how to write reliable, well-behaved activities.
 ## Activities: Handling Downstream Service Errors
 
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
 
-    resp, err := w.httpClient.Do(httpReq)
+    resp, err := httpClient.Do(httpReq)
     if err != nil {
         return nil, err
     }
@@ -111,7 +111,7 @@ And you can see there are already a few places where we might return an error. S
 ## Activities: Avoid Amplifying Invalid Requests
 
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     // Send the request ...
 
     switch resp.StatusCode {
@@ -134,7 +134,7 @@ One of those conditions would be if the payments API responds with a "Bad Reques
 
 <!-- Updated code example for HTTP 429: prefer the server's Retry-After hint (RFC 7231 §7.1.3 -- delta-seconds or HTTP-date) when present, and fall back to activityhelpers.GetNextRetryDelay with a minimum backoff coefficient of 3 so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     // Send the request ...
 
     switch resp.StatusCode {
@@ -174,7 +174,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
         ScheduleToCloseTimeout: time.Minute,
         RetryPolicy: { /* ... */ },
     })
-    resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+    resp, err := workflowhelpers.AwaitActivity(ctx, ChargePayment, chargeRequest)
 
     // ...
 }
@@ -206,7 +206,7 @@ But we also need to consider the worst case: what if our worker, or the payments
          RetryPolicy: { /* ... */ },
      })
 
-     resp, err := workflowhelpers.AwaitActivity(ctx, w.ChargePayment, chargeRequest)
+     resp, err := workflowhelpers.AwaitActivity(ctx, ChargePayment, chargeRequest)
      // ...
  }
 ```
@@ -379,7 +379,7 @@ Common techniques to achieve idempotency:
 
 <!-- Back to the previous payment code example. Update the code to compute an idempotency key (using activityhelpers.GetIdempotencyToken) and add it to the request header (follow the example from stripe docs: https://docs.stripe.com/api/idempotent_requests). -->
 ```go
-func (w *Worker) ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
+func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
     httpReq.Header.Set("Idempotency-Key", getIdempotencyToken(ctx))
 
