@@ -829,22 +829,12 @@ Find more techniques at [temporal.io/resources/on-demand/replay-safety-at-datado
 <!--
 And this is what that unit test might look like. We can run this locally or in CI, and if the new code's command sequence diverges from either workflow history, then the test fails and we can be alerted before shipping the new workflow code to production.
 
-I definitely recommend setting a test harness for workflow replay, because it can also be a super powerful way to debug workflows locally when things go wrong.
+I definitely recommend setting up a test harness for workflow replay, because it can also be a super powerful way to debug workflows locally when things go wrong.
 
 Having a replay test harness also makes it pretty easy to compute code coverage for your workflow and visualize it in an IDE just by running that specific test; you should be doing this to ensure that the replay test is actually exercising the parts of the workflow function that you updated.
 
-If you're interested in more techniques to ensure replay safety for workflow code changes, then please check out the talk from my colleague Jing Yi a couple years ago titled Replay Safety at Datadog.
+If you're interested in more techniques to ensure replay safety for workflow code changes, then please check out the talk that my colleague Jing Yi gave a couple years ago titled Replay Safety at Datadog.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
