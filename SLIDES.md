@@ -115,8 +115,9 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
     // Send the request ...
 
     switch resp.StatusCode {
-    case http.StatusOK: /* ... */
+    case http.StatusOK: /* Decode the response and return ... */
     case http.StatusBadRequest:
+        // Return non-retryable error
         return nil, temporal.NewNonRetryableApplicationError(resp.Status, "http_400", nil)
     default:
         return nil, fmt.Errorf("unexpected http status: %s", resp.StatusCode)
@@ -138,8 +139,8 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
     // Send the request ...
 
     switch resp.StatusCode {
-    case http.StatusOK: /* ... */
-    case http.StatusBadRequest: /* ... */
+    case http.StatusOK: /* Decode the response and return ... */
+    case http.StatusBadRequest: /* Return non-retryable error ... */
     case http.StatusTooManyRequests:
         // Honor the server's hint when present; otherwise back off
         // more aggressively than the policy's default.
