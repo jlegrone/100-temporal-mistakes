@@ -322,8 +322,8 @@ _CARBON_PARAMS = {
 
 def _carbon_cache_key(code: str, language: str) -> str:
     """Deterministic hash for a code block to use as a cache key.
-    Includes carbon style params so changing fs/width busts the cache."""
-    style = f"{_CARBON_PARAMS.get('fs', '')}|{_CARBON_PARAMS.get('width', '')}|{_CARBON_PARAMS.get('fm', '')}"
+    Includes carbon style params so changing fs/width/highlighting busts the cache."""
+    style = f"{_CARBON_PARAMS.get('fs', '')}|{_CARBON_PARAMS.get('width', '')}|{_CARBON_PARAMS.get('fm', '')}|v2"
     h = hashlib.sha256(f"{style}\n{language}\n{code}".encode()).hexdigest()[:16]
     return h
 
@@ -331,12 +331,17 @@ def _carbon_cache_key(code: str, language: str) -> str:
 def _build_carbon_url(code: str, language: str) -> str:
     """Build a carbon.now.sh URL with the given code and language.
 
-    Always uses "auto" language detection to avoid trailing blank lines that
-    some CodeMirror modes (like text/x-diff) add. Diff coloring is applied
-    separately via CodeMirror.markText() after the page loads.
+    Use the explicit CodeMirror MIME for known languages so highlighting is
+    consistent across snippets. Fall back to "auto" for unknown / diff blocks
+    (the diff mode adds trailing blank lines, so we color diffs ourselves via
+    CodeMirror.markText() after the page loads).
     """
     params = dict(_CARBON_PARAMS)
-    params["l"] = "auto"
+    mime = _CARBON_LANG_MAP.get(language)
+    if mime and mime != "auto" and language != "diff":
+        params["l"] = mime
+    else:
+        params["l"] = "auto"
     # Carbon expects the code param to be double-encoded: the browser decodes one
     # layer, then carbon's JavaScript decodes the second.
     params["code"] = quote(code, safe="")
