@@ -709,23 +709,13 @@ This is a well formed change version check, and deploying as-is would not cause 
 
 First, the change version is being evaluated inside of a conditional branch means that not all workflow executions will actually evaluate it. Right now, only workflows that don't receive the shipment processed signal within 12 hours will register the change version.
 
-Second, the change version is being evaluated late in the workflow's execution; in this case we know that the workflow will be running for at least 12 hours before it registers the change version.
+Second, the change version is being evaluated late in the workflow's execution; in this case we know that the workflow could be running for at least 12 hours before it registers the change version.
 
 The reason this matters is that we want ALL workflow executions started after the new version of the worker is deployed to register the same set of change versions so that we can automate checks to verify that removal of the change version is safe in the future.
 -->
 
 <!-- Speaker notes: GetVersion is reached only when shipment fails. Workflows that complete successfully never evaluate the patch, so the TemporalChangeVersion search attribute is never set on those executions and a list-workflow query filtering by version keeps returning unversioned workflows indefinitely.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
