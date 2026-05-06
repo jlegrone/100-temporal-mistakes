@@ -417,8 +417,8 @@ And then we can just pass that along to the payments API!
 
 <!-- New code example: An activity called RunKubernetesJob that starts a k8s job and waits for it to complete (two k8s API calls). The activity should accept a struct with Name and Namespace fields, and return a struct with a Status field (completed or failed) -->
 ```go
-func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
-    jobs := w.client.BatchV1().Jobs(req.Namespace)
+func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
+    jobs := k8sClient.BatchV1().Jobs(req.Namespace)
     // Create the job
     if _, err := jobs.Create(ctx, &batchv1.Job{
         Name: req.Name,
@@ -450,10 +450,9 @@ The problem here is that if the activity fails or the worker is redeployed durin
 
 <!-- Updated code example, now ignoring an already exists error for the job. -->
 ```diff
- func (w *Worker) RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
-     jobs := w.client.BatchV1().Jobs(req.Namespace)
--    // Create the job
-+    // Create the job if it doesn't exist
+ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
+     jobs := k8sClient.BatchV1().Jobs(req.Namespace)
+     // Create the job if it doesn't exist
      if _, err := jobs.Create(ctx, &batchv1.Job{
          Name: req.Name,
 -    }); err != nil {
@@ -476,8 +475,8 @@ So it's possible to keep activities idempotent, even if they perform multiple op
 ## Activities: Natural Idempotency (continued)
 <!-- Update code example: Split into two activities, one called StartKubernetesJob and another called AwaitKubernetesJob. -->
 ```go
-func (w *Worker) StartKubernetesJob(ctx context.Context, req StartJobRequest) error {
-    jobs := w.client.BatchV1().Jobs(req.Namespace)
+func StartKubernetesJob(ctx context.Context, req StartJobRequest) error {
+    jobs := k8sClient.BatchV1().Jobs(req.Namespace)
     // Create the job if it doesn't exist
     _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
     if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -486,9 +485,8 @@ func (w *Worker) StartKubernetesJob(ctx context.Context, req StartJobRequest) er
     return nil
 }
 
-func (w *Worker) AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*AwaitJobResponse, error) {
-    // Poll for final status
-    // ...
+func AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*AwaitJobResponse, error) {
+    for { /* Poll for final status... */ }
 }
 ```
 
@@ -501,10 +499,8 @@ Note that I still kept the already exists check in the new `StartKubernetesJob` 
 
 ## Activities: Handling Worker Disruptions
 
-Choosing between StartToClose and Heartbeat timeouts
-
 ```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
+func RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
     // Execute the StartKubernetesJob activity
     // ...
 
@@ -514,7 +510,7 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
             StartToCloseTimeout:    time.Hour,
             ScheduleToCloseTimeout: time.Hour,
         }),
-        w.AwaitKubernetesJob,
+        AwaitKubernetesJob,
         AwaitJobRequest{Name: req.Name, Namespace: req.Namespace},
     )
 }
@@ -538,7 +534,7 @@ Speaker notes:
 - Replacing a start to close timeout with heartbeat timeout avoids the tradeoff between retrying quickly when the worker fails, and allowing your longest-running tasks to complete. Now the activity can run as long as it needs to, up to the schedule to close timeout, but is retried quickly if the worker becomes unresponsive.
  -->
 ```go
-func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
+func RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse, error) {
     // Execute the StartKubernetesJob activity
     // ...
 
@@ -549,7 +545,7 @@ func (w *Worker) RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*Run
             HeartbeatTimeout:       30 * time.Second,
             ScheduleToCloseTimeout: time.Hour,
         }),
-        w.AwaitKubernetesJob,
+        AwaitKubernetesJob,
         AwaitJobRequest{Name: req.Name, Namespace: req.Namespace},
     )
 }
