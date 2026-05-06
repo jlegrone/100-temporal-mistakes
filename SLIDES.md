@@ -890,26 +890,19 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 ```
 
 <!--
-After we've checked that it is safe to do so, we can clean up the old code branches.
+After we've confirmed there are no workflows running with earlier change versions, we can clean up the old code branches.
 
-Note that it is always safest to do this in two phases; first bumping the min supported version to match the max version, and a later deployment to remove the change version evaluation entirely. The reasons for this have to do with your ability to roll back to the previous version of the code, but it's kind of complicated.
+Note that it is HIGHLY recommended to do this in two phases; first bumping the min supported version to match the max version like we're doing here, and a later deployment to remove the change version entirely.
+
+The reason to continue evaluating the change version for one additional deploy cycle is that while your rollout progresses, it's possible for a workflow execution to bounce between the current and previous versions of your worker. So that change version marker is still needed in order to avoid the previous version of the worker going down the wrong path if it evaluates a workflow that was started on the current version of the worker.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
 ## Workflows: Disconnected Child Workflows
 
-<!-- Speaker notes: An external fulfillment system signals the workflow once the shipment is processed. A Selector fans in that signal, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
+<!--
+An external fulfillment system signals the workflow once the shipment is processed. A Selector fans in that signal, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 
 But this naive version uses the parent's (possibly canceled) ctx, the default ParentClosePolicy, and doesn't wait for the child to be scheduled before returning. Each of those is a bug we'll fix on the next slide. -->
 
@@ -933,7 +926,15 @@ There is another subtle issue with the workflow code we've just been looking at.
 
 When we execute the RefundPayment child workflow, we're not actually waiting for it to complete before returning from our workflow function.
 
-This is actually what was intended; the Purchase workflow should return as soon as it detects the shipment error, while the refund child workflow is meant to complete asynchronously.
+This is what was intended; the Purchase workflow is designed to return as soon as it detects the shipment error, while the refund child workflow is meant to complete asynchronously.
+
+TODO: Move each point here into a subsequent slide with a diff adding the relevant line of code to the execDisconnectedChildWorkflow helper.
+
+1. But when a parent workflow returns, by default Temporal will terminate any of its child workflows that are still running. We can change this behavior by setting a parent close policy when starting the child workflow.
+
+2. It is also possible that at this point the Purchase workflow has been canceled. Even with a custom parent close policy, attempting to start the refund workflow would fail in this case. So we also need to be explicit that the child workflow should be started with a disconnected context that is unaffected by cancelation.
+
+3. And the last issue here is especially subtle: if we only "start" the child workflow and immediately return, it may not actually be started. So before returning we also need to get the child workflow execution future to ensure it was created by Temporal.
 -->
 
 
