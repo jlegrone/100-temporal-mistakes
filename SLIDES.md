@@ -952,10 +952,10 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 -        switch delayVersion {
 -        case 1: /* Refund only ... */
 -        case 2:
-+        if e := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); e != nil {
-+            log.Warn("failed to cancel shipment", "error", e)
-+        }
-+        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
+         if e := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); e != nil {
+             log.Warn("failed to cancel shipment", "error", e)
+         }
+         workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          return nil, err
      }
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
@@ -1073,37 +1073,25 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
      // ...
+
 +    // Reserve at least 1 minute for compensation before the hard timeout.
-+    softTimeout, err := getSoftTimeout(ctx, time.Minute)
-+    if err != nil {
-+        return nil, err
-+    }
-+    sel.AddFuture(softTimeout, func(f workflow.Future) {
++    sel.AddFuture(getSoftTimeout(ctx, time.Minute), func(f workflow.Future) {
 +        // Run compensating actions now! Workflow terminating in 1 minute...
 +    })
+
      // ...
  }
 
- func getSoftTimeout(ctx workflow.Context, padding time.Duration) (workflow.Future, error) {
+ func getSoftTimeout(ctx workflow.Context, padding time.Duration) workflow.Future {
      timeout := workflow.GetInfo(ctx).WorkflowRunTimeout
      if timeout <= padding {
-         return nil, errTimeoutTooSmall(padding) // non-retryable application error
+         panic("WorkflowRunTimeout too short")
      }
-     return workflow.NewTimer(ctx, timeout - padding), nil
+     return workflow.NewTimer(ctx, timeout - padding)
  }
 ```
 
 <!-- When a workflow execution times out, the end result is functionally the same as termination. No deferred functions run, no cancelation handlers fire. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow timeout is reached. -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
