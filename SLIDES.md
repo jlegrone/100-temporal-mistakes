@@ -721,7 +721,6 @@ The reason this matters is that we want ALL workflow executions started after th
 ```diff
  func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
 +    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
-
      // ...
 
      sel.AddFuture(workflow.NewTimer(ctx, 12*time.Hour), func(f workflow.Future) {
@@ -751,7 +750,6 @@ The fix is simple, we just need to hoist the version check to the top of the wor
  func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 1)
 +    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
-
      // ...
 
      sel.Select(ctx)
@@ -842,7 +840,7 @@ If you're interested in more techniques to ensure replay safety for workflow cod
 
 ```bash
 #!/bin/sh
-# Returns 0 when no in-flight workflow can still be on v0 or v1.
+# Prints 0 when no in-flight workflows are still on v0 or v1.
 
 # Timestamp for 5 minutes ago, to avoid counting workflows that have been
 # scheduled but haven't yet been picked up by a worker. (use `date` on Linux)
@@ -858,22 +856,12 @@ temporal workflow count --query "$QUERY"
 ```
 
 <!--
-Now after we've deployed a workflow code change, it's time to wait for the old workflows to complete and then clean up the old change version branches in our code.
+Now after we've deployed a workflow code change, it's time to wait for the old workflows to complete and then clean up the change version branches.
 
-To verify this is safe, we can run a query like this to check if there are still any workflows running that were started with an earlier change version.
+To verify this is safe, we can run a query to check if there are still any workflows running that were started with an earlier change version.
 
 Note that you'd need to do this once per namespace or Temporal cluster if you have multiple deployments of your worker.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -884,7 +872,6 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 -    delayVersion := workflow.GetVersion(ctx, "handle-shipment-delay", workflow.DefaultVersion, 2)
 +    // TODO: drop this once the new worker is rolled out everywhere.
 +    _ = workflow.GetVersion(ctx, "handle-shipment-delay", 2, 2)
-
      // ...
 
      sel.Select(ctx)

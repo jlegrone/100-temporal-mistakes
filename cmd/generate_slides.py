@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 import hashlib
 import re
 import sys
@@ -943,6 +944,23 @@ def _render_code_images(
 # ---------------------------------------------------------------------------
 
 
+def _partition_speaker_notes(notes: list[str], max_paras: int = 2) -> list[list[str]]:
+    """Flatten all paragraphs across speaker-note comments and split into chunks
+    of `max_paras`. Each returned chunk is a list of paragraph strings (which the
+    renderer joins with blank lines)."""
+    paras: list[str] = []
+    for note in notes:
+        for p in re.split(r"\n\s*\n", note.strip()):
+            p = p.strip()
+            if p:
+                paras.append(p)
+    if not paras:
+        return [[]]
+    if len(paras) <= max_paras:
+        return [paras]
+    return [paras[i:i + max_paras] for i in range(0, len(paras), max_paras)]
+
+
 def generate_pptx(
     meta: PresentationMeta,
     slides: list[Slide],
@@ -954,17 +972,22 @@ def generate_pptx(
     prs.slide_height = Inches(7.5)
 
     for i, s in enumerate(slides):
-        if i == 0:
-            _render_title_slide(prs, s, meta)
-        elif s.is_part_header:
-            _render_section_slide(prs, s, meta)
-        elif not s.content and not s.code_blocks and not s.images and s.title:
-            if not s.subtitle and len(s.title) < 60:
-                _render_section_slide(prs, s, meta)
+        # Slides with >2 speaker-note paragraphs become multiple identical
+        # slides, each carrying ≤2 paragraphs so the speaker view stays light.
+        for partition in _partition_speaker_notes(s.speaker_notes):
+            s_copy = copy.copy(s)
+            s_copy.speaker_notes = partition
+            if i == 0:
+                _render_title_slide(prs, s_copy, meta)
+            elif s.is_part_header:
+                _render_section_slide(prs, s_copy, meta)
+            elif not s.content and not s.code_blocks and not s.images and s.title:
+                if not s.subtitle and len(s.title) < 60:
+                    _render_section_slide(prs, s_copy, meta)
+                else:
+                    _render_content_slide(prs, s_copy, meta, carbon_images)
             else:
-                _render_content_slide(prs, s, meta, carbon_images)
-        else:
-            _render_content_slide(prs, s, meta, carbon_images)
+                _render_content_slide(prs, s_copy, meta, carbon_images)
 
     prs.save(str(output))
 
