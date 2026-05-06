@@ -714,9 +714,6 @@ Second, the change version is being evaluated late in the workflow's execution; 
 The reason this matters is that we want ALL workflow executions started after the new version of the worker is deployed to register the same set of change versions so that we can automate checks to verify that removal of the change version is safe in the future.
 -->
 
-<!-- Speaker notes: GetVersion is reached only when shipment fails. Workflows that complete successfully never evaluate the patch, so the TemporalChangeVersion search attribute is never set on those executions and a list-workflow query filtering by version keeps returning unversioned workflows indefinitely.
--->
-
 ---
 
 ## Workflows: Evaluate Change Versions Up Front
@@ -745,16 +742,6 @@ The reason this matters is that we want ALL workflow executions started after th
 <!--
 The fix is simple, we just need to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the code branch it's used in is never evaluated.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -786,20 +773,12 @@ The fix is simple, we just need to hoist the version check to the top of the wor
 ```
 
 <!--
-If we need to make more changes then we can bump the change id's max version.
+And if we ever need to make more updates to that area of the workflow in the future, then we can bump the change id's max version again and add another branch with our new logic.
 
-In this case, version 2 now cancels the in-flight shipment before issuing the refund so the package doesn't get shipped after the customer has been refunded.
+In our example the payment workflow now now cancels the in-flight shipment before issuing the refund so the package doesn't get shipped after the customer has been refunded.
+
+When reviewed in isolation, we can often be pretty confident about a change like this, but in order to scale verification of replay safety to larger and more frequent changes, we can get some help from our friends, the computers.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
@@ -822,24 +801,12 @@ temporal workflow show --workflow-id <ID> --output json \
 ```
 
 <!--
-By the way, before shipping any workflow code change, it's a good idea to test replaying some existing workflow histories against the new version of your code.
+Temporal provides a harness to replay any workflow history against your workflow function locally, without ever deploying a worker. So in order to verify a change is replay safe programatically, we just need to find a workflow history to test against.
 
-Any time you evaluate a change version, Temporal automatically adds a TemporalChangeVersion search attribute with that change id and maximum supported version number. This is why it's important to evaluate change versions first thing when the workflow starts, because otherwise it can be hard to distinguish old from new workflows (at least not without lots of complicated filters based on workflow start time or worker build ids).
-
-What I'm showing here is a quick way to find the earliest workflow execution that ran on the version of our code that didn't have the handle-shipment-delay change version, and a second command to find the earliest workflow that took the version 1 branch.
+What I'm showing here is a quick way to find the earliest workflow execution that ran on the version of our code that didn't have the handle-shipment-delay change version, and a second command to find the earliest workflow that took the version 1 branch. The query is using the TemporalChangeVersion search attribute that is automatically registered when you evaluate a change version in a workflow.
 
 And then in the third command, we're grabbing the workflow history and saving to a JSON file to replay in a unit test.
 -->
-
-
-
-
-
-
-
-
-
-
 
 ---
 
