@@ -83,11 +83,9 @@ So let's dive into how to write reliable, well-behaved activities.
 ```go
 func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
-
+    // Send request
     resp, err := httpClient.Do(httpReq)
-    if err != nil {
-        return nil, err
-    }
+    if err != nil { return nil, err }
 
     switch resp.StatusCode {
     case http.StatusOK:
@@ -112,7 +110,8 @@ And you can see there are already a few places where we might return an error. S
 
 ```go
 func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
-    // Send the request ...
+    httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
+    // Send request ...
 
     switch resp.StatusCode {
     case http.StatusOK: /* Decode the response and return ... */
@@ -136,7 +135,8 @@ One of those conditions would be if the payments API responds with a "Bad Reques
 <!-- Updated code example for HTTP 429: prefer the server's Retry-After hint (RFC 7231 §7.1.3 -- delta-seconds or HTTP-date) when present, and fall back to activityhelpers.GetNextRetryDelay with a minimum backoff coefficient of 3 so retries against the rate-limited endpoint back off more aggressively than the workflow's default policy. -->
 ```go
 func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
-    // Send the request ...
+    httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
+    // Send request ...
 
     switch resp.StatusCode {
     case http.StatusOK: /* Decode the response and return ... */
@@ -383,8 +383,14 @@ Common techniques to achieve idempotency:
 func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, error) {
     httpReq := newPaymentHTTPReq(req) // POST api.example.com/v1/payments/charge
     httpReq.Header.Set("Idempotency-Key", getIdempotencyToken(ctx))
+    // Send request ...
 
-    // ... send the HTTP request & handle errors
+    switch resp.StatusCode {
+    case http.StatusOK: /* Decode the response and return ... */
+    case http.StatusBadRequest: /* Return non-retryable error ... */
+    case http.StatusTooManyRequests: /* Back off more aggressively ... */
+    default: /* Unexpected status ... */
+    }
 }
 
 func getIdempotencyToken(ctx context.Context) string {
