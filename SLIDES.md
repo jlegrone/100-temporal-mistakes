@@ -303,16 +303,6 @@ Note that if you need to you can still use retry policies to fine tune the initi
 But for these additional properties of retry policies, I think Temporal already sets pretty good defaults for most use cases. And those are what we're looking at here: by default, the first retry happens 1 second after the first activity failure, and the interval doubles from there until it caps off at 100 seconds between each attempt.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Weathering System Outages (continued)
