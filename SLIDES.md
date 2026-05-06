@@ -791,9 +791,8 @@ The fix is simple, we just need to hoist the version check to the top of the wor
              workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
 +        case 2:
 +            // Cancel the in-flight shipment before issuing the refund.
-+            cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
-+            if cancelErr != nil {
-+                log.Warn("failed to cancel shipment", "error", cancelErr)
++            if e := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); e != nil {
++                log.Warn("failed to cancel shipment", "error", e)
 +            }
 +            workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          }
@@ -953,9 +952,8 @@ Note that you'd need to do this once per namespace or Temporal cluster if you ha
 -        switch delayVersion {
 -        case 1: /* Refund only ... */
 -        case 2:
-+        cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
-+        if cancelErr != nil {
-+            log.Warn("failed to cancel shipment", "error", cancelErr)
++        if e := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); e != nil {
++            log.Warn("failed to cancel shipment", "error", e)
 +        }
 +        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
          return nil, err
@@ -993,9 +991,8 @@ func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*Purch
     // ...
     sel.Select(ctx)
     if err != nil {
-        cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
-        if cancelErr != nil {
-            log.Warn("failed to cancel shipment", "error", cancelErr)
+        if e := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); e != nil {
+            log.Warn("failed to cancel shipment", "error", e)
         }
         workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
         return nil, err
@@ -1040,20 +1037,18 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
      // ...
      sel.Select(ctx)
      if err != nil {
-         cancelErr := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest)
-         if cancelErr != nil {
-             log.Warn("failed to cancel shipment", "error", cancelErr)
+         if e := workflowhelpers.AwaitActivity(ctx, w.CancelShipment, cancelRequest); e != nil {
+             log.Warn("failed to cancel shipment", "error", e)
          }
 -        workflow.ExecuteChildWorkflow(ctx, w.RefundPayment, refundRequest)
-+        executeDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest)
-
++        execDisconnectedChildWorkflow(ctx, w.RefundPayment, refundRequest)
          return nil, err
      }
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 
  // Start a child workflow using disconnected context and wait for it to be scheduled.
- func executeDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) {
+ func execDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) {
      ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
      ctx, _ = workflow.NewDisconnectedContext(ctx)
      fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
@@ -1078,7 +1073,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 ```diff
  func (w *Worker) PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
      // ...
-
 +    // Reserve at least 1 minute for compensation before the hard timeout.
 +    softTimeout, err := getSoftTimeout(ctx, time.Minute)
 +    if err != nil {
@@ -1087,7 +1081,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 +    sel.AddFuture(softTimeout, func(f workflow.Future) {
 +        // Run compensating actions now! Workflow terminating in 1 minute...
 +    })
-
      // ...
  }
 
@@ -1128,7 +1121,6 @@ Speaker note: This API is Go-specific (workflow.NewDisconnectedContext). Other S
 +        if continueAsNewSuggested(ctx) {
 +            return workflow.NewContinueAsNewError(ctx, SubscriptionWorkflow, state)
 +        }
-
          // ...
      }
  }
