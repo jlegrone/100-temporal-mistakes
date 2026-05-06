@@ -937,16 +937,6 @@ TODO: Move each point here into a subsequent slide with a diff adding the releva
 3. And the last issue here is especially subtle: if we only "start" the child workflow and immediately return, it may not actually be started. So before returning we also need to get the child workflow execution future to ensure it was created by Temporal.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Workflows: Disconnected Child Workflows (continued)
@@ -1075,4 +1065,6 @@ Temporal workers:
 
 - [100 Go Mistakes](https://100go.co) by Teiva Harsanyi
 - Loïc Minaudier (software engineer @Datadog)
-- Participants in the "common Temporal mistakes" birds of a feather (Replay 2025)
+- Participants in the "Temporal Pain Points" birds of a feather (Replay 2025)
+
+<!-- BoaF notes: https://docs.google.com/document/d/1lfITwMgWT3eyY7qpd64YKHmjtHL4KhFonZqYawJsEdM/edit -->
