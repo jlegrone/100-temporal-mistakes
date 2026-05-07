@@ -1083,7 +1083,7 @@ Temporal workers:
 
 ---
 
-## Acknowledgements
+# Acknowledgements
 
 - [100 Go Mistakes](https://100go.co) by Teiva Harsanyi
 - Loïc Minaudier (software engineer @Datadog)

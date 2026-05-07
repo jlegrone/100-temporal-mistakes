@@ -754,11 +754,16 @@ def _render_content_slide(
             return max(1, -(-len(it.text) // cpl))
 
         # Try font sizes from largest to smallest; pick the largest that fits.
-        candidates = [28, 22, 20, 18]
         has_paragraph = any(c.kind == "paragraph" for c in items)
-        # Cap paragraphs at 22pt to keep prose readable.
+        all_bullets = all(c.kind == "bullet" for c in items)
         if has_paragraph:
+            # Cap paragraphs at 22pt to keep prose readable.
             candidates = [22, 20, 18]
+        elif all_bullets:
+            # Bullet-only slides read better at a moderate size.
+            candidates = [22, 20, 18]
+        else:
+            candidates = [28, 22, 20, 18]
 
         font_size = candidates[-1]
         for fs in candidates:
@@ -778,8 +783,9 @@ def _render_content_slide(
             est_height = total_lines * font_size * 1.4 / 72 + 0.3
 
         available = 7.5 - content_top - 0.3
-        # Re-center only if content uses ≤50% of available area.
-        if est_height < available * 0.5:
+        # Re-center only when the content is paragraph-like and short.
+        # Bullets stay top-aligned so lists look anchored to the title.
+        if not all_bullets and est_height < available * 0.5:
             content_top = content_top + (available - est_height) / 2
         box_h = min(max(est_height, 1.5), 7.5 - content_top - 0.2)
         _render_content_box(
