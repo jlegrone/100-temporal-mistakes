@@ -1,24 +1,11 @@
 # Workflow Lock Contention due to Concurrent Updates
 
 > [!TIP]
-> * Minimize concurrent updates to a given workflow history
-> * Failing doing so lead to lock contention and high end-to-end workflow execution latency
+> Too many concurrent updates to a single workflow can cause `busy_workflow` errors and high latency because of the way Temporal serializes [history](terms/event-history.md) updates through a server side lock.
 
-## What?
+Temporal scales well across many workflows but poorly when a single workflow receives many concurrent updates. [Signals](terms/signals.md) can be a difficult source of contention since they are often sent in response to external events. Other causes for contention can be activities or [child workflows](terms/child-workflow.md) completing simultaneously, [updates](terms/updates.md), and [queries](terms/queries.md).
 
-Temporal scales well with the numbers of workflows but poorly when a given workflow receive many concurrent updates to its history.
+Avoid funneling high-throughput tasks through a single workflow by spreading events across multiple workflows when possible.
 
-When that happens you'll see contention in the form of a rise in `busy_workflow` errors from the `service_errors_resource_exhausted` metric and high end to end workflow execution latency.
-
-## Why?
-
-Workflow history updates are serialized using a workflow level locking mechanism. As a result, concurrent updates will eventually compete to acquire that workflow lock resulting in high end to end latency for your workflow executions due to the high overhead caused by code blocked waiting for lock acquisition.
-
-Concurrent updates come in many flavors, the most obvious one being [signals](terms/signals.md) as those can be appended to workflow histories at any time by definition.
-But asynchronous activities and child workflows completing at the same time, long running activities heartbeats, as well as workflows [updates](terms/updates.md) and [queries](terms/queries.md) can also lead to contention.
-
-## How?
-
-You should design your application to spread events over multiple workflows when possible.
-
-You should avoid bad patterns like implementing a high throughput message queue over a single workflow or [naïve batch processing implementations](<naive-batch-processing-implementation.md>).
+<!-- TODO: Add instructions for how to monitor for lock contention (maybe not possible in temporal cloud?) -->
+<!-- TODO: Link to batch entry, fan-out workflow design pattern. -->

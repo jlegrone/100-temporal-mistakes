@@ -1,0 +1,11 @@
+origins:
+  - files:
+      pattern: "src/**/*.go"
+      owner: jlegrone
+      repo: 100-temporal-mistakes
+      ref: main
+targets:
+  - src
+features:
+  enable_source_link: true
+  allowed_target_extensions: [.md]

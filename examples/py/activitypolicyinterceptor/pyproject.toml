@@ -1,0 +1,24 @@
+[project]
+name = "activitypolicyinterceptor"
+version = "0.1.0"
+description = "Reference Python implementation of the Activity Policy Interceptor spec"
+requires-python = ">=3.10"
+dependencies = [
+    "temporalio>=1.7",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["activitypolicyinterceptor"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
