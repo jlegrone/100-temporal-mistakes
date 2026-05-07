@@ -360,7 +360,7 @@ Common techniques to achieve idempotency:
 - Using naturally idempotent operations
     - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
     - May help to decompose into multiple activities.
-- ~~Setting `MaxAttempts: 1` in retry policy~~
+- _Don't rely on `MaxAttempts: 1` in retry policy_
 
 <!-- I also want to note that, just in case you're thinking that it's ok to not have idempotent behavior if you set MaxAttempts to 1 in your retry policy, you should be aware that Temporal does not guarantee at most once execution for activities. This has to do with the way server replication and failover works, so it's probably ok if you're self-hosting a single Temporal cluster but even that could change. -->
 
