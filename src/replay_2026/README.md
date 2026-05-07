@@ -25,7 +25,7 @@ What we'll cover
 - Recommendations to simplify working with Temporal day to day
 
 Follow Along:
-![Scan to follow along at jacob.work/100TM](src/.assets/100TM_QR.png)
+![Scan to follow along at jacob.work/100TM](../.assets/100TM_QR.png)
 [Follow along: jacob.work/100TM](https://jacob.work/100TM)
 
 <!-- Speaker notes:
@@ -252,7 +252,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 ## Activities: Weathering System Outages (continued)
 
-![Retry simulator showing max attempts exhausted](src/.assets/retry_simulator_max_attempts.png)
+![Retry simulator showing max attempts exhausted](../.assets/retry_simulator_max_attempts.png)
 
 [docs.temporal.io/develop/activity-retry-simulator](https://docs.temporal.io/develop/activity-retry-simulator)
 

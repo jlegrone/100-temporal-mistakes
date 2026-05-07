@@ -7,9 +7,9 @@
 #     "playwright",
 # ]
 # ///
-"""Generate a PowerPoint presentation from SLIDES.md.
+"""Generate a PowerPoint presentation from a slide-formatted markdown file.
 
-SLIDES.md format:
+Markdown format:
   - Optional YAML frontmatter (between --- delimiters) for presentation metadata
   - Slides separated by --- on its own line (not indented, not inside code fences)
   - Markdown content: # Title, ## Subtitle, - bullets, **bold**, *italic*
@@ -17,7 +17,9 @@ SLIDES.md format:
   - HTML comments (<!-- ... -->) become speaker notes
 
 Usage:
-    uv run cmd/generate_slides.py [SLIDES.md] [-o output.pptx]
+    uv run cmd/generate_slides.py [path/to/slides.md] [-o output.pptx]
+
+Default input: src/replay_2026/README.md.
 
 First-time setup for carbon screenshots:
     uv run --with playwright python -m playwright install chromium
@@ -993,8 +995,12 @@ def generate_pptx(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate PPTX from SLIDES.md")
-    parser.add_argument("input", nargs="?", default="SLIDES.md", help="Input markdown file")
+    parser = argparse.ArgumentParser(description="Generate PPTX from a slide-formatted markdown file")
+    parser.add_argument(
+        "input", nargs="?",
+        default="src/replay_2026/README.md",
+        help="Input markdown file",
+    )
     parser.add_argument("-o", "--output", default=None, help="Output .pptx path")
     args = parser.parse_args()
 
