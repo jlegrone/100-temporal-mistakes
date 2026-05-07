@@ -19,7 +19,7 @@ theme:
 
 # 100 Temporal Mistakes
 
-What we'll cover
+## What we'll cover
 - Activities: Errors, retries, idempotency, timeouts, worker disruption
 - Workflows: Runtime limitations, determinism, change versioning
 - Recommendations to simplify working with Temporal day to day
