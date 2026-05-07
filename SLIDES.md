@@ -222,16 +222,6 @@ So now we're ready to go, right?
 <!-- Speaker note: ScheduleToClose doesn't always need to be large. Long values (hours) make sense when the workflow should weather an extended outage and the caller is OK waiting, or is notified asynchronously. Short values (seconds to minutes) make sense when the workflow has a graceful degradation path, when reporting an error quickly is preferable to retrying through an outage, or when an upstream caller is waiting synchronously.
 -->
 
-
-
-
-
-
-
-
-
-
-
 ---
 
 ## Activities: Weathering System Outages (continued)
@@ -457,8 +447,7 @@ The problem here is that if the activity fails or the worker is redeployed durin
          return nil, err
      }
  
-     // Poll for final status
-     // ...
+     for { /* Poll for final status... */ }
  }
 ```
 
@@ -927,14 +916,6 @@ There is another subtle issue with the workflow code we've just been looking at.
 When we execute the RefundPayment child workflow, we're not actually waiting for it to complete before returning from our workflow function.
 
 This is what was intended; the Purchase workflow is designed to return as soon as it detects the shipment error, while the refund child workflow is meant to complete asynchronously.
-
-TODO: Move each point here into a subsequent slide with a diff adding the relevant line of code to the execDisconnectedChildWorkflow helper. Also split the speaker note for each point out into the relevant slide.
-
-1. But when a parent workflow returns, by default Temporal will terminate any of its child workflows that are still running. We can change this behavior by setting a parent close policy when starting the child workflow.
-
-2. It is also possible that at this point the Purchase workflow has been canceled. Even with a custom parent close policy, attempting to start the refund workflow would fail in this case. So we also need to be explicit that the child workflow should be started with a disconnected context that is unaffected by cancelation.
-
-3. And the last issue here is especially subtle: if we only "start" the child workflow and immediately return, it may not actually be started. So before returning we also need to get the child workflow execution future to ensure it was created by Temporal.
 -->
 
 ---
@@ -956,14 +937,69 @@ TODO: Move each point here into a subsequent slide with a diff adding the releva
      return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
  }
 
- // Start a child workflow using disconnected context and wait for it to be scheduled.
+ func execDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) {
+     ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
+     workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
+ }
+```
+
+<!-- But when a parent workflow returns, by default Temporal will terminate any of its child workflows that are still running. We can change this behavior by setting a parent close policy when starting the child workflow. -->
+
+---
+
+## Workflows: Disconnected Child Workflows (continued)
+
+```diff
+ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
+     // ...
+     sel.Select(ctx)
+     if err != nil {
+         if e := workflowhelpers.AwaitActivity(ctx, CancelShipment, cancelRequest); e != nil {
+             log.Warn("failed to cancel shipment", "error", e)
+         }
+         execDisconnectedChildWorkflow(ctx, RefundPayment, refundRequest)
+         return nil, err
+     }
+     return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
+ }
+
+ func execDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) {
+     ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
++    ctx, _ = workflow.NewDisconnectedContext(ctx)
+     workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
+ }
+```
+
+<!-- It is also possible that at this point the Purchase workflow has been canceled. Even with a custom parent close policy, attempting to start the refund workflow would fail in this case. So we also need to be explicit that the child workflow should be started with a disconnected context that is unaffected by cancelation. -->
+
+---
+
+## Workflows: Disconnected Child Workflows (continued)
+
+```diff
+ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse, error) {
+     // ...
+     sel.Select(ctx)
+     if err != nil {
+         if e := workflowhelpers.AwaitActivity(ctx, CancelShipment, cancelRequest); e != nil {
+             log.Warn("failed to cancel shipment", "error", e)
+         }
+         execDisconnectedChildWorkflow(ctx, RefundPayment, refundRequest)
+         return nil, err
+     }
+     return &PurchaseResponse{TrackingID: shipmentResponse.TrackingID}, nil
+ }
+
  func execDisconnectedChildWorkflow(ctx workflow.Context, childWorkflow any, args ...any) {
      ctx = workflow.WithParentClosePolicy(ctx, enums.PARENT_CLOSE_POLICY_ABANDON)
      ctx, _ = workflow.NewDisconnectedContext(ctx)
-     fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
-     if err := fut.GetChildWorkflowExecution().Get(ctx, nil); err != nil { panic(err) }
+-    workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
++    fut := workflow.ExecuteChildWorkflow(ctx, childWorkflow, args...)
++    if err := fut.GetChildWorkflowExecution().Get(ctx, nil); err != nil { panic(err) }
  }
 ```
+
+<!-- And the last issue here is especially subtle: if we only "start" the child workflow and immediately return, it may not actually be started. So before returning we also need to get the child workflow execution future to ensure it was created by Temporal. -->
 
 ---
 

@@ -302,7 +302,7 @@ _CARBON_PARAMS = {
     "bg": "rgba(171,184,195,0)",
     "t": "vscode",
     "wt": "none",
-    "width": "1180",
+    "width": "1200",
     "ds": "false",
     "dsyoff": "20px",
     "dsblur": "68px",
