@@ -24,7 +24,6 @@ What we'll cover
 - Workflows: Runtime limitations, determinism, change versioning
 - Recommendations to simplify working with Temporal day to day
 
-Follow Along:
 ![Scan to follow along at jacob.work/100TM](../.assets/100TM_QR.png)
 [Follow along: jacob.work/100TM](https://jacob.work/100TM)
 

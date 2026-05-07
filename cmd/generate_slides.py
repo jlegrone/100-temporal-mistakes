@@ -281,6 +281,13 @@ def parse_slides_md(path: Path) -> tuple[PresentationMeta, list[Slide]]:
             continue
         slides.append(_parse_slide_block(block))
 
+    # Resolve image paths relative to the markdown file's directory.
+    base_dir = path.resolve().parent
+    for s in slides:
+        for img in s.images:
+            if not Path(img.path).is_absolute():
+                img.path = str((base_dir / img.path).resolve())
+
     return meta, slides
 
 
