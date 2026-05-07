@@ -3,7 +3,7 @@
 A collection of common mistakes made when using [Temporal](https://temporal.io) and how to avoid them. This is a work in progress!
 
 ## Workflow Limits
-- [Overflowing workflow history length](src/overflowing-workflow-history-size.md)
+- [Overflowing workflow history length](src/overflowing-workflow-history-length.md)
 - [Overflowing workflow history bytes](src/overflowing-workflow-history-bytes.md)
 - [Overflowing maximum individual payload size](src/overflowing-maximum-individual-payload-size.md)
 - [Shard contention due to concurrent updates](src/workflow-lock-contention-due-to-concurrent-updates.md)
@@ -12,97 +12,120 @@ A collection of common mistakes made when using [Temporal](https://temporal.io) 
     - Concurrent child workflows
 	- Frequent signals, updates, queries
 	- [Naive batch processing implementations](src/naive-batch-processing-implementation.md)
-- Exceeding 10s task timeout
+- [Exceeding 10s task timeout](src/exceeding-10s-task-timeout.md)
+
+### Solutions
+- External payloads
+- ContinueAsNew
+- Fan Out pattern
+- Monitor history length, payload size, etc (customer interceptor and codec for metrics?)
 
 ## Workflow Replay
-- Not using workflow versioning/patching
-- Incorrect workflow patching (wrong version numbers, removing branch before it's safe)
-- Thinking that replay means re-running activities
-- Performing network calls in workflow code
-- Using system time instead of workflow time
-- Reading environment variables in workflow code
-- Modifying shared state in workflow code
-- Performing expensive computation in workflow code
-- Passing too much information from activities to workflow code
-- Lossy payload serialization/deserialization
-- Breaking changes to payloads
-- Not using the return value in a side effect
-- Not using the Temporal SDK for logging, metrics, tracing
-- Not using workflow replay for debugging
-- Not using static analysis / sandboxed SDK
-- Modifying workflow history in interceptors or shared libraries
+- [Not using workflow versioning/patching](src/not_using_workflow_versioning/)
+- [Incorrect workflow patching (wrong version numbers, removing branch before it's safe)](src/incorrect-workflow-patching.md)
+	- Removing a version branch before it's safe
+	- Using the wrong version numbers
+- [Thinking that replay means re-running activities](src/thinking-replay-means-rerunning-activities.md)
+- [Performing network calls in workflow code](src/performing_network_calls_in_workflow_code/)
+- [Using system time instead of workflow time](src/using_system_time_instead_of_workflow_time/)
+- [Reading environment variables in workflow code](src/reading_environment_variables_in_workflow_code/)
+- [Modifying shared state in workflow code](src/modifying_shared_state_in_workflow_code/)
+- [Performing expensive computation in workflow code](src/performing_expensive_computation_in_workflow_code/)
+- [Passing too much information from activities to workflow code](src/passing_too_much_information_from_activities/)
+- [Lossy payload serialization/deserialization](src/lossy-payload-serialization.md)
+- [Breaking changes to payloads](src/breaking-changes-to-payloads.md)
+- [Not using the return value in a side effect](src/not_using_return_value_in_side_effect/)
+- [Not using the Temporal SDK for logging, metrics, tracing](src/not_using_temporal_sdk_for_observability/)
+- [Not using workflow replay for debugging](src/not_using_workflow_replay_for_debugging/)
+- [Not using static analysis / sandboxed SDK](src/not-using-static-analysis-sandboxed-sdk.md)
+- [Modifying workflow history in interceptors or shared libraries](src/modifying-workflow-history-in-interceptors.md)
+
+### Solutions
+- Worker versioning + pinned workflows
+- Static analysis
+- SDK sandboxes
+- Replay testing
+- Run with very small sticky cache size in dev?
 
 ## Timeouts and Retries
-- Assuming workflow timeouts allow graceful cleanup (treated like termination, not cancellation)
-- Preventing activity retries
+- [Assuming workflow timeouts allow graceful cleanup (treated like termination, not cancellation)](src/assuming_workflow_timeouts_allow_graceful_cleanup/)
+- [Preventing activity retries](src/preventing-activity-retries.md)
 	- Not setting activity heartbeat timeout
 	- Not setting start to close activity timeout
 	- Setting start to close and schedule to close timeout to same value
-- Using workflow retries
-- Setting too-short workflow or activity timeouts (keep long enough to survive downstream failures)
-- Not setting a workflow timeout (they'll run for 10 years!)
+- [Using workflow retries](src/using-workflow-retries.md)
+- [Setting too-short workflow or activity timeouts (keep long enough to survive downstream failures)](src/setting-too-short-timeouts.md)
+- [Not setting a workflow timeout (they'll run for 10 years!)](src/not-setting-a-workflow-timeout.md)
+- Retrying after receiving a downstream error that should not be retried (add interceptor example)
+- Retrying too quickly/frequently in the event of downstream resource overload errors (also include interceptor example)
+- Too short StartToClose timeout (never allows longer tasks to complete even though they are actively running)
+
+### Solutions
+- Timeout and retry policy lint/simulator
+- Enforcement via interceptor (hard error in dev, warn in prod)
+  - Also prevent max_attempts=1
+- Decide retryability from the activity!
 
 ## Cancellation
-- Assuming activity cancellation means workflow cancellation
-- Not using ParentClosePolicy when graceful cleanup on cancellation is needed in child workflows
-- Deadlocking when workflow cancelled (handle cancel signal)
-- Not using a disconnected context to perform cleanup or other deferred child workflows/activities after workflow cancelled
-- [Not sending heartbeats from activities you want to handle cancellation](src/not-sending-heartbeats-from-activities-you-want-to-handle-cancellation.md)
+- [Assuming activity cancellation means workflow cancellation](src/assuming_activity_cancelation_means_workflow_cancelation/)
+- [Not using ParentClosePolicy when graceful cleanup on cancellation is needed in child workflows](src/not_using_parent_close_policy/)
+- [Deadlocking when workflow canceled (handle cancel signal)](src/deadlocking_when_workflow_canceled/)
+- [Not using a disconnected context to perform cleanup or other deferred child workflows/activities after workflow canceled](src/not_using_disconnected_context_for_cleanup/)
+- [Not sending heartbeats from activities you want to handle cancellation](src/not_sending_heartbeats_for_cancellation/)
+
+### Solutions
+- Heartbeat from (almost) all activities
+- Let workflows orchestrate cleanup/compensation on cancel
+- Test workflow cancelation based on timing of the cancel signal
 
 ## Software Design
-- Not making activities idempotent (at least once execution semantic, even with max attempts == 1)
-- Not leveraging workflow input/response payloads (not all workflow engines support these!)
-- Using more than one input/response payload (only supported in Go, Java SDKs?)
-- Doing too many things in one workflow (scale out rather than scale up) (shard contention)
-- Over-using activities (do more in one activity without checkpointing)
-- Unnecessary usage of workflows (maybe you don't need the durability for a CRUD API)?
-- Not using activity heartbeat details
-- Not using ContinueAsNew (limit your maximum code age!)
-- Not draining signals before completing workflow
-- Depending on `ListWorkflow` API outside of debugging/operational use cases
-- Doing work outside of workflow (eg. before starting, or before sending a signal) -- move into the workflow for more durability
-- Wrapping a queue with a workflow (unless you have a good reason!)
-- Unnecessary child workflows
-- Custom task orchestration frameworks/abstractions (you should probably use an existing declarative workflow engine if Temporal's programming model doesn't suit your needs)
-- Returning both a payload and an error value
-- Using local activities
+- [Not making activities idempotent (at least once execution semantic, even with max attempts == 1)](src/not-making-activities-idempotent.md)
+- [Not leveraging workflow input/response payloads (not all workflow engines support these!)](src/not_leveraging_workflow_input_response_payloads/)
+- [Using more than one input/response payload (only supported in Go, Java SDKs?)](src/using_more_than_one_input_response_payload/)
+- [Doing too many things in one workflow (scale out rather than scale up) (shard contention)](src/doing-too-many-things-in-one-workflow.md)
+- [Over-using activities (do more in one activity without checkpointing)](src/over-using-activities.md) <!-- TODO: consider the wording for this title, it's ok if the activity is idempotent and not expensive to retry. There's another entry about combining multiple activities into one that should be crosslinked or combined with this one. -->
+- [Unnecessary usage of workflows (maybe you don't need the durability for a CRUD API)?](src/unnecessary-usage-of-workflows.md)
+- [Not using activity heartbeat details](src/not_using_activity_heartbeat_details/)
+- [Not using ContinueAsNew (limit your maximum code age!)](src/not_using_continue_as_new/)
+- [Not draining signals before completing workflow](src/not_draining_signals_before_completing_workflow/)
+- [Depending on `ListWorkflow` API outside of debugging/operational use cases](src/depending-on-list-workflow-api.md)
+- [Doing work outside of workflow (eg. before starting, or before sending a signal) -- move into the workflow for more durability](src/doing_work_outside_of_the_workflow/)
+- [Wrapping a queue with a workflow (unless you have a good reason!)](src/wrapping_a_queue_with_a_workflow/)
+- [Unnecessary child workflows](src/unnecessary-child-workflows.md)
+- [Custom task orchestration frameworks/abstractions (you should probably use an existing declarative workflow engine if Temporal's programming model doesn't suit your needs)](src/custom-task-orchestration-frameworks.md)
+- [Returning both a payload and an error value](src/returning_both_payload_and_error/)
+- [Using local activities](src/using_local_activities/)
 	- Don't exceed 10s task timeout
-- Polling workflow results
+- [Polling workflow results](src/polling_workflow_results/)
 	- Just use child workflows, or the SDK client from outside a worker!
-- Starting workflows from activities
-- Assuming signals/updates will be received in a specific order
-- Not properly scoping semantic workflow IDs
-- Not waiting for child workflows to start before exiting when using disconnected context
-- Writing polling loops in workflow code
+- [Starting workflows from activities](src/starting_workflows_from_activities/)
+- [Assuming signals/updates will be received in a specific order](src/assuming_signal_update_order/)
+- [Not properly scoping semantic workflow IDs](src/not-properly-scoping-semantic-workflow-ids.md)
+- [Not waiting for child workflows to start before exiting when using disconnected context](src/not_waiting_for_child_workflows_to_start/)
+- [Writing polling loops in workflow code](src/writing_polling_loops_in_workflow_code/)
     - [Use an activity, or (rarely) a child workflow + ContinueAsNew](https://community.temporal.io/t/long-polling-inside-workflows-or-activities/11348/2)
-- Querying closed workflows
-- Storing sensitive data in workflow history
-- Fallible local activities
+- [Querying closed workflows](src/querying-closed-workflows.md)
+- [Storing sensitive data in workflow history](src/storing_sensitive_data_in_workflow_history/)
+- [Fallible local activities](src/fallible_local_activities/)
     - https://youtu.be/b2AnXkqCwgw?feature=shared&t=429
+- Using a primitive type rather than an object for workflow/activity/signal/update payloads
 
 ## Testing
 
 ## Operations
-- Terminating rather than canceling
-- Not monitoring STSL
-- Not monitoring sync match rate
-- Not enabling autotuning (still preview feature though)
-- Not knowing about `workflow reset`
-- Not knowing about batch operations API
-- Underutilizing namespaces
-- Not draining activity tasks before graceful worker shutdown
-- Downloading workflow history from UI with "DecodePayloads" option enabled
-- Not validating replay safety before worker deployments
-- Not setting up TLS
-- Not enabling ringpop TLS
-- Not setting up persistence rate limits
-- Not setting up namespaces rate limits
+- [Terminating rather than canceling](src/terminating-rather-than-canceling.md)
+- [Not monitoring STSL](src/not-monitoring-stsl.md)
+- [Not monitoring sync match rate](src/not-monitoring-sync-match-rate.md)
+- [Not enabling autotuning (still preview feature though)](src/not_enabling_autotuning/)
+<!-- TODO: The "not knowing" phrasing is awkward -->
+- [Not knowing about `workflow reset`](src/not-knowing-about-workflow-reset.md)
+- [Not knowing about batch operations API](src/not-knowing-about-batch-operations-api.md)
+- [Not draining activity tasks before graceful worker shutdown](src/not_draining_activity_tasks_before_shutdown/)
+- [Downloading workflow history from UI with "DecodePayloads" option enabled](src/downloading-history-with-decode-payloads.md)
+- [Not validating replay safety before worker deployments](src/not_validating_replay_safety_before_deployments/)
 
 ## Other
-- Starting workflows on the wrong task queue
-- Not understanding why you're using Temporal
-- Not investing in a Temporal platform team (?)
-- Using the Temporal UI use cases other than debugging (eg. as the main interface for end users)
+- [Starting workflows on the wrong task queue](src/starting-workflows-on-wrong-task-queue.md)
 
 ---
 

@@ -1,0 +1,6 @@
+node_modules/
+printout.pdf
+*.pptx
+.slide_images
+__pycache__
+.DS_Store

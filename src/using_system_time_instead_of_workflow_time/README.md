@@ -1,0 +1,72 @@
+# Using System Time Instead of Workflow Time
+
+<!-- TODO: Update the wording to not be Go SDK specific. -->
+> [!TIP]
+> `time.Now()` returns different values on [replay](terms/replay.md), breaking determinism. Use `workflow.Now()` for the current time and `workflow.Sleep()` for delays -- both are deterministic and durable.
+
+Using the system clock directly in workflow code is a common determinism violation. `time.Now()` in Go (or `Date.now()` in TypeScript, `datetime.now()` in Python) returns the current wall-clock time, which differs every time the code executes. Since workflow code re-executes during replay, this causes the workflow to potentially make different decisions.
+
+<!-- TODO: Update example to a time based ContinueAsNew loop (if >24h since wf started, continue as new). -->
+<!--SNIPSTART using-system-time-bad-->
+[using_system_time_instead_of_workflow_time/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_system_time_instead_of_workflow_time/workflow.go)
+```go
+
+// BAD: system time in workflow code
+func MyWorkflowV1Time(ctx workflow.Context) error {
+	now := time.Now() // Different on replay!
+	if now.Hour() < 12 {
+		// Morning logic
+	}
+	return nil
+}
+
+```
+<!--SNIPEND-->
+
+<!--SNIPSTART using-system-time-good-->
+[using_system_time_instead_of_workflow_time/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_system_time_instead_of_workflow_time/workflow.go)
+```go
+
+// GOOD: workflow time
+func MyWorkflowV2Time(ctx workflow.Context) error {
+	now := workflow.Now(ctx) // Same value on replay
+	if now.Hour() < 12 {
+		// Morning logic -- deterministic
+	}
+	return nil
+}
+
+```
+<!--SNIPEND-->
+
+<!--SNIPSTART using-system-time-sleep-bad-->
+[using_system_time_instead_of_workflow_time/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_system_time_instead_of_workflow_time/workflow.go)
+```go
+
+// BAD: language-native sleep
+func MyWorkflowV1Sleep(ctx workflow.Context) error {
+	time.Sleep(10 * time.Minute)
+	return nil
+}
+
+```
+<!--SNIPEND-->
+
+<!--SNIPSTART using-system-time-sleep-good-->
+[using_system_time_instead_of_workflow_time/workflow.go](https://github.com/jlegrone/100-temporal-mistakes/blob/main/using_system_time_instead_of_workflow_time/workflow.go)
+```go
+
+// GOOD: durable timer
+func MyWorkflowV2Sleep(ctx workflow.Context) error {
+	if err := workflow.Sleep(ctx, 10*time.Minute); err != nil {
+		return err
+	}
+	return nil
+}
+
+```
+<!--SNIPEND-->
+
+Temporal timers (`workflow.Sleep`, `workflow.NewTimer`) are both deterministic and durable: they survive worker restarts and produce the same behavior on replay. In the TypeScript SDK, `Date.now()` and `setTimeout` are automatically patched inside workflow code.
+
+<!-- TODO: Are sandboxes opt-in for any SDKs? Is it possible to misconfigure/disable them? Document/warn if so. -->

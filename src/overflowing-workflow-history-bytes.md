@@ -1,25 +1,12 @@
-# Overflowing Maximum Workflow History Bytes
+# Overflowing Workflow History Bytes
 
 > [!TIP]
-> - Workflows histories record many events during the execution of a workflow including all the inputs and outputs of activities and child workflows, signals payloads, ...
-> - Workflow history size (in terms of bytes utilization) are capped at 50MB by default. When that limit is crossed, workflows are terminated without giving a chance to cleanup after themselves.
+> Temporal enforces a maximum history size in bytes (50MB by default), separate from the [event count limit](overflowing-workflow-history-length.md). Large activity results, signal payloads, and workflow inputs are the most common contributors to hitting this limit. Workflows that hit this limit are automatically terminated.
 
-## What?
-Alongside the [number of events a workflow history can hold](overflowing-workflow-history-size.md), a second limit can easily be reached, the individual history bytes size.
+Temporal enforces a hard limit on the total byte size of a workflow's history (50MB by default, configurable via [dynamic configuration](terms/dynamic-config.md)). When exceeded, the server [terminates](terms/terminate.md) the workflow with no chance for cleanup. A workflow can hit this limit well before 50k events if individual events carry large [payloads](terms/payload.md) -- tens of activity completions with megabyte-sized results are enough.
 
-Every input and output of workflows, child workflows and activities are being serialized (using a [data converter](<terms/data-converter.md>) and stored in the [temporal server backend](<terms/temporal-server-backend.md>) inside a workflow history. Signals payloads are also recorded in the workflow history. Other history events (timers, workflow tasks, ...) also need a couple of bytes of storage ultimately.
+<!-- TODO: Add techniques to monitor history size. Link to history size custom search attribute, and check if there's already an out of the box metric coming from the worker SDK or temporal cloud. If not, create an example interceptor that records a metric before the workflow completes. -->
+<!-- TODO: Is workflow_history_size_bytes a real metric and is it available from both cloud and self-hosted temporal server? -->
+To stay within limits, monitor workflow history size (TODO: add explanation for how to do this). For long-running workflows that accumulate results, use [ContinueAsNew](terms/continue-as-new.md) to start a fresh history, resetting both the event count and history size. Monitor the `workflow_history_size_bytes` metric and set alerts well below the configured limit. If larger payloads are genuinely required for use in workflow code, an [external storage codec](https://docs.temporal.io/external-storage) can offload them to external storage at the serialization layer.
 
-While [each individual payload for an activity or workflow input / output are capped](overflowing-maximum-individual-payload-size.md), this doesn't prevent total history bytes size to grow big when you sum the size of all events an history contains.
-
-By default, maximum history size is set to 50MB. If an history grow larger, the server will immediately [terminate](terminate.md) the workflow without giving it a chance to perform any cleanup operation.
-
-Temporal servers will also log warning when it sees an history crossing the warning size limit which is by default set to 10MB. The limit can be tweaked via the `limit.historySize.warning` server [dynamic-config](dynamic-config.md).
-## Why?
-Temporal data model relies heavily on [replay](terms/replay.md) which is not a free operation as it involves downloading workflow histories over the network and re-running workflow code many times during the life of a workflow, especially when in memory caches are not hot. So large histories take more time to replay than small ones. 10ms additional replay delay may compound quickly when you run millions of workflows and you have to replay all of them at once.
-## Solutions
-To workaround the issue, it is recommended to:
-1. Trim down your inputs and outputs to the minimum first
-2. Store the payloads in an external system (a database, blob storage, disk if you use [sessions](terms/sessions.md) , …) and pass references (IDs, links, …) to as inputs, outputs or signal payload.
-3. Fan out work on multiple smaller workflows as each will have their own limit
-4. Look at the [large payload codec](<terms/large-payload-codec.md>) (which offloads activities and workflows inputs / outputs to blob storage automatically).
-5. Tweak the `limit.historySize.error` server [dynamic-config](dynamic-config.md).
+See also: [Overflowing workflow history length](overflowing-workflow-history-length.md), [Passing too much information from activities](passing_too_much_information_from_activities/), [Overflowing maximum individual payload size](overflowing-maximum-individual-payload-size.md).

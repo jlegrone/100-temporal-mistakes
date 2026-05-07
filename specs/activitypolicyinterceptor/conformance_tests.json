@@ -1,0 +1,590 @@
+{
+  "$schema_version": "2.0",
+  "spec_document": "README.md",
+  "description": "Conformance tests for the Activity Policy Interceptor specification. Each test specifies an interceptor configuration, a scenario (either scheduling an activity from a workflow or executing an activity), and the expected outcome. Implementations in any host SDK should be able to translate each test into a runnable case using their SDK's test harness.",
+  "conventions": {
+    "duration_unit": "seconds (integer or fractional)",
+    "unset_field": "null",
+    "config_defaults": "Configuration options not listed in a test's interceptor_config use the defaults from README.md (Severities map fully Error, AutoHeartbeat=true, RequiredRetries=2, Logger=null).",
+    "severities_map_default": "All four policy identifiers default to Error: schedule_to_close_required, max_attempts_too_low, local_activity_start_to_close_too_long, timeouts_permit_retries.",
+    "scenario_types": {
+      "schedule_activity": "Workflow attempts to schedule an activity with the given options. Test harness inspects whether the call was forwarded, mutated, or violated.",
+      "execute_activity": "Activity runs for the given duration on the worker with the interceptor active. Test harness inspects observable side effects (heartbeats, returns, etc.)."
+    },
+    "expected_outcome_values": {
+      "violation": "The interceptor blocked the scheduling call and surfaced an ApplicationFailure. The `application_failure` field describes the expected shape per README.md requirements 27-30.",
+      "forwarded": "The interceptor allowed the scheduling call to proceed unchanged and emitted no violation log.",
+      "forwarded_with_mutation": "The interceptor modified the activity options before forwarding (e.g., applied a default heartbeat). The `mutated_options` field lists expected post-mutation values.",
+      "warn_logged_and_forwarded": "The interceptor emitted a warning log entry and forwarded the call unchanged. The `logged_policies` field names the expected policy identifiers in the log entries.",
+      "execution_succeeded": "The activity ran to completion. Additional fields describe observable side effects."
+    },
+    "application_failure_shape": {
+      "type": "Must equal \"PolicyViolationError\".",
+      "non_retryable": "Must equal true.",
+      "details_payload_policies": "First entry of `details` array contains a payload whose `policies` field equals this array (in canonical order)."
+    }
+  },
+  "tests": [
+    {
+      "id": "TC-ScheduleToClose-Error",
+      "spec_requirement": 8,
+      "name": "Missing schedule-to-close timeout fails when severity is Error (default)",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": null,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["schedule_to_close_required"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-ScheduleToClose-Warn",
+      "spec_requirement": 8,
+      "name": "Missing schedule-to-close timeout logs warning when severity is Warn",
+      "interceptor_config": {
+        "Severities": {
+          "schedule_to_close_required": "Warn"
+        }
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": null,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "warn_logged_and_forwarded",
+        "logged_policies": ["schedule_to_close_required"],
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-ScheduleToClose-Ignore",
+      "spec_requirement": 8,
+      "name": "Missing schedule-to-close timeout is silently allowed when severity is Ignore",
+      "interceptor_config": {
+        "Severities": {
+          "schedule_to_close_required": "Ignore"
+        }
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": null,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-DefaultHeartbeat-Applied",
+      "spec_requirement": 9,
+      "name": "Heartbeat timeout defaulted to 30s when neither heartbeat nor start-to-close is set",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 3600,
+          "start_to_close_seconds": null,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded_with_mutation",
+        "mutated_options": {
+          "heartbeat_seconds": 30
+        },
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-DefaultHeartbeat-NotApplied",
+      "spec_requirement": 10,
+      "name": "Heartbeat default is not applied when start-to-close is already set",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 3600,
+          "start_to_close_seconds": 60,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "mutated_options": {
+          "heartbeat_seconds": null
+        },
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-DefaultHeartbeat-LocalActivityNotApplied",
+      "spec_requirement": 11,
+      "name": "Heartbeat default is not applied to local activities",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "local",
+        "activity_options": {
+          "schedule_to_close_seconds": 30,
+          "start_to_close_seconds": 5,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "mutated_options": {
+          "heartbeat_seconds": null
+        },
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-MaxAttempts-Two-Violation",
+      "spec_requirement": 12,
+      "name": "max_attempts=2 violates the max_attempts policy",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 3600,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": {
+            "maximum_attempts": 2
+          }
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["max_attempts_too_low"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-MaxAttempts-Three-Allowed",
+      "spec_requirement": 13,
+      "name": "max_attempts=3 is allowed (>= 3 boundary)",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 3600,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": {
+            "maximum_attempts": 3
+          }
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-MaxAttempts-Zero-Allowed",
+      "spec_requirement": 13,
+      "name": "max_attempts=0 (unlimited) is allowed",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 3600,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": {
+            "maximum_attempts": 0
+          }
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-NoHeartbeat-Violation",
+      "spec_requirement": 16,
+      "name": "no-heartbeat schedule_to_close=60s, start_to_close=30s violates: 2*30 + 1 + 2 = 63 > 60",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 60,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["timeouts_permit_retries"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-Heartbeat-Allowed",
+      "spec_requirement": 16,
+      "name": "heartbeat=10s with default retry policy: 2*10 + 1 + 2 = 23s <= schedule_to_close=60s is allowed",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 60,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": 10,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-NoHeartbeat-Allowed",
+      "spec_requirement": 16,
+      "name": "no-heartbeat schedule_to_close=70s, start_to_close=30s allowed: 2*30 + 1 + 2 = 63 <= 70",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 70,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-Heartbeat-RetryIntervalTooLong-Violation",
+      "spec_requirement": 16,
+      "name": "heartbeat=10s, initial_interval=5s, schedule_to_close=11s: 2*10 + 5 + 10 = 35 > 11 violates even though heartbeat is set",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 11,
+          "start_to_close_seconds": 11,
+          "heartbeat_seconds": 10,
+          "retry_policy": {
+            "initial_interval_seconds": 5,
+            "backoff_coefficient": 2.0
+          }
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["timeouts_permit_retries"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-MaxIntervalCaps-Allowed",
+      "spec_requirement": 16,
+      "name": "maximum_interval clips per-attempt backoff: heartbeat=5s, initial=1s, backoff=10, max_interval=2s -> 2*5 + 1 + 2 = 13 <= 30",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 30,
+          "start_to_close_seconds": 10,
+          "heartbeat_seconds": 5,
+          "retry_policy": {
+            "initial_interval_seconds": 1,
+            "backoff_coefficient": 10.0,
+            "maximum_interval_seconds": 2
+          }
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-RequiredRetries-Zero-Skipped",
+      "spec_requirement": 16,
+      "name": "RequiredRetries=0 skips the policy entirely; otherwise-failing config is forwarded",
+      "interceptor_config": {
+        "RequiredRetries": 0
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 60,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-RequiredRetries-One-Allowed",
+      "spec_requirement": 16,
+      "name": "RequiredRetries=1: schedule_to_close=60s allows N=1 (1*30 + 1 = 31 <= 60) where N=2 would not (63 > 60)",
+      "interceptor_config": {
+        "RequiredRetries": 1
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 60,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-TimeoutsPermitRetries-RequiredRetries-Three-Violation",
+      "spec_requirement": 16,
+      "name": "RequiredRetries=3: previously-allowed 70s/30s/no-heartbeat now violates (3*30 + 1 + 2 + 4 = 97 > 70)",
+      "interceptor_config": {
+        "RequiredRetries": 3
+      },
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 70,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["timeouts_permit_retries"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-LocalActivity-StartToClose-Violation",
+      "spec_requirement": 19,
+      "name": "Local activity start-to-close >= 10 seconds fails",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "local",
+        "activity_options": {
+          "schedule_to_close_seconds": 200,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": ["local_activity_start_to_close_too_long"]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-MultipleViolations",
+      "spec_requirement": 21,
+      "name": "Multi-policy violation lists identifiers in canonical order in details payload",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": null,
+          "start_to_close_seconds": 30,
+          "heartbeat_seconds": null,
+          "retry_policy": {
+            "maximum_attempts": 2
+          }
+        }
+      },
+      "expected": {
+        "outcome": "violation",
+        "application_failure": {
+          "type": "PolicyViolationError",
+          "non_retryable": true,
+          "details_payload_policies": [
+            "schedule_to_close_required",
+            "max_attempts_too_low"
+          ]
+        },
+        "activity_scheduled_on_worker": false
+      }
+    },
+    {
+      "id": "TC-AutoHeartbeat-DefaultOn",
+      "spec_requirement": 23,
+      "name": "AutoHeartbeat is enabled by default and records heartbeats",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "execute_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 600,
+          "start_to_close_seconds": null,
+          "heartbeat_seconds": 60,
+          "retry_policy": null
+        },
+        "activity_runtime": {
+          "duration_seconds": 90,
+          "manual_heartbeats": 0
+        }
+      },
+      "expected": {
+        "outcome": "execution_succeeded",
+        "min_heartbeats_observed": 1
+      }
+    },
+    {
+      "id": "TC-AutoHeartbeat-Disabled",
+      "spec_requirement": 25,
+      "name": "AutoHeartbeat=false suppresses interceptor-emitted heartbeats",
+      "interceptor_config": {
+        "AutoHeartbeat": false
+      },
+      "scenario": {
+        "type": "execute_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 600,
+          "start_to_close_seconds": null,
+          "heartbeat_seconds": 60,
+          "retry_policy": null
+        },
+        "activity_runtime": {
+          "duration_seconds": 90,
+          "manual_heartbeats": 0
+        }
+      },
+      "expected": {
+        "outcome": "execution_succeeded",
+        "min_heartbeats_observed": 0,
+        "max_heartbeats_observed": 0
+      }
+    },
+    {
+      "id": "TC-Happy-Regular",
+      "spec_requirement": 8,
+      "name": "Valid regular-activity options are forwarded unchanged",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "regular",
+        "activity_options": {
+          "schedule_to_close_seconds": 3600,
+          "start_to_close_seconds": null,
+          "heartbeat_seconds": 30,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    },
+    {
+      "id": "TC-Happy-Local",
+      "spec_requirement": 19,
+      "name": "Valid local-activity options are forwarded unchanged",
+      "interceptor_config": {},
+      "scenario": {
+        "type": "schedule_activity",
+        "activity_kind": "local",
+        "activity_options": {
+          "schedule_to_close_seconds": 30,
+          "start_to_close_seconds": 5,
+          "heartbeat_seconds": null,
+          "retry_policy": null
+        }
+      },
+      "expected": {
+        "outcome": "forwarded",
+        "violation_log_emitted": false,
+        "activity_scheduled_on_worker": true
+      }
+    }
+  ]
+}
