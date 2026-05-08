@@ -7,8 +7,31 @@ Content from presentation at Replay Conference in San Francisco May 7th 2026.
 - Workflows: Runtime limitations, determinism, change versioning
 - Recommendations to simplify working with Temporal day to day
 
-![Scan to follow along at jacob.work/100TM](../.assets/100TM_QR.png)
-[Follow along: jacob.work/100TM](https://jacob.work/100TM)
+## Table of Contents
+
+- [Part One: Activities](#part-one-activities)
+  - [Temporal's shared responsibility model for activities](#temporals-shared-responsibility-model-for-activities)
+  - [Handling Downstream Service Errors](#activities-handling-downstream-service-errors)
+  - [Avoid Amplifying Invalid Requests](#activities-avoid-amplifying-invalid-requests)
+  - [Avoid Overloading Services With Retries](#activities-avoid-overloading-services-with-retries)
+  - [Weathering System Outages](#activities-weathering-system-outages)
+  - [Implementing Idempotency](#activities-implementing-idempotency)
+    - [Idempotency Keys](#activities-idempotency-keys)
+    - [Natural Idempotency](#activities-natural-idempotency)
+  - [Handling Worker Disruptions](#activities-handling-worker-disruptions)
+  - [A Grand Unified Theory](#activities-a-grand-unified-theory)
+- [Part Two: Workflows](#part-two-workflows)
+  - [Living Within Server Limits](#workflows-living-within-server-limits)
+  - [Keeping Code Deterministic](#workflows-keeping-code-deterministic)
+  - [Versioning Code Changes](#workflows-versioning-code-changes)
+    - [Evaluate Change Versions Up Front](#workflows-evaluate-change-versions-up-front)
+    - [Verifying Replay Safety](#workflows-verifying-replay-safety)
+    - [Cleaning Up Change Versions](#workflows-cleaning-up-change-versions)
+  - [Disconnected Child Workflows](#workflows-disconnected-child-workflows)
+  - [Use Timers, Not Timeouts](#workflows-use-timers-not-timeouts)
+  - [Cap Workflow Lifetime With ContinueAsNew](#workflows-cap-workflow-lifetime-with-continueasnew)
+  - [Design Guidelines](#workflows-design-guidelines)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
