@@ -461,9 +461,9 @@ func AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*AwaitJobResp
 ```
 
 > [!NOTE]
-> But in this case, splitting responsibilities across two separate activities is probably an even cleaner approach, because now we can set independent timeouts and retry policies for each step of creating the job, and then waiting for it to complete. We also automatically get more visibility into what's going on in the workflow history.
+> But in this case, splitting responsibilities across two separate activities is probably an even better approach, because now we can set independent timeouts and retry policies for each step of a) creating the job, and b) waiting for it to complete. We also automatically get more visibility into what's going on in the workflow history.
 >
-> Note that there is still an already exists check in the new `StartKubernetesJob` activity. Even though it may not be likely, a network partition or a poorly timed worker crash could still mean that the activity is retried even after the Create API call succeeds. But reducing the scope of what the activity does still makes reasoning about idempotency a bit simpler.
+> Note that there is still an already exists check in the new `StartKubernetesJob` activity. Even though it may not be likely, **a network partition or a poorly timed worker crash could still mean that the activity is retried even after the Create API call succeeds**. But reducing the scope of what the activity does still makes reasoning about idempotency a bit simpler.
 
 ---
 
@@ -487,9 +487,9 @@ func RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse,
 ```
 
 > [!NOTE]
-> In the workflow that invokes our activities to create and wait for completion of the Kubernetes job, again we need to choose some timeout values. Here we went with a 1 hour StartToClose and ScheduleToClose timeout because we wanted to allow the Kubernetes job to run for up to an hour, and the activity itself shouldn't be timed out as long as it's still polling the job status in that for loop.
+> In the workflow that invokes our activities to create and wait for completion of the Kubernetes job, again we need to choose some timeout values. Here we started out with a 1 hour StartToClose and ScheduleToClose timeout because we wanted to allow the Kubernetes job to run for up to an hour, and the activity itself shouldn't be timed out as long as it's still polling the job status in that for loop.
 >
-> The only problem here is that if the worker crashes or terminates unexpectedly, then it will never report a final result or error for the activity. And since the ScheduleToClose timeout is the same duration as StartToClose timeout, Temporal won't retry the activity on our behalf either.
+> The only problem here is that **if the worker crashes or terminates unexpectedly, then it will never report a final result or error for the activity**. And since the ScheduleToClose timeout is the same duration as StartToClose timeout, **Temporal won't retry the activity on our behalf** either.
 >
 > We could decrease the StartToClose timeout to allow the activity to be retried if the worker fails. But that forces a tradeoff between how quickly Temporal retries after a worker failure and how often we are doing unnecessary retries (which in some cases, could mean repeating expensive work).
 
@@ -517,13 +517,13 @@ func RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse,
 ```
 
 > [!NOTE]
-> The more elegant solution is to swap out the StartToClose timeout for a Heartbeat timeout.
+> A more elegant solution is to swap out the StartToClose timeout for a Heartbeat timeout.
 >
 > This allows our activity to run for as long as it needs to, up to the ScheduleToClose timeout, without being stopped and retried, as long as it keeps reporting back to the Temporal server via heartbeat messages. If the worker fails to send heartbeats, then Temporal will retry the activity.
 >
-> When choosing a value for Heartbeat or StartToClose timeout, the question to answer is how long you can wait for the activity's retry policy to kick in if the worker fails. My default is to use 30s, because that's about how long I reasonably want to be stuck staring at a workflow in the Temporal UI waiting to see if the activity is still in progress or the worker has become unresponsive.
+> When choosing a value for Heartbeat or StartToClose timeout, the question to answer is **how long you want to wait for the activity's retry policy to kick in if the worker fails**. A good starting point is 30 seconds, but you may want to go higher in order to reduce the cost of heartbeats for long-running activities.
 >
-> Note that sending heartbeats is also the only way for the activity to detect that it was canceled. Heartbeats are therefore required for any activity that needs to be stopped or that should perform some cleanup logic if it is explicitly canceled by the workflow or the workflow completes before the activity.
+> Note that **sending heartbeats is also the only way for the activity to detect that it was canceled**. Heartbeats are therefore required for any activity that needs to be stopped or that should perform some cleanup logic if it is explicitly canceled by the workflow or the workflow completes before the activity.
 
 ---
 
