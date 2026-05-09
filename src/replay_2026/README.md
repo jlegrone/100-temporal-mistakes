@@ -93,7 +93,7 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 > [!NOTE]
 > We'll start out with an example activity that's responsible for charging a customer through a payments API.
 >
-> And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of failure conditions that _shouldn't_ result in the activity being retried.
+> And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of **failure conditions that _shouldn't_ result in the activity being retried**.
 
 ---
 
@@ -116,7 +116,7 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 ```
 
 > [!NOTE]
-> One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Since retrying won't change the shape of the request being sent, we should probably update our activity to translate this into a non-retryable error so that the activity fails fast.
+> One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Since retrying won't change the shape of the request being sent, we should probably update our activity to **translate this into a non-retryable error** so that the activity fails fast.
 
 ---
 
@@ -146,7 +146,7 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 ```
 
 > [!NOTE]
-> It's also possible that there is a problem with the downstream API service provider or we are approaching a rate limit. In that case an error might be retryable, but we should increase our backoff time before the next retry to avoid making the problem worse.
+> It's also possible that there is a problem with the downstream API service provider or we are approaching a rate limit. In that case an error might be retryable, but we should **increase our backoff time** before the next retry to avoid making the problem worse.
 >
 > So now our activity checks for the TooManyRequests HTTP status and calculates a next retry delay based on the `Retry-After` HTTP response header if it has been set. Otherwise we can just increase the next retry delay be a factor of 2.
 
@@ -211,7 +211,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 > [!NOTE]
 > In this case, let's say we want to be able to recover after outages lasting up to about an hour.
 >
-> We can allow this by updating the ScheduleToClose timeout to an hour, which means there's a much larger window for incidents to be resolved through activity retries without the workflow ever straying from its happy path. And because we're categorizing the errors returned from the activity function as retryable vs. not, we also don't need to worry so much about the tradeoff between failing fast and having more time for system recovery.
+> We can allow this by updating the ScheduleToClose timeout to an hour, which means there's a much **larger window for incidents to be resolved through activity retries** without the workflow ever straying from its happy path. And because we're categorizing the errors returned from the activity function as retryable vs. not, we also don't need to worry so much about the tradeoff between failing fast and having more time for system recovery.
 >
 > So now we're ready to go, right?
 
@@ -239,7 +239,9 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 ```
 
 > [!NOTE]
-> Well, sort of. It turns out we were really thorough and also specified a retry policy. The problem here is that because we only allow a maximum of 3 attempts, in practice we exhaust our retries really quickly.
+> Almost!
+>
+> The last thing to double check is our retry policy. Right now it's configured to only allow a maximum of 3 attempts, which means that it's possible we will exhaust our retries really quickly.
 
 ---
 
@@ -252,7 +254,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 > [!NOTE]
 > Temporal provides a simulator to inspect the behavior of your timeout and retry policy configuration which is helpful since there's some math involved.
 >
-> If we plug in the policy from the previous slide, we can confirm that the activity could actually be marked as failed after only 6 seconds! Obviously this is way off our target of surviving outages up to 1 hour.
+> Plug in the policy from the previous slide, and we'll confirm that the activity could actually be marked as failed after only 6 seconds! This is way off our goal of surviving outages up to 1 hour.
 
 ---
 
@@ -280,7 +282,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 > [!NOTE]
 > Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our desired schedule to close timeout.
 >
-> But a simpler mental model is to skip setting maximum attempts at all, so that you automatically get as many retries as fit within your schedule to close timeout.
+> But a simpler mental model is to **skip setting maximum attempts** at all, so that you automatically get as many retries as fit within your schedule to close timeout.
 >
 > Note that if you need to you can still use retry policies to fine tune the initial and maximum retry intervals as needed such that you don't retry too frequently before the timeout is reached.
 >
@@ -306,7 +308,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 > [!NOTE]
 > So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
 >
-> Note that it is not always the case that you should avoid max attempts or that it is necessary to always have a long schedule to close timeout. But it is important to have a target in mind for how long your activity should be capable of retrying during a disruption, and to verify that your retry policy meets that goal.
+> Note that it is not always the case that you should avoid max attempts or that it is necessary to always have a long schedule to close timeout. But it is important to **have a target in mind for how long your activity should be capable of retrying during a disruption**, and to **verify that your retry policy meets that goal**.
 
 ---
 
@@ -317,7 +319,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 [wikipedia.org/wiki/Idempotence](https://en.wikipedia.org/wiki/Idempotence)
 
 > [!NOTE]
-> A term that gets thrown around a lot when talking about activities is idempotency. This just means that if you run an operation more than once with the same input, you should get the same result.
+> A term that gets thrown around a lot when talking about activities is idempotency. This just means that **if you run the activity more than once with the same input, you should get the same result**.
 >
 > It turns out this is a really important property for activities to have, because they're getting retried all the time. And we really don't want to do something like charging a customer 20 times for the same purchase just because there was a temporary system outage.
 
@@ -344,7 +346,7 @@ Common techniques to achieve idempotency:
 Caution: Don't rely on `MaxAttempts: 1` in retry policy!
 
 > [!NOTE]
-> Note that idempotent behavior is still required even if you set MaxAttempts to 1 in your retry policy. Temporal does not guarantee at most once execution for activities; this has to do with the way server replication and failover works.
+> Note that **idempotent behavior is still required** even if you set MaxAttempts to 1 in your retry policy. Temporal does not guarantee at most once execution for activities; this has to do with the way server replication and failover works.
 
 ---
 
@@ -365,16 +367,20 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 
 func getIdempotencyToken(ctx context.Context) string {
-	i := activity.GetInfo(ctx)
-	key := fmt.Sprintf("%s:%s:%s", i.WorkflowExecution.ID, i.WorkflowExecution.RunID, i.ActivityID)
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
+    i := activity.GetInfo(ctx)
+    key := fmt.Sprintf("%s:%s:%s",
+        i.WorkflowExecution.ID,
+        i.WorkflowExecution.RunID,
+        i.ActivityID,
+    )
+    return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
 ```
 
 > [!NOTE]
 > In our payment example from earlier, the activity is calling an API that supports the `Idempotency-Key` HTTP header.
 >
-> So here we can add a function to generate an opaque string based on the workflow ID and activity ID, which will be the same across every activity attempt, while still being unique in case the same workflow scheduled multiple payment activities.
+> So here we can add a function to **generate an opaque string based on the workflow run ID and activity ID**, which will be the same across every activity attempt while still being unique in case the same workflow scheduled multiple payment activities.
 >
 > And then we can just pass that along to the payments API!
 
@@ -386,9 +392,8 @@ func getIdempotencyToken(ctx context.Context) string {
 func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
     jobs := k8sClient.BatchV1().Jobs(req.Namespace)
     // Create the job
-    if _, err := jobs.Create(ctx, &batchv1.Job{
-        Name: req.Name,
-    }); err != nil {
+    _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
+    if err != nil {
         return nil, err
     }
 
@@ -396,7 +401,9 @@ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, 
     for {
         activity.RecordHeartbeat(ctx)
         j, err := jobs.Get(ctx, req.Name)
-        if err != nil { return nil, err }
+        if err != nil {
+            return nil, err
+        }
         if status := getJobStatus(j); status.IsTerminal() {
             return &RunJobResponse{Status: status}, nil
         }
@@ -408,7 +415,7 @@ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, 
 > [!NOTE]
 > In the real world, we also tend to have activities that perform multiple operations and interact with systems that don't have nice primitives for idempotency. Like in this new example, where our activity is responsible for creating a Kubernetes job, and then waiting for it to complete before reporting the final job status.
 >
-> The problem here is that if the activity fails or the worker is redeployed during the for loop, then on the next attempt the activity will fail at creating a job with the same name instead of skipping creation and getting the status of the existing job. No matter how many times the activity is retried, it would keep hitting that same error.
+> The problem here is that if the activity fails or the worker is redeployed during the polling loop, then on the next attempt the activity will fail at creating a job with the same name instead of skipping creation and getting the status of the existing job. **No matter how many times the activity is retried, it would keep hitting that same error**.
 
 ---
 
@@ -418,10 +425,9 @@ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, 
  func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, error) {
      jobs := k8sClient.BatchV1().Jobs(req.Namespace)
      // Create the job if it doesn't exist
-     if _, err := jobs.Create(ctx, &batchv1.Job{
-         Name: req.Name,
--    }); err != nil {
-+    }); err != nil && !apierrors.IsAlreadyExists(err) {
+     _, err := jobs.Create(ctx, &batchv1.Job{ /* ... */ })
+-    if err != nil {
++    if err != nil && !apierrors.IsAlreadyExists(err) {
          return nil, err
      }
  
@@ -430,7 +436,7 @@ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, 
 ```
 
 > [!NOTE]
-> The smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it if not.
+> The smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it or error out not.
 >
 > So it's possible to keep activities idempotent, even if they perform multiple operations.
 
