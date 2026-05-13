@@ -45,7 +45,6 @@ Activities must deal with:
 - Worker crashes & hangs
 - Temporal server disruptions
 
-> [!NOTE]
 > Activities have a lot of responsibility. They're the main window through which workflows are able to interact with the outside world. That means they also have to put up with all sorts of system disruptions that our workflow code can happily sleep through until it's time to be woken up again.
 
 ---
@@ -60,7 +59,6 @@ It's on us to:
 - Gracefully handle cancelation
 - Not amplify bad requests
 
-> [!NOTE]
 > The biggest way Temporal makes this easier for us is by retrying activities by default. Specifically Temporal gives us an "at least once" execution semantic for every activity.
 >
 > And that's really convenient, but Temporal can't automatically ensure that our activities don't have undefined behavior if you run them more than once, or that they detect and handle cancelation, or that when there's a downstream service outage our retry policies don't conjure up a storm of attempts that only make matters worse.
@@ -90,7 +88,6 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 ```
 
-> [!NOTE]
 > We'll start out with an example activity that's responsible for charging a customer through a payments API.
 >
 > And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of **failure conditions that _shouldn't_ result in the activity being retried**.
@@ -115,7 +112,6 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 ```
 
-> [!NOTE]
 > One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Since retrying won't change the shape of the request being sent, we should probably update our activity to **translate this into a non-retryable error** so that the activity fails fast.
 
 ---
@@ -145,7 +141,6 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 ```
 
-> [!NOTE]
 > It's also possible that there is a problem with the downstream API service provider or we are approaching a rate limit. In that case an error might be retryable, but we should **increase our backoff time** before the next retry to avoid making the problem worse.
 >
 > So now our activity checks for the TooManyRequests HTTP status and calculates a next retry delay based on the `Retry-After` HTTP response header if it has been set. Otherwise we can just increase the next retry delay be a factor of 2.
@@ -174,7 +169,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
-> [!NOTE]
 > If we switch contexts to the workflow code that is invoking our ChargePayment activity, we need to think about what timeouts and retry policy makes sense for what the activity does.
 >
 > In this case we've started with a 30 second Start To Close timeout because we're not doing any computation in the activity and we expect the payments API to respond fairly quickly.
@@ -208,7 +202,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> [!NOTE]
 > In this case, let's say we want to be able to recover after outages lasting up to about an hour.
 >
 > We can allow this by updating the ScheduleToClose timeout to an hour, which means there's a much **larger window for incidents to be resolved through activity retries** without the workflow ever straying from its happy path. And because we're categorizing the errors returned from the activity function as retryable vs. not, we also don't need to worry so much about the tradeoff between failing fast and having more time for system recovery.
@@ -238,7 +231,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
-> [!NOTE]
 > Almost!
 >
 > The last thing to double check is our retry policy. Right now it's configured to only allow a maximum of 3 attempts, which means that it's possible we will exhaust our retries really quickly.
@@ -251,7 +243,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 [docs.temporal.io/develop/activity-retry-simulator](https://docs.temporal.io/develop/activity-retry-simulator)
 
-> [!NOTE]
 > Temporal provides a simulator to inspect the behavior of your timeout and retry policy configuration which is helpful since there's some math involved.
 >
 > Plug in the policy from the previous slide, and we'll confirm that the activity could actually be marked as failed after only 6 seconds! This is way off our goal of surviving outages up to 1 hour.
@@ -279,7 +270,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
-> [!NOTE]
 > Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our desired schedule to close timeout.
 >
 > But a simpler mental model is to **skip setting maximum attempts** at all, so that you automatically get as many retries as fit within your schedule to close timeout.
@@ -305,7 +295,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
-> [!NOTE]
 > So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
 >
 > Note that it is not always the case that you should avoid max attempts or that it is necessary to always have a long schedule to close timeout. But it is important to **have a target in mind for how long your activity should be capable of retrying during a disruption**, and to **verify that your retry policy meets that goal**.
@@ -318,7 +307,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 [wikipedia.org/wiki/Idempotence](https://en.wikipedia.org/wiki/Idempotence)
 
-> [!NOTE]
 > A term that gets thrown around a lot when talking about activities is idempotency. This just means that **if you run the activity more than once with the same input, you should get the same result**.
 >
 > It turns out this is a really important property for activities to have, because they're getting retried all the time. And we really don't want to do something like charging a customer 20 times for the same purchase just because there was a temporary system outage.
@@ -336,7 +324,6 @@ Common techniques to achieve idempotency:
     - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
     - May help to decompose into multiple activities.
 
-> [!NOTE]
 > Implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
 
 ---
@@ -345,7 +332,6 @@ Common techniques to achieve idempotency:
 
 Caution: Don't rely on `MaxAttempts: 1` in retry policy!
 
-> [!NOTE]
 > Note that **idempotent behavior is still required** even if you set MaxAttempts to 1 in your retry policy. Temporal does not guarantee at most once execution for activities; this has to do with the way server replication and failover works.
 
 ---
@@ -377,7 +363,6 @@ func getIdempotencyToken(ctx context.Context) string {
 }
 ```
 
-> [!NOTE]
 > In our payment example from earlier, the activity is calling an API that supports the `Idempotency-Key` HTTP header.
 >
 > So here we can add a function to **generate an opaque string based on the workflow run ID and activity ID**, which will be the same across every activity attempt while still being unique in case the same workflow scheduled multiple payment activities.
@@ -412,7 +397,6 @@ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, 
 }
 ```
 
-> [!NOTE]
 > In the real world, we also tend to have activities that perform multiple operations and interact with systems that don't have nice primitives for idempotency. Like in this new example, where our activity is responsible for creating a Kubernetes job, and then waiting for it to complete before reporting the final job status.
 >
 > The problem here is that if the activity fails or the worker is redeployed during the polling loop, then on the next attempt the activity will fail at creating a job with the same name instead of skipping creation and getting the status of the existing job. **No matter how many times the activity is retried, it would keep hitting that same error**.
@@ -435,7 +419,6 @@ func RunKubernetesJob(ctx context.Context, req RunJobRequest) (*RunJobResponse, 
  }
 ```
 
-> [!NOTE]
 > The smallest fix is to add an already exists check to the job create step in the activity. I left it out here, but we'd probably also want to verify that the existing job spec matches our expected spec and replace it or error out not.
 >
 > So it's possible to keep activities idempotent, even if they perform multiple operations.
@@ -460,7 +443,6 @@ func AwaitKubernetesJob(ctx context.Context, req AwaitJobRequest) (*AwaitJobResp
 }
 ```
 
-> [!NOTE]
 > But in this case, splitting responsibilities across two separate activities is probably an even better approach, because now we can set independent timeouts and retry policies for each step of a) creating the job, and b) waiting for it to complete. We also automatically get more visibility into what's going on in the workflow history.
 >
 > Note that there is still an already exists check in the new `StartKubernetesJob` activity. Even though it may not be likely, **a network partition or a poorly timed worker crash could still mean that the activity is retried even after the Create API call succeeds**. But reducing the scope of what the activity does still makes reasoning about idempotency a bit simpler.
@@ -486,7 +468,6 @@ func RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse,
 }
 ```
 
-> [!NOTE]
 > In the workflow that invokes our activities to create and wait for completion of the Kubernetes job, again we need to choose some timeout values. Here we started out with a 1 hour StartToClose and ScheduleToClose timeout because we wanted to allow the Kubernetes job to run for up to an hour, and the activity itself shouldn't be timed out as long as it's still polling the job status in that for loop.
 >
 > The only problem here is that **if the worker crashes or terminates unexpectedly, then it will never report a final result or error for the activity**. And since the ScheduleToClose timeout is the same duration as StartToClose timeout, **Temporal won't retry the activity on our behalf** either.
@@ -516,7 +497,6 @@ func RunKubernetesJob(ctx workflow.Context, req RunJobRequest) (*RunJobResponse,
 }
 ```
 
-> [!NOTE]
 > A more elegant solution is to swap out the StartToClose timeout for a Heartbeat timeout.
 >
 > This allows our activity to run for as long as it needs to, up to the ScheduleToClose timeout, without being stopped and retried, as long as it keeps reporting back to the Temporal server via heartbeat messages. If the worker fails to send heartbeats, then Temporal will retry the activity.
@@ -552,7 +532,6 @@ Must also:
 - Stay deterministic across replays
 - Yield quickly to the workflow task event loop
 
-> [!NOTE]
 > Workflows definitely come with their own challenges. We're going to cover a few of these, including runtime limitations, determinism, and versioning code changes.
 
 ---
@@ -570,7 +549,6 @@ Mitigations:
 - Use **ContinueAsNew** to start a fresh execution with reset history. Check `GetContinueAsNewSuggested()` to know when the server is recommending it.
 - Avoid passing large payloads from activities to workflows, or use [external payload storage](https://docs.temporal.io/external-storage).
 
-> [!NOTE]
 > There are several dimensions in which workflows are constrained at runtime.
 >
 > The first is that individual payload sizes peristed in workflow history can't go past around 2MB. This is a limitation that is inherited from the Temporal gRPC API.
@@ -596,7 +574,6 @@ Common sources of non-determinism in workflow code:
 - Goroutines spawned outside `workflow.Go` -- the SDK doesn't record their scheduling, and they often race with the workflow function for shared state
 - Variable references from outside the workflow function scope
 
-> [!NOTE]
 > Another thing to be aware of is that workflow code must be deterministic. Temporal uses event sourcing under the hood to be able to recreate the state of workflows in your worker's memory on demand, so it's very important that workflow functions always produce the same state when replaying workflow histories.
 
 ---
@@ -608,7 +585,6 @@ Tools to catch non-determinism:
 - **Python**: [Workflow sandbox](https://docs.temporal.io/develop/python/python-sdk-sandbox) -- enabled by default; restricts imports and module access at runtime.
 - **TypeScript**: V8 isolate sandboxing is built-in -- workflow code runs in a separate V8 context with no Node.js APIs.
 
-> [!NOTE]
 > The Temporal team has done a great job making determinsm easier to implement by providing static analysis tools and by deeply integrating with language runtimes. I recommend checking out what tooling is available for your language, and be careful not to let a coding assistant run rampant adding exceptions to determinism rules just because it deems them pesky.
 
 ---
@@ -622,7 +598,6 @@ Change version lifecycle:
 2. Wait for workflows started on previous version of the worker to complete
 3. Remove the old behavior and the version check
 
-> [!NOTE]
 > Another really common challenge with workflows is shipping new versions of the code. Almost any new behavior added to an existing workflow function needs to be gated with a change version check -- this is called a patch in most SDKs.
 >
 > But beyond just making sure we use change versions when modifying workflows, we should also be cleaning up change versions in our codebase so that all of those logic branches don't accrue over time.
@@ -652,7 +627,6 @@ Change version lifecycle:
  }
 ```
 
-> [!NOTE]
 > So let's look at an example workflow code change. We're back in the PurchaseItem workflow, and the goal is to add some logic that executes a refund child workflow if the shipment isn't received on time.
 >
 > This is a well formed change version check, and deploying as-is would not cause immediate problems. But there are two subtle issues at play.
@@ -688,7 +662,6 @@ Change version lifecycle:
  }
 ```
 
-> [!NOTE]
 > The fix is simple, we just need to hoist the version check to the top of the workflow so every execution records the version as soon as it starts, even if the code branch it's used in is never evaluated.
 
 ---
@@ -719,7 +692,6 @@ Change version lifecycle:
  }
 ```
 
-> [!NOTE]
 > And if we ever need to make more updates to that area of the workflow in the future, then we can bump the change id's max version again and add another branch with our new logic.
 >
 > In our example the payment workflow now now cancels the in-flight shipment before issuing the refund so the package doesn't get shipped after the customer has been refunded.
@@ -746,7 +718,6 @@ temporal workflow show --workflow-id <ID> --output json \
   > testdata/purchase_item_history_<PATCH_VERSION>.json
 ```
 
-> [!NOTE]
 > Temporal provides a harness to replay any workflow history against your workflow function locally, without ever deploying a worker. So in order to verify a change is replay safe programatically, we just need to find a workflow history to test against.
 >
 > What I'm showing here is a quick way to find the earliest workflow execution that ran on the version of our code that didn't have the handle-shipment-delay change version, and a second command to find the earliest workflow that took the version 1 branch. The query is using the TemporalChangeVersion search attribute that is automatically registered when you evaluate a change version in a workflow.
@@ -771,7 +742,6 @@ func TestReplayWorkflowHistory(t *testing.T) {
 
 Find more techniques at [temporal.io/resources/on-demand/replay-safety-at-datadog](https://temporal.io/resources/on-demand/replay-safety-at-datadog)
 
-> [!NOTE]
 > And this is what that unit test might look like. We can run this locally or in CI, and if the new code's command sequence diverges from either workflow history, then the test fails and we can be alerted before shipping the new workflow code to production.
 >
 > I definitely recommend setting up a test harness for workflow replay, because it can also be a super powerful way to debug workflows locally when things go wrong.
@@ -801,7 +771,6 @@ QUERY+=" AND StartTime < '$CUTOFF'"
 temporal workflow count --query "$QUERY"
 ```
 
-> [!NOTE]
 > Now after we've deployed a workflow code change, it's time to wait for the old workflows to complete and then clean up the change version branches.
 >
 > To verify this is safe, we can run a query to check if there are still any workflows running that were started with an earlier change version.
@@ -834,7 +803,6 @@ temporal workflow count --query "$QUERY"
  }
 ```
 
-> [!NOTE]
 > After we've confirmed there are no workflows running with earlier change versions, we can clean up the old code branches.
 >
 > Note that it is HIGHLY recommended to do this in two phases; first bumping the min supported version to match the max version like we're doing here, and a later deployment to remove the change version entirely.
@@ -860,7 +828,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
-> [!NOTE]
 > An external fulfillment system signals the workflow once the shipment is processed. A Selector fans in that signal, a fulfilment deadline, and ctx cancelation; whichever fires sets err. On err, the workflow tries to refund via a child workflow.
 >
 > But this naive version uses the parent's (possibly canceled) ctx, the default ParentClosePolicy, and doesn't wait for the child to be scheduled before returning. Each of those is a bug we'll fix on the next slide.
@@ -896,7 +863,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> [!NOTE]
 > But when a parent workflow returns, by default Temporal will terminate any of its child workflows that are still running. We can change this behavior by setting a parent close policy when starting the child workflow.
 
 ---
@@ -924,7 +890,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> [!NOTE]
 > It is also possible that at this point the Purchase workflow has been canceled. Even with a custom parent close policy, attempting to start the refund workflow would fail in this case. So we also need to be explicit that the child workflow should be started with a disconnected context that is unaffected by cancelation.
 
 ---
@@ -954,7 +919,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> [!NOTE]
 > And the last issue here is especially subtle: if we only "start" the child workflow and immediately return, it may not actually be started. So before returning we also need to get the child workflow execution future to ensure it was created by Temporal. This is a Go SDK specific issue.
 
 ---
@@ -982,7 +946,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> [!NOTE]
 > In any workflow that needs to perform compensating actions, like our purchase example that refunds customers when shipment fails, it is also important to ensure that the workflow timeout set by the client when starting the workflow cannot elapse before the compensating action has been executed.
 >
 > When a workflow execution times out, the result is functionally the same as workflow termination. If you need a chance to perform compensating actions, create a deadline from inside the workflow using a timer and verify that the timer will fire before the actual workflow run timeout is reached.
@@ -1014,7 +977,6 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> [!NOTE]
 > Another way timers can be handy is when dealing with long-running workflows. I think of it as a general best practice to implement ContinueAsNew for any workflow which may run for longer than 24 hours, and to trigger ContinueAsNew proactively based on a timer even if no other state transitions are happening in the workflow. If you deploy once per day, then following this advice means you can safely add, deprecate, and remove any change version within one week.
 >
 > And as an added bonus, if you onboard to worker versioning then time based continue as new will also ensure that old worker versions do not need to remain active for longer than one day.
