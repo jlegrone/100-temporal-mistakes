@@ -45,6 +45,7 @@ Activities must deal with:
 - Worker crashes & hangs
 - Temporal server disruptions
 
+> [!TIP]
 > Activities have a lot of responsibility. They're the main window through which workflows are able to interact with the outside world. That means they also have to put up with all sorts of system disruptions that our workflow code can happily sleep through until it's time to be woken up again.
 
 ---
@@ -304,7 +305,8 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 ## Activities: Implementing Idempotency
 
-> Idempotence is the property of certain operations in mathematics and computer science whereby they can be applied multiple times without changing the result beyond the initial application.
+> [!TIP]
+> "Idempotence is the property of certain operations in mathematics and computer science whereby they can be applied multiple times without changing the result beyond the initial application."
 
 [wikipedia.org/wiki/Idempotence](https://en.wikipedia.org/wiki/Idempotence)
 
