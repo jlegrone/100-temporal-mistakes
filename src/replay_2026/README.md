@@ -169,7 +169,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
-> If we switch contexts to the workflow code that is invoking our ChargePayment activity, we need to think about what timeouts and retry policy makes sense for what the activity does.
+> Switching contexts to the workflow code that is invoking our ChargePayment activity, now we need to think about what timeouts and retry policy makes sense for what the activity does.
 >
 > In this case we've started with a 30 second Start To Close timeout because we're not doing any computation in the activity and we expect the payments API to respond fairly quickly.
 >
@@ -202,7 +202,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
-> In this case, let's say we want to be able to recover after outages lasting up to about an hour.
+> Let's say we want to be able to recover after outages lasting up to about an hour.
 >
 > We can allow this by updating the ScheduleToClose timeout to an hour, which means there's a much **larger window for incidents to be resolved through activity retries** without the workflow ever straying from its happy path. And because we're categorizing the errors returned from the activity function as retryable vs. not, we also don't need to worry so much about the tradeoff between failing fast and having more time for system recovery.
 >
@@ -245,7 +245,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 > Temporal provides a simulator to inspect the behavior of your timeout and retry policy configuration which is helpful since there's some math involved.
 >
-> Plug in the policy from the previous slide, and we'll confirm that the activity could actually be marked as failed after only 6 seconds! This is way off our goal of surviving outages up to 1 hour.
+> By plugging in the policy from the previous slide, we can confirm that the activity may actually be marked as failed after only 6 seconds! This is way off our goal of surviving outages up to 1 hour.
 
 ---
 
@@ -272,9 +272,9 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 > Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our desired schedule to close timeout.
 >
-> But a simpler mental model is to **skip setting maximum attempts** at all, so that you automatically get as many retries as fit within your schedule to close timeout.
+> But a simpler mental model is to **skip setting maximum attempts** at all, so that you automatically get as many retries as fit within the schedule to close timeout.
 >
-> Note that if you need to you can still use retry policies to fine tune the initial and maximum retry intervals as needed such that you don't retry too frequently before the timeout is reached.
+> Note that you can still use retry policies to fine tune the initial and maximum retry intervals as needed such that the activity doesn't retry too frequently before the timeout is reached.
 >
 > But for these additional properties of retry policies, Temporal already sets pretty good defaults for most use cases. And those are what we're looking at here: by default, the first retry happens 1 second after the first activity failure, and the interval doubles from there until it caps off at 100 seconds between each attempt.
 
@@ -296,8 +296,9 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 ```
 
 > So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
->
-> Note that it is not always the case that you should avoid max attempts or that it is necessary to always have a long schedule to close timeout. But it is important to **have a target in mind for how long your activity should be capable of retrying during a disruption**, and to **verify that your retry policy meets that goal**.
+
+> [!NOTE]
+> It is not always the case that you should avoid max attempts or that it is necessary to always have a long schedule to close timeout. But it is important to **have a target in mind for how long your activity should be capable of retrying during a disruption**, and to **verify that your retry policy meets that goal**.
 
 ---
 
