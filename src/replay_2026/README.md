@@ -315,11 +315,11 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 ## Activities: Implementing Idempotency
 
-> [!TIP]
 > "Idempotence is the property of certain operations in mathematics and computer science whereby they can be applied multiple times without changing the result beyond the initial application."
 
 [wikipedia.org/wiki/Idempotence](https://en.wikipedia.org/wiki/Idempotence)
 
+> [!TIP]
 > A term that gets thrown around a lot when talking about activities is idempotency. This just means that **if you run the activity more than once with the same input, you should get the same result**.
 >
 > It turns out this is a really important property for activities to have, because they're getting retried all the time. And we really don't want to do something like charging a customer 20 times for the same purchase just because there was a temporary system outage.
@@ -337,6 +337,7 @@ Common techniques to achieve idempotency:
     - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
     - May help to decompose into multiple activities.
 
+>> [!TIP]
 > Implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
 
 ---
