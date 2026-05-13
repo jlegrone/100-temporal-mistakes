@@ -90,7 +90,7 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > We'll start out with an example activity that's responsible for charging a customer through a payments API.
 >
 > And you can see there are already a few places where we might return an error. So one of the first things we need to consider is whether there are types of **failure conditions that _shouldn't_ result in the activity being retried**.
@@ -115,7 +115,7 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > One of those conditions would be if the payments API responds with a "Bad Request" HTTP status code. Since retrying won't change the shape of the request being sent, we should probably update our activity to **translate this into a non-retryable error** so that the activity fails fast.
 
 ---
@@ -145,7 +145,7 @@ func ChargePayment(ctx context.Context, req ChargeRequest) (*ChargeResponse, err
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > It's also possible that there is a problem with the downstream API service provider or we are approaching a rate limit. In that case an error might be retryable, but we should **increase our backoff time** before the next retry to avoid making the problem worse.
 >
 > So now our activity checks for the TooManyRequests HTTP status and calculates a next retry delay based on the `Retry-After` HTTP response header if it has been set. Otherwise we can just increase the next retry delay be a factor of 2.
@@ -174,7 +174,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > Switching contexts to the workflow code that is invoking our ChargePayment activity, now we need to think about what timeouts and retry policy makes sense for what the activity does.
 >
 > In this case we've started with a 30 second Start To Close timeout because we're not doing any computation in the activity and we expect the payments API to respond fairly quickly.
@@ -208,7 +208,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
  }
 ```
 
->> [!TIP]
+> [!TIP]
 > Let's say we want to be able to recover after outages lasting up to about an hour.
 >
 > We can allow this by updating the ScheduleToClose timeout to an hour, which means there's a much **larger window for incidents to be resolved through activity retries** without the workflow ever straying from its happy path. And because we're categorizing the errors returned from the activity function as retryable vs. not, we also don't need to worry so much about the tradeoff between failing fast and having more time for system recovery.
@@ -238,7 +238,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > Almost!
 >
 > The last thing to double check is our retry policy. Right now it's configured to only allow a maximum of 3 attempts, which means that it's possible we will exhaust our retries really quickly.
@@ -251,7 +251,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 
 [docs.temporal.io/develop/activity-retry-simulator](https://docs.temporal.io/develop/activity-retry-simulator)
 
->> [!TIP]
+> [!TIP]
 > Temporal provides a simulator to inspect the behavior of your timeout and retry policy configuration which is helpful since there's some math involved.
 >
 > By plugging in the policy from the previous slide, we can confirm that the activity may actually be marked as failed after only 6 seconds! This is way off our goal of surviving outages up to 1 hour.
@@ -279,7 +279,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > Of course we could increase the max attempts in our retry policy, and go back to the simulator to make sure there are enough attempts to reach our desired schedule to close timeout.
 >
 > But a simpler mental model is to **skip setting maximum attempts** at all, so that you automatically get as many retries as fit within the schedule to close timeout.
@@ -305,7 +305,7 @@ func PurchaseItem(ctx workflow.Context, req PurchaseRequest) (*PurchaseResponse,
 }
 ```
 
->> [!TIP]
+> [!TIP]
 > So the last tweak we'll make to the activity options is simply to remove the retry policy, and use the Temporal default of unlimited attempts and exponential backoff.
 
 > [!NOTE]
@@ -337,7 +337,7 @@ Common techniques to achieve idempotency:
     - Design side effects as state settings (Set to X) rather than increments (+1), or use upserts with fixed IDs.
     - May help to decompose into multiple activities.
 
->> [!TIP]
+> [!TIP]
 > Implementing and testing for idempotency is still not a solved problem. But there are some common techniques, and if you're lucky your activities are interacting with external services which themselves are designed for idempotency.
 
 ---
